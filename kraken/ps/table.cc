@@ -1,36 +1,46 @@
 #include "ps/table.h"
 
+#include "common/error_code.h"
 #include "common/exception.h"
 
 namespace kraken {
 
-Table::Table(Optim* optim, uint64_t id, const std::string& name)
-    : optim_(optim), id_(id), name_(name) {
+Table::Table(TableType type, Optim* optim, uint64_t id, const std::string& name)
+    : type_(type), optim_(optim), id_(id), name_(name) {
 }
 
-uint64_t Table::Id() const {
+TableType Table::type() const {
+  return type_;
+}
+
+uint64_t Table::id() const {
   return id_;
 }
 
-const std::string Table::Name() const {
+const std::string Table::name() const {
   return name_;
 }
 
-bool Table::Push(const Tensor& grad, float lr) {
-  RUNTIME_ERROR("The subclass must implement Push function.")
+int32_t Table::Push(const Tensor& grad, float lr) {
+  return ErrorCode::kUnImplementError;
 }
 
-bool Table::Pull(Tensor* var) {
-  RUNTIME_ERROR("The subclass must implement Pull function.")
+int32_t Table::Pull(Tensor* var) {
+  return ErrorCode::kUnImplementError;
 }
 
-bool Table::Push(const std::vector<IndepVector>& grads, float lr) {
-  RUNTIME_ERROR("The subclass must implement Push function.")
+int32_t Table::PushPull(const Tensor& grad, float lr, Tensor* val) {
+  return ErrorCode::kUnImplementError;
 }
 
-bool Table::Pull(const std::vector<int64_t>& indices,
-                 std::vector<Tensor>* vars) {
-  RUNTIME_ERROR("The subclass must implement Pull function.")
+int32_t Table::Push(const std::vector<int64_t>& indices,
+                    const std::vector<Tensor>& grads, float lr) {
+  return ErrorCode::kUnImplementError;
+}
+
+int32_t Table::Pull(const std::vector<int64_t>& indices,
+                    std::vector<Tensor>* vals) {
+  return ErrorCode::kUnImplementError;
 }
 
 }  // namespace kraken

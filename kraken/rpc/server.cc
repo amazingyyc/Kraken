@@ -7,7 +7,7 @@
 
 namespace kraken {
 
-Server::Server(uint16_t port, uint32_t thread_nums)
+Server::Server(uint32_t port, uint32_t thread_nums)
     : port_(port), thread_nums_(thread_nums), started_(false), stop_(false) {
 }
 
@@ -125,7 +125,7 @@ void Server::WorkerRun(void* zmp_context) {
   ZMQ_CALL(zmq_close(receiver));
 }
 
-void Server::start() {
+void Server::Start() {
   zmq_context_ = zmq_init(1);
   ARGUMENT_CHECK(zmq_context_ != nullptr, "zmq_init return nullptr, error:"
                                               << zmq_strerror(zmq_errno()));
@@ -160,7 +160,7 @@ void Server::start() {
   ZMQ_CALL(zmq_device(ZMQ_QUEUE, zmq_clients_, zmq_workers_));
 }
 
-void Server::stop() {
+void Server::Stop() {
   stop_.store(true);
 
   for (auto& t : workers_) {

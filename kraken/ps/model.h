@@ -4,7 +4,7 @@
 #include <shared_mutex>
 #include <unordered_map>
 
-#include "ps/optim.h"
+#include "ps/optim/optim.h"
 #include "ps/table.h"
 
 namespace kraken {
@@ -19,13 +19,9 @@ private:
   uint64_t id_;
   std::string name_;
 
-  std::unique_ptr<Optim> optim_;
-
   std::shared_mutex mu_;
 
-  uint64_t table_id_gen_;
-
-  std::unordered_map<std::string, uint64_t> table_name_id_;
+  std::unique_ptr<Optim> optim_;
   std::unordered_map<uint64_t, std::unique_ptr<Table>> tables_;
 
 public:
@@ -33,31 +29,31 @@ public:
 
   ~Model() = default;
 
-  /**
-   * \brief Register a dense table in this model.
-   *
-   * \param name The table name, must be unique.
-   * \param shape The table shape.
-   * \param etype The table's element type.
-   * \param table_id Store the table id when success.
-   * \return true Register success.
-   * \return false Register fail, like the name has been register but has different shape or element type.
-   */
-  bool RegisterDenseTable(const std::string& name, const Shape& shape,
-                          ElementType etype, uint64_t* table_id);
+public:
+  uint16_t Id() const;
 
-  /**
-   * \brief Register a sparse table.
-   *
-   * \param name The table name.
-   * \param dimension The SparseTable dimension.
-   * \param etype The Table tensor's element type.
-   * \param table_id Store the table id.
-   * \return true Reigster success.
-   * \return false Register fail like already register a same name SparseTable but has different dimension or element type.
-   */
-  bool RegisterSparseTable(const std::string& name, int64_t dimension,
-                           ElementType etype, uint64_t* table_id);
+  const std::string& Name() const;
+
+  int32_t RegisterDenseTable(uint64_t id, const std::string& name,
+                             const Tensor& var);
+
+  int32_t RegisterSparseTable(uint64_t id, const std::string& name,
+                              int64_t dimension, ElementType etype);
+
+  int32_t PushDenseTable(uint64_t table_id, const Tensor& grad, float lr);
+
+  int32_t PullDenseTable(uint64_t table_id, Tensor* val);
+
+  int32_t PushPullDenseTable(uint64_t table_id, const Tensor& grad, float lr,
+                             Tensor* val);
+
+  int32_t PushSparseTable(uint64_t table_id,
+                          const std::vector<int64_t>& indices,
+                          const std::vector<Tensor>& grads, float lr);
+
+  int32_t PullSparseTable(uint64_t table_id,
+                          const std::vector<int64_t>& indices,
+                          std::vector<Tensor>* vars);
 };
 
 }  // namespace kraken

@@ -7,8 +7,7 @@
 namespace kraken {
 
 /**
- * \brief For now only has CPU type.
- *
+ * \brief For now only CPU type.
  */
 enum class DeviceType : uint8_t {
   kCPU = 0,
@@ -47,7 +46,7 @@ private:
   std::unique_ptr<IAllocator> allocator_;
 
 private:
-  explicit Device(int16_t id, DeviceType type);
+  Device(int16_t id, DeviceType type);
 
 public:
   ~Device() = default;
@@ -65,7 +64,7 @@ public:
   void memcpy(void*, const void*, size_t);
 
 public:
-  static Device* default_device();
+  static Device* Shared();
 };
 
 }  // namespace kraken

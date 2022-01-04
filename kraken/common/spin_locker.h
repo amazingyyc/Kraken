@@ -20,9 +20,9 @@ public:
   ~SpinLocker() = default;
 
 public:
-  void lock();
+  void Lock();
 
-  void unlock();
+  void UnLock();
 };
 
 class SpinLockerHandler {

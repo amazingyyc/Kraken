@@ -4,14 +4,17 @@
 
 #include <atomic>
 #include <functional>
+#include <iostream>
 #include <mutex>
 #include <queue>
 #include <string>
 #include <thread>
 #include <unordered_map>
 
+#include "common/error_code.h"
 #include "common/exception.h"
 #include "common/mutable_buffer.h"
+#include "common/thread_barrier.h"
 #include "rpc/deserialize.h"
 #include "rpc/protocol.h"
 #include "rpc/serialize.h"
@@ -64,9 +67,31 @@ public:
   void Stop();
 
   template <typename ReqType, typename RspType>
-  int32_t CallAsync(uint32_t type, const ReqType& req,
-                    std::function<void(int32_t, const RspType&)>&& callback) {
+  int32_t Call(uint32_t type, const ReqType& req, RspType* rsp) {
+    ThreadBarrier barrier(1);
+
+    int32_t ecode;
+
+    auto callback = [&ecode, &barrier, rsp](int32_t rcode, RspType& rrsp) {
+      ecode = rcode;
+      *rsp = std::move(rrsp);
+
+      barrier.Release();
+    };
+
+    CallAsync<ReqType, RspType>(type, req, std::move(callback));
+
+    barrier.Wait();
+
+    return ecode;
+  }
+
+  template <typename ReqType, typename RspType>
+  void CallAsync(uint32_t type, const ReqType& req,
+                 std::function<void(int32_t, RspType&)>&& callback) {
     uint64_t timestamp = timestamp_.fetch_add(1);
+
+    RspType fake_rsp;
 
     RequestHeader req_header;
     req_header.timestamp = timestamp;
@@ -77,7 +102,8 @@ public:
 
     ARGUMENT_CHECK(serialize << req_header, "serialize request header error!");
     if ((serialize << req) == false) {
-      return ErrorCode::kSerializeRequestError;
+      callback(ErrorCode::kSerializeRequestError, fake_rsp);
+      return;
     }
 
     // create callback
@@ -108,8 +134,6 @@ public:
 
     // send to server.
     SendBuffer(std::move(buffer));
-
-    return ErrorCode::kSuccess;
   }
 };
 

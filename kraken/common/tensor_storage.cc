@@ -30,8 +30,8 @@ size_t TensorStorage::size() {
   return size_;
 }
 
-std::shared_ptr<TensorStorage> TensorStorage::create(size_t size) {
-  Device* device = Device::default_device();
+std::shared_ptr<TensorStorage> TensorStorage::Create(size_t size) {
+  Device* device = Device::Shared();
 
   void* ptr = device->malloc(size);
 
@@ -41,10 +41,11 @@ std::shared_ptr<TensorStorage> TensorStorage::create(size_t size) {
   return storage;
 }
 
-std::shared_ptr<TensorStorage> TensorStorage::create_from(void* ptr,
-                                                          size_t size) {
+std::shared_ptr<TensorStorage> TensorStorage::From(void* ptr, size_t size) {
+  Device* device = Device::Shared();
+
   std::shared_ptr<TensorStorage> storage(
-      new TensorStorage(nullptr, ptr, size, false));
+      new TensorStorage(device, ptr, size, false));
 
   return storage;
 }

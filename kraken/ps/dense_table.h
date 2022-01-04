@@ -5,6 +5,7 @@
 #include "common/element_type.h"
 #include "common/shape.h"
 #include "common/tensor.h"
+#include "ps/optim/optim.h"
 #include "ps/table.h"
 
 namespace kraken {
@@ -13,18 +14,21 @@ class DenseTable : public Table {
 private:
   std::shared_mutex mu_;
 
-  Tensor var_;
+  Tensor val_;
+  Bag bag_;
 
 public:
   DenseTable(Optim* optim, uint64_t id, const std::string& name,
-             const Shape& shape, ElementType etype);
+             const Tensor& val);
 
 public:
-  const Tensor& Var() const;
+  const Tensor& val() const;
 
-  bool Push(const Tensor& grad, float lr) override;
+  int32_t Push(const Tensor& grad, float lr) override;
 
-  bool Pull(Tensor* var) override;
+  int32_t Pull(Tensor* val) override;
+
+  int32_t PushPull(const Tensor& grad, float lr, Tensor* val) override;
 };
 
 }  // namespace kraken

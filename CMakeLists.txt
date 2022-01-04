@@ -11,6 +11,30 @@ project(kGraph LANGUAGES C CXX)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
+# try to find openmp
+find_package(OpenMP)
+
+if (OPENMP_FOUND)
+  set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+  set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+
+  # add a OpenMP flag
+  add_definitions(-DHAVE_OPENMP)
+else()
+  message(WARNING "Can not find OpenMP")
+endif()
+
+# get pytorch cmake path
+execute_process(COMMAND python3 -c "import torch;print(torch.utils.cmake_prefix_path, end='')"
+                OUTPUT_VARIABLE PYTORCH_CMAKE_PREFIX_PATH)
+message(STATUS "PYTORCH_CMAKE_PREFIX_PATH:${PYTORCH_CMAKE_PREFIX_PATH}")
+
+execute_process(COMMAND
+                python3 -c "import torch.utils.cpp_extension;print(torch.utils.cpp_extension.library_paths()[0], end='')"
+                OUTPUT_VARIABLE PYTORCH_LIBRARY_PREFIX_PATH)
+message(STATUS "PYTORCH_LIBRARY_PREFIX_PATH:${PYTORCH_LIBRARY_PREFIX_PATH}")
+
 # add fPIC flag
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
@@ -34,11 +58,19 @@ file(GLOB_RECURSE KRAKEN_HEAD_FILES "kraken/*.h")
 file(GLOB_RECURSE KRAKEN_SRC_FILES "kraken/*.cc")
 
 # test source file
-file(GLOB_RECURSE KRAKEN_TEST_FILES "kgraph/*_test.cc")
+file(GLOB_RECURSE KRAKEN_TEST_FILES "kraken/*_test.cc")
+
+# for pybind11 API file
+file(GLOB_RECURSE KRAKEN_PYBIND11_HEAD_FILES "kraken/pybind11/*.h")
+file(GLOB_RECURSE KRAKEN_PYBIND11_SRC_FILES "kraken/pybind11/*.cc")
 
 # remove test/main file
 list(FILTER KRAKEN_SRC_FILES EXCLUDE REGEX ".*_test.cc")
 list(FILTER KRAKEN_SRC_FILES EXCLUDE REGEX ".*_main.cc")
+
+# remove for pybind11 file
+list(REMOVE_ITEM KRAKEN_HEAD_FILES ${KRAKEN_PYBIND11_HEAD_FILES})
+list(REMOVE_ITEM KRAKEN_SRC_FILES ${KRAKEN_PYBIND11_SRC_FILES})
 
 ##############################################################################################################
 # include third_party cmake
@@ -46,20 +78,45 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
 
 # include(googletest)
 include(eigen)
+include(pybind11)
+include(gflags)
 
 set(BUILD_TESTS OFF CACHE BOOL "set libzmq BUILD_TESTS to be OFF")
 include(libzmq)
 
 #########################################################################################
-# create library
-add_library(kraken ${KRAKEN_HEAD_FILES} ${KRAKEN_SRC_FILES})
-target_link_libraries(kraken libzmq-static)
+# static library
+# add_library(kraken_base ${KRAKEN_HEAD_FILES} ${KRAKEN_SRC_FILES})
+# target_link_libraries(kraken_base libzmq-static)
 
 #########################################################################################
-# server_test executable
-add_executable(server_test kraken/executable/server_test_main.cc)
-target_link_libraries(server_test kraken)
+# dynamic library
+find_package(PythonLibs REQUIRED)
+find_package(Torch REQUIRED PATHS "${PYTORCH_CMAKE_PREFIX_PATH}/Torch")
 
-# client test executable
-add_executable(caller_test kraken/executable/caller_test_main.cc)
-target_link_libraries(caller_test kraken)
+message(STATUS "TORCH_LIBRARIES:${TORCH_LIBRARIES}")
+message(STATUS "KRAKEN_PYBIND11_SRC_FILES:${KRAKEN_PYBIND11_SRC_FILES}")
+
+add_library(kraken_native SHARED
+                    ${KRAKEN_HEAD_FILES}
+                    ${KRAKEN_SRC_FILES}
+                    ${KRAKEN_PYBIND11_HEAD_FILES}
+                    ${KRAKEN_PYBIND11_SRC_FILES})
+
+# remove lib prefix for kraken_native
+set_target_properties(kraken_native PROPERTIES PREFIX "")
+target_include_directories(kraken_native PUBLIC ${PYTHON_INCLUDE_DIRS})
+target_link_libraries(kraken_native
+                      libzmq-static
+                      pybind11_headers
+                      ${PYTHON_LIBRARIES}
+                      ${TORCH_LIBRARIES}
+                      ${PYTORCH_LIBRARY_PREFIX_PATH}/libtorch_python.so)
+
+#########################################################################################
+# kraken_server executable
+add_executable(kraken_server
+                kraken/executable/server_main.cc
+                ${KRAKEN_HEAD_FILES}
+                ${KRAKEN_SRC_FILES})
+target_link_libraries(kraken_server libzmq-static gflags)

@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "common/error_code.h"
 #include "common/exception.h"
 #include "common/log.h"
 #include "rpc/deserialize.h"
@@ -24,7 +25,7 @@ private:
   using FUNC =
       std::function<int32_t(const RequestHeader&, Deserialize&, Serialize*)>;
 
-  uint16_t port_;
+  uint32_t port_;
 
   uint32_t thread_nums_;
   std::vector<std::thread> workers_;
@@ -48,7 +49,7 @@ private:
   std::unordered_map<uint32_t, FUNC> funcs_;
 
 public:
-  Server(uint16_t port, uint32_t thread_nums);
+  Server(uint32_t port, uint32_t thread_nums);
 
   ~Server();
 
@@ -66,6 +67,7 @@ public:
    *
    * Every RPC func has a Request and Response, the server accept the request
    * and return the response.
+   *
    * \tparam RequestType The RPC request type.
    * \tparam ReplyType The RPC response type.
    * \param type Which function will be called, every RPC function has q unique id.
@@ -116,9 +118,9 @@ public:
     funcs_.emplace(type, std::move(func));
   }
 
-  void start();
+  void Start();
 
-  void stop();
+  void Stop();
 };
 
 }  // namespace kraken

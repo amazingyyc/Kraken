@@ -51,8 +51,10 @@ void Caller::Run(void* zmp_context, const std::string& addr, zmq_fd_t efd) {
   ARGUMENT_CHECK(zsocket != nullptr, "zmq_socket return nullptr, error:"
                                          << zmq_strerror(zmq_errno()));
 
+  std::string tcp_addr = "tcp://" + addr;
+
   // connect server.
-  ZMQ_CALL(zmq_connect(zsocket, addr.c_str()));
+  ZMQ_CALL(zmq_connect(zsocket, tcp_addr.c_str()));
 
   zmq_pollitem_t items[2];
 
@@ -153,11 +155,17 @@ void Caller::Start() {
 
   started_.store(true);
 
-  LOG_INFO("Caller start for addr:" << addr_);
+  LOG_INFO("Caller start for addr: " << addr_);
 }
 
 void Caller::Stop() {
   stop_.store(true);
+
+  // tell thread to stop.
+  uint64_t u = 1;
+  ARGUMENT_CHECK(
+      write(efd_, &u, sizeof(uint64_t)) == sizeof(uint64_t),
+      "write eventfd errno:" << errno << ", msg:" << strerror(errno));
 
   if (woker_.joinable()) {
     woker_.join();

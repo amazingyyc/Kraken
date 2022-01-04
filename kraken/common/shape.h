@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace kraken {
@@ -18,7 +19,7 @@ public:
   explicit Shape(std::vector<int64_t>&& dims);
 
 private:
-  void update_strides();
+  void UpdateStrides();
 
 public:
   const Shape& operator=(const Shape& other);
@@ -29,15 +30,19 @@ public:
 
   int64_t operator[](int64_t axis) const;
 
-  const std::vector<int64_t> dims() const;
+  const std::vector<int64_t>& dims() const;
 
-  int64_t ndims() const;
+  const std::vector<int64_t>& strides() const;
 
-  int64_t size() const;
+  int64_t NDims() const;
 
-  int64_t dim(int64_t axis) const;
+  int64_t Size() const;
 
-  int64_t stride(int64_t axis) const;
+  int64_t Dim(int64_t axis) const;
+
+  int64_t Stride(int64_t axis) const;
+
+  std::string Str() const;
 };
 
 }  // namespace kraken

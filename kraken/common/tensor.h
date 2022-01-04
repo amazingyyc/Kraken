@@ -25,40 +25,47 @@ private:
 public:
   Tensor() = default;
 
-  Tensor(std::shared_ptr<TensorStorage> storage, size_t offset,
-         const Shape& shape, ElementType element_type);
-
   ~Tensor() = default;
 
+private:
+  Tensor(std::shared_ptr<TensorStorage> storage, size_t offset,
+         const Shape& shape, ElementType etype);
+
 public:
+  size_t offset() const;
+
   const Shape& shape() const;
 
   ElementType element_type() const;
 
-  int64_t size() const;
+  int64_t Size() const;
 
-  int64_t num_bytes() const;
+  int64_t NumBytes() const;
 
-  int64_t dim(int64_t) const;
+  int64_t Dim(int64_t) const;
 
-  void* ptr();
-  void* ptr() const;
+  void* Ptr();
+  void* Ptr() const;
 
   template <typename T>
-  T* data() {
-    return (T*)ptr();
+  T* Data() {
+    return (T*)Ptr();
   }
 
   template <typename T>
-  T* data() const {
-    return (T*)ptr();
+  T* Data() const {
+    return (T*)Ptr();
   }
+
+  std::string Str() const;
 
 public:
-  static Tensor create(const std::vector<int64_t>& dims,
-                       ElementType element_type);
+  static Tensor Create(const std::vector<int64_t>& dims, ElementType etype);
 
-  static Tensor create(const Shape& shape, ElementType element_type);
+  static Tensor Create(const Shape& shape, ElementType etype);
+
+  static Tensor Create(std::shared_ptr<TensorStorage> storage, size_t offset,
+                       const Shape& shape, ElementType etype);
 
 public:
   Tensor operator+(const Tensor& other) const;
@@ -81,8 +88,36 @@ public:
   Tensor operator*=(float v);
   Tensor operator/=(float v);
 
+  Tensor Reshape(const Shape& nshape) const;
+  Tensor Reshape(const std::vector<int64_t>& dims) const;
+
+  // Zero current
+  Tensor Zero();
+
+  // normalize initialize
+  Tensor Norm(float lower, float upper);
+
+  // Fetch one vector from a tesnor. the tensor must be a matrix.
+  // Shape the same storage.
+  Tensor Vector(int64_t idx) const;
+
+  // Same shape/element type.
+  Tensor Like() const;
+
   // Clone this tensor.
-  Tensor clone() const;
+  Tensor Clone() const;
+
+  // Concat to matrix.
+  Tensor ConcatVec(const std::vector<Tensor>& vecs) const;
+
+  // x = x  ^ 2
+  Tensor Square(bool in_place=false);
+
+  // x = sqrt(x)
+  Tensor Sqrt(bool in_place=false);
+
+  // ret = max(this, other)
+  Tensor Max(const Tensor &other);
 };
 
 // operator override

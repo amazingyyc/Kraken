@@ -2,68 +2,50 @@
 
 #include <string>
 
-#include "ps/optim.h"
+#include "ps/optim/optim.h"
 
 namespace kraken {
 
 /**
- * \brief This is a pecial struct represent a Row in matrix.
+ * \brief The table type.
  */
-struct IndepVector {
-  int64_t indice;
-  Tensor val;
+enum TableType : uint8_t {
+  kDense = 0,
+  kSparse = 1,
 };
 
 class Table {
 protected:
-  /**
-   * \brief The optimizer.
-   */
+  TableType type_;
+
   Optim* optim_;
 
   uint64_t id_;
+
   std::string name_;
 
-  Table(Optim* optim, uint64_t id, const std::string& name);
+  Table(TableType type, Optim* optim, uint64_t id, const std::string& name);
 
 public:
   virtual ~Table() = default;
 
-  uint64_t Id() const;
+  TableType type() const;
 
-  const std::string Name() const;
+  uint64_t id() const;
 
-  /**
-   * \brief Push dense parameter for PS server.
-   *
-   * \param grad the parameter gradient.
-   * \param lr learning rate.
-   * \return true Update success.
-   * \return false Update fail: like has different shape.
-   */
-  virtual bool Push(const Tensor& grad, float lr);
+  const std::string name() const;
 
-  /**
-   * \brief Pull variable from this table.
-   *
-   * \param var store the table's variable, deep copy.
-   * \return true Copy success.
-   * \return false Fail.
-   */
-  virtual bool Pull(Tensor* var);
+  virtual int32_t Push(const Tensor& grad, float lr);
 
-  virtual bool Push(const std::vector<IndepVector>& grads, float lr);
+  virtual int32_t Pull(Tensor* val);
 
-  /**
-   * \brief Use for pull Sparse embedding.
-   *
-   * \param indices Which row will be pulled.
-   * \param vars Store the result.
-   * \return true Pull success.
-   * \return false Pull fail.
-   */
-  virtual bool Pull(const std::vector<int64_t>& indices,
-                    std::vector<Tensor>* vars);
+  virtual int32_t PushPull(const Tensor& grad, float lr, Tensor* val);
+
+  virtual int32_t Push(const std::vector<int64_t>& indices,
+                       const std::vector<Tensor>& grads, float lr);
+
+  virtual int32_t Pull(const std::vector<int64_t>& indices,
+                       std::vector<Tensor>* vals);
 };
 
 }  // namespace kraken

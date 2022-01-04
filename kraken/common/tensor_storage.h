@@ -33,8 +33,8 @@ public:
   size_t size();
 
 public:
-  static std::shared_ptr<TensorStorage> create(size_t size);
-  static std::shared_ptr<TensorStorage> create_from(void* ptr, size_t size);
+  static std::shared_ptr<TensorStorage> Create(size_t size);
+  static std::shared_ptr<TensorStorage> From(void* ptr, size_t size);
 };
 
 }  // namespace kraken

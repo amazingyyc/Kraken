@@ -8,7 +8,7 @@ namespace kraken {
 /**
  * \brief A unknow type.
  */
-class UnKnown {};
+struct UnKnown {};
 
 /**
  * \brief Use uint16_t represent a half.
@@ -39,7 +39,7 @@ enum class DType : uint8_t {
 struct ElementType {
   DType dtype;
 
-  std::string name() const {
+  std::string Name() const {
     switch (dtype) {
       case DType::kUnKnown:
         return "UnKnown";
@@ -72,7 +72,7 @@ struct ElementType {
     }
   }
 
-  size_t byte_width() const {
+  size_t ByteWidth() const {
     switch (dtype) {
       case DType::kUnKnown:
         return sizeof(UnKnown);
@@ -114,12 +114,12 @@ struct ElementType {
   }
 
   template <typename T>
-  bool is() const {
+  bool Is() const {
     return false;
   }
 
   template <typename T>
-  static ElementType from() {
+  static ElementType From() {
     ElementType etype;
     etype.dtype = DType::kUnKnown;
 
@@ -128,74 +128,74 @@ struct ElementType {
 };
 
 template <>
-inline bool ElementType::is<UnKnown>() const {
+inline bool ElementType::Is<UnKnown>() const {
   return dtype == DType::kUnKnown;
 }
 
 template <>
-inline bool ElementType::is<bool>() const {
+inline bool ElementType::Is<bool>() const {
   return dtype == DType::kBool;
 }
 
 template <>
-inline bool ElementType::is<uint8_t>() const {
+inline bool ElementType::Is<uint8_t>() const {
   return dtype == DType::kUint8;
 }
 
 template <>
-inline bool ElementType::is<int8_t>() const {
+inline bool ElementType::Is<int8_t>() const {
   return dtype == DType::kInt8;
 }
 
 template <>
-inline bool ElementType::is<uint16_t>() const {
+inline bool ElementType::Is<uint16_t>() const {
   return dtype == DType::kUint16;
 }
 
 template <>
-inline bool ElementType::is<int16_t>() const {
+inline bool ElementType::Is<int16_t>() const {
   return dtype == DType::kInt16;
 }
 
 template <>
-inline bool ElementType::is<uint32_t>() const {
+inline bool ElementType::Is<uint32_t>() const {
   return dtype == DType::kUint32;
 }
 
 template <>
-inline bool ElementType::is<int32_t>() const {
+inline bool ElementType::Is<int32_t>() const {
   return dtype == DType::kInt32;
 }
 
 template <>
-inline bool ElementType::is<uint64_t>() const {
+inline bool ElementType::Is<uint64_t>() const {
   return dtype == DType::kUint64;
 }
 
 template <>
-inline bool ElementType::is<int64_t>() const {
+inline bool ElementType::Is<int64_t>() const {
   return dtype == DType::kInt64;
 }
 
 template <>
-inline bool ElementType::is<half>() const {
+inline bool ElementType::Is<half>() const {
   return dtype == DType::kFloat16;
 }
 
 template <>
-inline bool ElementType::is<float>() const {
+inline bool ElementType::Is<float>() const {
   return dtype == DType::kFloat32;
 }
 
 template <>
-inline bool ElementType::is<double>() const {
+inline bool ElementType::Is<double>() const {
   return dtype == DType::kFloat64;
 }
 
 #undef DEF_FROM_FUNC
 #define DEF_FROM_FUNC(Type, T) \
   template <> \
-  inline ElementType ElementType::from<T>() { \
+  inline ElementType ElementType::From<T>() { \
     ElementType etype; \
     etype.dtype = DType::Type; \
 \

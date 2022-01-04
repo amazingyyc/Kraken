@@ -1,5 +1,6 @@
-
 #include "common/shape.h"
+
+#include <sstream>
 
 #include "common/exception.h"
 
@@ -14,7 +15,7 @@ Shape::Shape(const std::vector<int64_t>& dims) : dims_(dims) {
     ARGUMENT_CHECK(d > 0, "dimension need > 0");
   }
 
-  update_strides();
+  UpdateStrides();
 }
 
 Shape::Shape(std::vector<int64_t>&& dims) : dims_(std::move(dims)) {
@@ -22,10 +23,10 @@ Shape::Shape(std::vector<int64_t>&& dims) : dims_(std::move(dims)) {
     ARGUMENT_CHECK(d > 0, "dimension need > 0");
   }
 
-  update_strides();
+  UpdateStrides();
 }
 
-void Shape::update_strides() {
+void Shape::UpdateStrides() {
   int64_t ndims = (int64_t)dims_.size();
 
   strides_.resize(ndims);
@@ -72,18 +73,22 @@ bool Shape::operator!=(const Shape& other) const {
 }
 
 int64_t Shape::operator[](int64_t axis) const {
-  return dim(axis);
+  return Dim(axis);
 }
 
-const std::vector<int64_t> Shape::dims() const {
+const std::vector<int64_t>& Shape::dims() const {
   return dims_;
 }
 
-int64_t Shape::ndims() const {
+const std::vector<int64_t>& Shape::strides() const {
+  return strides_;
+}
+
+int64_t Shape::NDims() const {
   return (int64_t)dims_.size();
 }
 
-int64_t Shape::size() const {
+int64_t Shape::Size() const {
   int64_t size = 1;
 
   for (auto d : dims_) {
@@ -93,26 +98,42 @@ int64_t Shape::size() const {
   return size;
 }
 
-int64_t Shape::dim(int64_t axis) const {
+int64_t Shape::Dim(int64_t axis) const {
   if (axis < 0) {
-    axis += ndims();
+    axis += NDims();
   }
 
-  ARGUMENT_CHECK(0 <= axis && axis < ndims(),
-                 "the axis is out of rang: [0, " << ndims() << "]");
+  ARGUMENT_CHECK(0 <= axis && axis < NDims(),
+                 "the axis is out of rang: [0, " << NDims() << "]");
 
   return dims_[axis];
 }
 
-int64_t Shape::stride(int64_t axis) const {
+int64_t Shape::Stride(int64_t axis) const {
   if (axis < 0) {
-    axis += ndims();
+    axis += NDims();
   }
 
-  ARGUMENT_CHECK(0 <= axis && axis < ndims(),
-                 "the axis is out of rang: [0, " << ndims() << "]");
+  ARGUMENT_CHECK(0 <= axis && axis < NDims(),
+                 "the axis is out of rang: [0, " << NDims() << "]");
 
   return strides_[axis];
+}
+
+std::string Shape::Str() const {
+  std::stringstream ss;
+
+  ss << "[";
+  for (int64_t i = 0; i < NDims() - 1; ++i) {
+    ss << Dim(i) << ",";
+  }
+
+  if (NDims() > 0) {
+    ss << Dim(-1);
+  }
+  ss << "]";
+
+  return ss.str();
 }
 
 }  // namespace kraken

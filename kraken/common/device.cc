@@ -52,7 +52,7 @@ void Device::memcpy(void* dst, const void* src, size_t n) {
   allocator_->memcpy(dst, src, n);
 }
 
-Device* Device::default_device() {
+Device* Device::Shared() {
   static Device device(0, DeviceType::kCPU);
 
   return &device;

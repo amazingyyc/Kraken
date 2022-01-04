@@ -17,13 +17,13 @@ extern uint32_t LOG_LEVEL;
 #define LOG_ERROR_LEVEL 3
 
 #define REAL_PRINT_LOG(msg) \
-  std::ostringstream oss; \
-  oss << "[" << std::this_thread::get_id() << "] "; \
-  oss << kraken::utils::current_timestamp() << " "; \
-  oss << __FILE__ << ":"; \
-  oss << __LINE__ << ":"; \
-  oss << msg << "\n"; \
-  std::cout << oss.str();
+  std::ostringstream _oss; \
+  _oss << "[" << std::this_thread::get_id() << "] "; \
+  _oss << kraken::utils::CurrentTimestamp() << " "; \
+  _oss << __FILE__ << ":"; \
+  _oss << __LINE__ << ":"; \
+  _oss << msg << "\n"; \
+  std::cout << _oss.str();
 
 #define PRINT_LOG(msg, level) \
   if (level >= kraken::log::LOG_LEVEL) { \

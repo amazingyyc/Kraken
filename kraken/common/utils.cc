@@ -1,12 +1,14 @@
 #include "common/utils.h"
 
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <ctime>
 
 namespace kraken {
 namespace utils {
 
-std::string current_timestamp() {
+std::string CurrentTimestamp() {
   using std::chrono::system_clock;
   auto cur_time = std::chrono::system_clock::now();
 
@@ -24,6 +26,40 @@ std::string current_timestamp() {
   sprintf(buffer, "%s.%03d", buffer, (int)millis);
 
   return std::string(buffer);
+}
+
+void Split(const std::string& str, const std::string& delim,
+           std::vector<std::string>* tokens) {
+  tokens->clear();
+
+  if (str.empty()) {
+    return;
+  }
+
+  std::string::size_type start = 0;
+  auto pos = str.find_first_of(delim, start);
+
+  while (pos != std::string::npos) {
+    tokens->emplace_back(std::move(str.substr(start, pos - start)));
+
+    start = pos + delim.size();
+    pos = str.find_first_of(delim, start);
+  }
+
+  if (start < str.size()) {
+    tokens->emplace_back(std::move(str.substr(start)));
+  } else if (start == str.size()) {
+    tokens->emplace_back(std::string());
+  }
+}
+
+std::string ToLower(const std::string& v) {
+  std::string lv;
+  lv.resize(v.size());
+
+  std::transform(v.begin(), v.end(), lv.begin(), tolower);
+
+  return lv;
 }
 
 }  // namespace utils
