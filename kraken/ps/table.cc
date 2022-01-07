@@ -22,25 +22,25 @@ const std::string Table::name() const {
 }
 
 int32_t Table::Push(const Tensor& grad, float lr) {
-  return ErrorCode::kUnImplementError;
+  return ErrorCode::kInterfaceUnImplementError;
 }
 
 int32_t Table::Pull(Tensor* var) {
-  return ErrorCode::kUnImplementError;
+  return ErrorCode::kInterfaceUnImplementError;
 }
 
 int32_t Table::PushPull(const Tensor& grad, float lr, Tensor* val) {
-  return ErrorCode::kUnImplementError;
+  return ErrorCode::kInterfaceUnImplementError;
 }
 
 int32_t Table::Push(const std::vector<int64_t>& indices,
                     const std::vector<Tensor>& grads, float lr) {
-  return ErrorCode::kUnImplementError;
+  return ErrorCode::kInterfaceUnImplementError;
 }
 
 int32_t Table::Pull(const std::vector<int64_t>& indices,
                     std::vector<Tensor>* vals) {
-  return ErrorCode::kUnImplementError;
+  return ErrorCode::kInterfaceUnImplementError;
 }
 
 }  // namespace kraken

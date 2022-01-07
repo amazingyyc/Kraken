@@ -53,4 +53,5 @@ int32_t Adagrad::Update(const Tensor& grad, float lr, Tensor* val,
 
   return ErrorCode::kSuccess;
 }
+
 }  // namespace kraken

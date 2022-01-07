@@ -1,5 +1,6 @@
 # coding=utf-8
 
+import time
 import numpy as np
 import pandas as pd
 import data_utils
@@ -69,6 +70,8 @@ for epoch in range(n_epochs):
   correct = 0
 
   for i, (X_wide, X_deep, target) in enumerate(train_loader):
+    start_t = time.clock()
+
     X_w = Variable(X_wide)
     X_d = Variable(X_deep)
     y = Variable(target).float().unsqueeze(-1)
@@ -89,8 +92,11 @@ for epoch in range(n_epochs):
     total += count
     correct += cur_correct
 
-    print('Epoch {} of {}, Loss: {}, accuracy: {}'.format(epoch + 1, n_epochs, round(loss.item(), 3),
-                                                          round(correct / total, 4)))
+    end_t = time.clock()
+
+    print('Cost {:0,.2f} Epoch {} of {}, Loss: {}, accuracy: {}'.format((end_t - start_t) * 1000, epoch + 1, n_epochs,
+                                                                        round(loss.item(), 3),
+                                                                        round(correct / total, 4)))
 
 # Stop it
 kk.stop()

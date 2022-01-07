@@ -12,7 +12,6 @@ namespace kraken {
 
 /**
  * \brief This will not create a table, just return a unique table id.
- *
  */
 struct ApplyTableRequest {
   uint64_t model_id;

@@ -29,13 +29,13 @@ int32_t Model::RegisterDenseTable(uint64_t id, const std::string& name,
   auto it = tables_.find(id);
   if (it != tables_.end()) {
     if (it->second->name() != name || it->second->type() != TableType::kDense) {
-      return ErrorCode::kTableTypeUnCompatibleError;
+      return ErrorCode::kSparseTableUnCompatibleError;
     }
 
     const Tensor& exit_val = ((DenseTable*)(it->second.get()))->val();
     if (exit_val.shape() != val.shape() ||
         exit_val.element_type() != val.element_type()) {
-      return ErrorCode::kDenseTabelError;
+      return ErrorCode::kSparseTableUnCompatibleError;
     }
 
     LOG_INFO("Registered DenseTable: "
@@ -70,12 +70,12 @@ int32_t Model::RegisterSparseTable(uint64_t id, const std::string& name,
   if (it != tables_.end()) {
     if (it->second->name() != name ||
         it->second->type() != TableType::kSparse) {
-      return ErrorCode::kTableTypeUnCompatibleError;
+      return ErrorCode::kSparseTableUnCompatibleError;
     }
 
     SparseTable* table = (SparseTable*)(it->second.get());
     if (table->dimension() != dimension || table->etype() != etype) {
-      return ErrorCode::kSparseTabelError;
+      return ErrorCode::kSparseTableUnCompatibleError;
     }
 
     LOG_INFO("Registered SparseTable:"
@@ -105,7 +105,7 @@ int32_t Model::PushDenseTable(uint64_t table_id, const Tensor& grad, float lr) {
   }
 
   if (it->second->type() != TableType::kDense) {
-    return ErrorCode::kTableTypeUnCompatibleError;
+    return ErrorCode::kSparseTableUnCompatibleError;
   }
 
   return it->second->Push(grad, lr);
@@ -120,7 +120,7 @@ int32_t Model::PullDenseTable(uint64_t table_id, Tensor* val) {
   }
 
   if (it->second->type() != TableType::kDense) {
-    return ErrorCode::kTableTypeUnCompatibleError;
+    return ErrorCode::kSparseTableUnCompatibleError;
   }
 
   return it->second->Pull(val);
@@ -136,7 +136,7 @@ int32_t Model::PushPullDenseTable(uint64_t table_id, const Tensor& grad,
   }
 
   if (it->second->type() != TableType::kDense) {
-    return ErrorCode::kTableTypeUnCompatibleError;
+    return ErrorCode::kSparseTableUnCompatibleError;
   }
 
   return it->second->PushPull(grad, lr, val);
@@ -153,7 +153,7 @@ int32_t Model::PushSparseTable(uint64_t table_id,
   }
 
   if (it->second->type() != TableType::kSparse) {
-    return ErrorCode::kTableTypeUnCompatibleError;
+    return ErrorCode::kSparseTableUnCompatibleError;
   }
 
   return it->second->Push(indices, grads, lr);
@@ -170,7 +170,7 @@ int32_t Model::PullSparseTable(uint64_t table_id,
   }
 
   if (it->second->type() != TableType::kSparse) {
-    return ErrorCode::kTableTypeUnCompatibleError;
+    return ErrorCode::kSparseTableUnCompatibleError;
   }
 
   return it->second->Pull(indices, vars);

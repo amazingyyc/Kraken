@@ -10,7 +10,7 @@ import kraken_native
 
 class Optimizer:
 
-  def __init__(self, model_name: str, named_parameters, lr: Union[float, LR], optim: Optim):
+  def __init__(self, model_name: str, named_parameters, lr: Union[float, LR], optim: Optim, dense_async=True):
 
     self._model_name = model_name
 
@@ -23,6 +23,10 @@ class Optimizer:
     self._optim_conf = optim.conf()
     self._name_parma = {}
     self._name_table_id = {}
+
+    # Whether async send Dense gradient to server.
+    self._dense_async = dense_async
+    logging.info(f'dense_async is:{self._dense_async}')
 
     self._model_id = kraken_native.register_model(self._model_name, self._optim_type, self._optim_conf)
     logging.info(f'Register model:[{self._model_name}], model_id:[{self._model_id}].')
@@ -65,18 +69,25 @@ class Optimizer:
     logging.info(f'Create gradient hook for:[{name}], table_id:[{table_id}].')
 
     def hook(grad):
-      # This is a little tricky, the returned gradient actually is the Tensor value.
-      # (TODO) maybe send gradient but not wait receive.
-      return kraken_native.push_pull_dense_table(table_id, grad)
+      # At here we will check the flag: dense_async, it True we will send gradient to server async and not wait.
+      # If False we will send Parameter's Gradient to server and wait fetch the Val.
+      if self._dense_async:
+        kraken_native.push_dense_table(table_id, grad)
+        return None
+      else:
+        return kraken_native.push_pull_dense_table(table_id, grad)
 
     return hook
 
   def step(self):
-    # For now we already pull the DenseTable from server and assign to the param's grad,
-    # So just give it to param's data.
-    for _, param in self._name_parma.items():
+    for name, param in self._name_parma.items():
       if not isinstance(param, SparseTable):
-        param.data = param.grad
+        if self._dense_async:
+          param.data = kraken_native.pull_dense_table(self._name_table_id[name])
+        else:
+          # dense_async is False means the Prameter's value has been assign to the grad.
+          param.data = param.grad
+
         param.grad = None
 
     # Update learning rate.
