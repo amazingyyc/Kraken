@@ -390,6 +390,15 @@ public:
   Tensor PullDenseTable(uint64_t table_id);
 
   /**
+   * \brief Pull a list of dense table from server.
+   *
+   * \param table_ids The list of dense table ids.
+   * \return std::vector<Tensor> Dense table value.
+   */
+  std::vector<Tensor> PullListDenseTable(
+      const std::vector<uint64_t>& table_ids);
+
+  /**
    * \brief Push gradient and pull val from server.
    *
    * \param table_id Table id.

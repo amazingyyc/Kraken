@@ -10,6 +10,7 @@
 #include "protocol/apply_model_prot.h"
 #include "protocol/apply_table_prot.h"
 #include "protocol/pull_dense_table_prot.h"
+#include "protocol/pull_list_dense_table_prot.h"
 #include "protocol/pull_sparse_table_prot.h"
 #include "protocol/push_dense_table_prot.h"
 #include "protocol/push_pull_dense_table_prot.h"
@@ -246,6 +247,59 @@ Tensor Worker::PullDenseTable(uint64_t table_id) {
       clients_[server_id]->Call(RPCFuncType::kPullDenseTableType, req, &rsp));
 
   return rsp.val;
+}
+
+std::vector<Tensor> Worker::PullListDenseTable(
+    const std::vector<uint64_t>& table_ids) {
+  std::unordered_map<size_t, PullListDenseTableRequest> server_reqs;
+  std::unordered_map<size_t, std::vector<size_t>> origin_indice_map;
+
+  for (size_t i = 0; i < table_ids.size(); ++i) {
+    uint64_t table_id = table_ids[i];
+    size_t server_id = DenseTableRouter(model_id_, table_id);
+
+    if (server_reqs.find(server_id) == server_reqs.end()) {
+      PullListDenseTableRequest req;
+      req.model_id = model_id_;
+
+      server_reqs.emplace(server_id, req);
+    }
+
+    server_reqs[server_id].table_ids.emplace_back(table_id);
+    origin_indice_map[server_id].emplace_back(i);
+  }
+
+  std::vector<size_t> server_indices;
+  server_indices.reserve(server_reqs.size());
+
+  std::vector<PullListDenseTableRequest> reqs;
+  std::vector<PullListDenseTableResponse> rsps;
+
+  reqs.reserve(server_reqs.size());
+  for (auto& item : server_reqs) {
+    server_indices.emplace_back(item.first);
+    reqs.emplace_back(std::move(item.second));
+  }
+
+  RPC_CALL(ParallelCall(RPCFuncType::kPullListDenseTableType, server_indices,
+                        reqs, &rsps));
+
+  std::vector<Tensor> vals;
+  vals.resize(table_ids.size());
+
+  for (size_t i = 0; i < server_indices.size(); ++i) {
+    uint64_t server_id = server_indices[i];
+    const auto& origin_indice = origin_indice_map[server_id];
+    const auto& rsp_vals = rsps[i].vals;
+
+    ARGUMENT_CHECK(origin_indice.size() == rsp_vals.size(), "Internal error.");
+
+    for (size_t j = 0; j < origin_indice.size(); ++j) {
+      vals[origin_indice[j]] = rsp_vals[j];
+    }
+  }
+
+  return vals;
 }
 
 Tensor Worker::PushPullDenseTable(uint64_t table_id, const Tensor& grad) {

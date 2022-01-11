@@ -103,6 +103,19 @@ int32_t Ps::PullDenseTable(uint64_t model_id, uint64_t table_id, Tensor* val) {
   return it->second->PullDenseTable(table_id, val);
 }
 
+int32_t Ps::PullListDenseTable(uint64_t model_id,
+                               const std::vector<uint64_t>& table_ids,
+                               std::vector<Tensor>* vals) {
+  std::shared_lock<std::shared_mutex> lock(mu_);
+
+  auto it = models_.find(model_id);
+  if (it == models_.end()) {
+    return ErrorCode::kUnRegisterModelError;
+  }
+
+  return it->second->PullListDenseTable(table_ids, vals);
+}
+
 int32_t Ps::PushPullDenseTable(uint64_t model_id, uint64_t table_id,
                                const Tensor& grad, float lr, Tensor* val) {
   std::shared_lock<std::shared_mutex> lock(mu_);

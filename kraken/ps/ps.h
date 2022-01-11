@@ -101,6 +101,18 @@ public:
   int32_t PullDenseTable(uint64_t model_id, uint64_t table_id, Tensor* val);
 
   /**
+   * \brief Pull list of dense table.
+   *
+   * \param model_id Model id.
+   * \param table_id Table_id list.
+   * \param vals The result.
+   * \return int32_t Error code.
+   */
+  int32_t PullListDenseTable(uint64_t model_id,
+                             const std::vector<uint64_t>& table_ids,
+                             std::vector<Tensor>* vals);
+
+  /**
    * \brief Push and Pull dense table.
    *
    * \param model_id Model id.

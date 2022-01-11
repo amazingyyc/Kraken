@@ -27,6 +27,8 @@ void PushDenseTable(uint64_t table_id, torch::Tensor grad);
 
 torch::Tensor PullDenseTable(uint64_t table_id);
 
+std::vector<torch::Tensor> PullListDenseTable(const std::vector<uint64_t>& table_ids);
+
 torch::Tensor PushPullDenseTable(uint64_t table_id, torch::Tensor grad);
 
 void PushSparseTable(uint64_t table_id, torch::Tensor indices,

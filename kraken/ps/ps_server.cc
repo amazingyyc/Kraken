@@ -45,6 +45,11 @@ int32_t PsServer::PullDenseTable(const PullDenseTableRequest& req,
   return ps_.PullDenseTable(req.model_id, req.table_id, &(rsp->val));
 }
 
+int32_t PsServer::PullListDenseTable(const PullListDenseTableRequest& req,
+                                     PullListDenseTableResponse* rsp) {
+  return ps_.PullListDenseTable(req.model_id, req.table_ids, &(rsp->vals));
+}
+
 int32_t PsServer::PushPullDenseTable(const PushPullDenseTableRequest& req,
                                      PushPullDenseTableResponse* rsp) {
   return ps_.PushPullDenseTable(req.model_id, req.table_id, req.grad, req.lr,
@@ -77,6 +82,7 @@ void PsServer::RegisterFuncs() {
   REGISTER_FUNC(RegisterSparseTable, RegisterSparseTable);
   REGISTER_FUNC(PushDenseTable, PushDenseTable);
   REGISTER_FUNC(PullDenseTable, PullDenseTable);
+  REGISTER_FUNC(PullListDenseTable, PullListDenseTable);
   REGISTER_FUNC(PushPullDenseTable, PushPullDenseTable);
   REGISTER_FUNC(PushSparseTable, PushSparseTable);
   REGISTER_FUNC(PullSparseTable, PullSparseTable);

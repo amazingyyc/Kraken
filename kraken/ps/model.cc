@@ -7,8 +7,6 @@
 
 namespace kraken {
 
-const size_t Model::kSparseTableSCount = 4;
-
 Model::Model(uint64_t id, const std::string& name,
              std::unique_ptr<Optim>&& optim)
     : id_(id), name_(name), optim_(std::move(optim)) {
@@ -85,8 +83,8 @@ int32_t Model::RegisterSparseTable(uint64_t id, const std::string& name,
     return ErrorCode::kSuccess;
   }
 
-  std::unique_ptr<SparseTable> table(new SparseTable(
-      optim_.get(), id, name, dimension, etype, kSparseTableSCount));
+  std::unique_ptr<SparseTable> table(
+      new SparseTable(optim_.get(), id, name, dimension, etype));
 
   tables_.emplace(id, std::move(table));
 
@@ -124,6 +122,34 @@ int32_t Model::PullDenseTable(uint64_t table_id, Tensor* val) {
   }
 
   return it->second->Pull(val);
+}
+
+int32_t Model::PullListDenseTable(const std::vector<uint64_t>& table_ids,
+                                  std::vector<Tensor>* vals) {
+  vals->reserve(table_ids.size());
+
+  std::shared_lock<std::shared_mutex> lock(mu_);
+
+  for (size_t i = 0; i < table_ids.size(); ++i) {
+    auto it = tables_.find(table_ids[i]);
+    if (it == tables_.end()) {
+      return ErrorCode::kUnRegisterTableError;
+    }
+
+    if (it->second->type() != TableType::kDense) {
+      return ErrorCode::kSparseTableUnCompatibleError;
+    }
+
+    Tensor val;
+    int32_t ecode = it->second->Pull(&val);
+    if (ecode != ErrorCode::kSuccess) {
+      return ecode;
+    }
+
+    vals->emplace_back(val);
+  }
+
+  return ErrorCode::kSuccess;
 }
 
 int32_t Model::PushPullDenseTable(uint64_t table_id, const Tensor& grad,

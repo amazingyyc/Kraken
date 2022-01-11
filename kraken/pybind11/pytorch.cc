@@ -160,6 +160,25 @@ torch::Tensor PullDenseTable(uint64_t table_id) {
   return val;
 }
 
+std::vector<torch::Tensor> PullListDenseTable(
+    const std::vector<uint64_t>& table_ids) {
+  std::vector<Tensor> kvals = worker.PullListDenseTable(table_ids);
+  std::vector<torch::Tensor> vals;
+
+  for (auto& kv : kvals) {
+    torch::IntArrayRef sizes = ShapeToTorchSizes(kv.shape());
+    torch::Dtype dtype = ElementTypeToTorchDType(kv.element_type());
+
+    torch::Tensor v = torch::zeros(sizes, dtype);
+
+    memcpy(v.data_ptr(), kv.Ptr(), kv.NumBytes());
+
+    vals.emplace_back(v);
+  }
+
+  return vals;
+}
+
 torch::Tensor PushPullDenseTable(uint64_t table_id, torch::Tensor grad) {
   ARGUMENT_CHECK(!grad.is_cuda(), "PushDenseTable need torch::Tensor is CPU.");
 

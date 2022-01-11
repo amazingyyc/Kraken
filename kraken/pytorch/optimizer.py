@@ -21,7 +21,7 @@ class Optimizer:
 
     self._optim_type = optim.type()
     self._optim_conf = optim.conf()
-    self._name_parma = {}
+    self._name_param = {}
     self._name_table_id = {}
 
     # Whether async send Dense gradient to server.
@@ -36,7 +36,7 @@ class Optimizer:
 
     for name, param in named_parameters:
       if param.requires_grad:
-        self._name_parma[name] = param
+        self._name_param[name] = param
 
         if isinstance(param, SparseTable):
           # Check whether the user has set a name.
@@ -80,7 +80,7 @@ class Optimizer:
     return hook
 
   def step(self):
-    for name, param in self._name_parma.items():
+    for name, param in self._name_param.items():
       if not isinstance(param, SparseTable):
         if self._dense_async:
           param.data = kraken_native.pull_dense_table(self._name_table_id[name])
@@ -88,7 +88,7 @@ class Optimizer:
           # dense_async is False means the Prameter's value has been assign to the grad.
           param.data = param.grad
 
-        param.grad = None
+      param.grad = None
 
     # Update learning rate.
     self._lr.step()

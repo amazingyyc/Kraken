@@ -16,6 +16,32 @@ template <typename T>
 using EVector =
     Eigen::Map<Eigen::Matrix<T, 1, Eigen::Dynamic, Eigen::RowMajor>>;
 
+std::vector<int64_t> CalFanInAndFanOut(const Tensor& t) {
+  int64_t ndims = t.shape().NDims();
+
+  int64_t num_input_fmaps = 1;
+  int64_t num_output_fmaps = 1;
+  int64_t receptive_field_size = 1;
+
+  // This maybe different with pytorch.
+  if (ndims >= 1) {
+    num_output_fmaps = t.shape().Dim(0);
+  }
+
+  if (ndims >= 2) {
+    num_input_fmaps = t.shape().Dim(1);
+  }
+
+  for (int64_t i = 2; i < ndims; ++i) {
+    receptive_field_size *= t.shape().Dim(i);
+  }
+
+  int64_t fan_in = num_input_fmaps * receptive_field_size;
+  int64_t fan_out = num_output_fmaps * receptive_field_size;
+
+  return {fan_in, fan_out};
+}
+
 template <typename T>
 void AddImpl(T* x, T* y, T* z, int64_t size) {
   EVector<T> xv(x, size);
@@ -267,22 +293,95 @@ void Div(const Tensor& x, float v, Tensor& y) {
 }
 
 template <typename T>
-void NormImpl(T* v, int64_t n, T lower, float upper) {
+void NormalImpl(T* v, int64_t n, T mean, T stddev) {
   static thread_local std::mt19937 generator;
-  std::normal_distribution<T> distribution(lower, upper);
+  std::normal_distribution<T> distribution(mean, stddev);
 
   for (int64_t i = 0; i < n; ++i) {
     v[i] = distribution(generator);
   }
 }
 
-void Norm(Tensor& x, float lower, float upper) {
+void Normal(Tensor& x, float mean, float stddev) {
   if (x.element_type().Is<float>()) {
-    NormImpl<float>(x.Data<float>(), x.Size(), lower, upper);
+    NormalImpl<float>(x.Data<float>(), x.Size(), mean, stddev);
   } else if (x.element_type().Is<double>()) {
-    NormImpl<double>(x.Data<double>(), x.Size(), lower, upper);
+    NormalImpl<double>(x.Data<double>(), x.Size(), mean, stddev);
   } else {
-    RUNTIME_ERROR("norm not support ElementType:" << x.element_type().Name());
+    RUNTIME_ERROR("Normal not support ElementType:" << x.element_type().Name());
+  }
+}
+
+void XavierNormal(Tensor& x, float gain) {
+  std::vector<int64_t> fan_in_out = CalFanInAndFanOut(x);
+  int64_t fan_in = fan_in_out[0];
+  int64_t fan_out = fan_in_out[1];
+
+  float std = gain * std::sqrt(2.0 / float(fan_in + fan_out));
+
+  Normal(x, 0, std);
+}
+
+template <typename T>
+void UniformImpl(T* v, int64_t n, T lower, T upper) {
+  static thread_local std::mt19937 gen;
+  std::uniform_real_distribution<T> dis(lower, upper);
+
+  for (int64_t i = 0; i < n; ++i) {
+    v[i] = dis(gen);
+  }
+}
+
+void Uniform(Tensor& x, float lower, float upper) {
+  if (x.element_type().Is<float>()) {
+    UniformImpl<float>(x.Data<float>(), x.Size(), lower, upper);
+  } else if (x.element_type().Is<double>()) {
+    UniformImpl<double>(x.Data<double>(), x.Size(), lower, upper);
+  } else {
+    RUNTIME_ERROR(
+        "Uniform not support ElementType:" << x.element_type().Name());
+  }
+}
+
+void XavierUniform(Tensor& x, float gain) {
+  std::vector<int64_t> fan_in_out = CalFanInAndFanOut(x);
+  int64_t fan_in = fan_in_out[0];
+  int64_t fan_out = fan_in_out[1];
+
+  float std = gain * std::sqrt(2.0 / float(fan_in + fan_out));
+  float a = std::sqrt(3.0) * std;
+
+  Uniform(x, -a, a);
+}
+
+template <typename T>
+void ConstantImpl(T* p, int64_t n, T v) {
+  int64_t limit = n / 8 * 8;
+  int64_t i = 0;
+  for (; i < limit; i += 8) {
+    p[i] = v;
+    p[i + 1] = v;
+    p[i + 2] = v;
+    p[i + 3] = v;
+    p[i + 4] = v;
+    p[i + 5] = v;
+    p[i + 6] = v;
+    p[i + 7] = v;
+  }
+
+  for (; i < n; ++i) {
+    p[i] = v;
+  }
+}
+
+void Constant(Tensor& x, float v) {
+  if (x.element_type().Is<float>()) {
+    ConstantImpl<float>(x.Data<float>(), x.Size(), v);
+  } else if (x.element_type().Is<double>()) {
+    ConstantImpl<double>(x.Data<double>(), x.Size(), v);
+  } else {
+    RUNTIME_ERROR(
+        "Constant not support ElementType:" << x.element_type().Name());
   }
 }
 
