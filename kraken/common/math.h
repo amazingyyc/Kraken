@@ -12,6 +12,10 @@ namespace math {
 // https://pytorch.org/docs/stable/_modules/torch/nn/init.html#xavier_uniform_
 std::vector<int64_t> CalFanInAndFanOut(const Tensor& t);
 
+// ref:
+// https://pytorch.org/docs/stable/_modules/torch/nn/init.html#kaiming_uniform_
+int64_t CalculateCorrectFan(const Tensor& t, const std::string& mode);
+
 // z = x + y
 void Add(const Tensor& x, const Tensor& y, Tensor& z);
 // y = x + v

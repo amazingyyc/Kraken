@@ -67,7 +67,7 @@ public:
   /**
    * \brief Register a sparse table.
    *
-   * \param model_id Whick model will be register.
+   * \param model_id Which model will be register.
    * \param id Table id.
    * \param name Table name.
    * \param dimension Sparse tensor dimension.
@@ -77,6 +77,23 @@ public:
   int32_t RegisterSparseTable(uint64_t model_id, uint64_t id,
                               const std::string& name, int64_t dimension,
                               ElementType etype);
+
+  /**
+   * \brief Register a sparse table.
+   *
+   * \param model_id Which model will be register.
+   * \param id Table id.
+   * \param name Table name.
+   * \param dimension Sparse tensor dimension.
+   * \param etype Sparse tensor element type.
+   * \param init_type Initialize type.
+   * \param init_conf Initialize config.
+   * \return int32_t Error code.
+   */
+  int32_t RegisterSparseTableV2(
+      uint64_t model_id, uint64_t id, const std::string& name,
+      int64_t dimension, ElementType etype, InitializerType init_type,
+      const std::unordered_map<std::string, std::string>& init_conf);
 
   /**
    * \brief Push update dense table.

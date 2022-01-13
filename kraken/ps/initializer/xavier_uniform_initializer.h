@@ -15,7 +15,6 @@ private:
 
 public:
   XavierUniformInitializer(
-      InitializerType type,
       const std::unordered_map<std::string, std::string>& conf);
 
   void Initialize(Tensor* val) const override;

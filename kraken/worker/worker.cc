@@ -213,6 +213,54 @@ uint64_t Worker::RegisterSparseTable(const std::string& name, int64_t dimension,
   return table_id;
 }
 
+uint64_t Worker::RegisterSparseTableV2(
+    const std::string& name, int64_t dimension, ElementType etype,
+    InitializerType init_type,
+    const std::unordered_map<std::string, std::string>& init_conf) {
+  ARGUMENT_CHECK(initialized_.load(), "The worker not initialize.");
+
+  uint64_t table_id;
+
+  {
+    // Apply table id.
+    ApplyTableRequest req;
+    ApplyTableResponse rsp;
+
+    req.model_id = model_id_;
+    req.table_name = name;
+    req.table_type = TableType::kSparse;
+
+    RPC_CALL(clients_[0]->Call(RPCFuncType::kApplyTableType, req, &rsp));
+
+    table_id = rsp.table_id;
+
+    LOG_INFO("Apply SparseTable: " << name << ", id: " << table_id
+                                   << ", from server 0.");
+  }
+
+  {
+    // Register sparse table in all server.
+    RegisterSparseTableV2Request req;
+    std::vector<RegisterSparseTableV2Response> rsps;
+
+    req.model_id = model_id_;
+    req.id = table_id;
+    req.name = name;
+    req.dimension = dimension;
+    req.etype = etype;
+    req.init_type = init_type;
+    req.init_conf = init_conf;
+
+    RPC_CALL(
+        ParallelCallAll(RPCFuncType::kRegisterSparseTableV2Type, req, &rsps));
+
+    LOG_INFO("Register SparseTable: " << name << ", id: " << table_id
+                                      << ", in all server.");
+  }
+
+  return table_id;
+}
+
 void Worker::PushDenseTable(uint64_t table_id, const Tensor& grad) {
   ARGUMENT_CHECK(initialized_.load(), "The worker not initialize.");
 

@@ -8,6 +8,7 @@
 #include "common/spin_locker.h"
 #include "common/tensor.h"
 #include "parallel_hashmap/parallel_hashmap/phmap.h"
+#include "ps/initializer/initializer.h"
 #include "ps/optim/optim.h"
 #include "ps/table.h"
 
@@ -15,16 +16,13 @@ namespace kraken {
 
 class SparseTable : public Table {
 private:
-  struct Value {
-    Tensor val;
-    Bag bag;
-  };
-
   // For sparse table this must be a matrix. shape is [N, dimension].
   // We donnot assign the N, so it means the matrix's row canbe increase
   // automatically.
   int64_t dimension_;
   ElementType etype_;
+
+  std::unique_ptr<Initializer> initializer_;
 
   phmap::parallel_flat_hash_map<
       int64_t, Value, phmap::priv::hash_default_hash<int64_t>,
@@ -34,12 +32,15 @@ private:
 
 public:
   SparseTable(Optim* optim, uint64_t id, const std::string& name,
-              int64_t dimension, ElementType etype);
+              int64_t dimension, ElementType etype,
+              std::unique_ptr<Initializer>&& initializer);
 
 public:
   int64_t dimension() const;
 
   ElementType etype() const;
+
+  Initializer* initializer() const;
 
   int32_t Push(const std::vector<int64_t>& indices,
                const std::vector<Tensor>& grads, float lr) override;

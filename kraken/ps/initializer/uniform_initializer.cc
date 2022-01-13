@@ -5,9 +5,8 @@
 namespace kraken {
 
 UniformInitializer::UniformInitializer(
-    InitializerType type,
     const std::unordered_map<std::string, std::string>& conf)
-    : Initializer(type, conf), lower_(0.0), upper_(1.0) {
+    : Initializer(InitializerType::kUniform, conf), lower_(0.0), upper_(1.0) {
   GetConf<float>("lower", &lower_);
   GetConf<float>("upper", &upper_);
 

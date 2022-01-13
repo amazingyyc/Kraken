@@ -9,12 +9,18 @@ namespace kraken {
 /**
  * \brief The table type.
  */
-enum TableType : uint8_t {
+enum class TableType : uint8_t {
   kDense = 0,
   kSparse = 1,
 };
 
 class Table {
+protected:
+  struct Value {
+    Tensor val;
+    Bag bag;
+  };
+
 protected:
   TableType type_;
 

@@ -1,22 +1,22 @@
 #pragma once
 
+#include "rpc/serialize.h"
 #include "snappy-sinksource.h"
 
 namespace kraken {
 
-class SnappySource : public ::snappy::Source {
+class SnappySource : public snappy::Source {
 private:
-  char* ptr_;
+  const char* ptr_;
   size_t offset_;
-  size_t capacity_;
-
-  void (*deleter_)(void*);
+  size_t length_;
 
 public:
-  SnappySource(char* ptr, size_t capacity, void (*deleter)(void*));
+  SnappySource(const char* ptr, size_t length);
 
   ~SnappySource() override;
 
+public:
   size_t Available() const override;
 
   const char* Peek(size_t* len) override;
@@ -24,32 +24,49 @@ public:
   void Skip(size_t n) override;
 };
 
-// class SnappySink : public ::snappy::Sink {
-// private:
-//   char* ptr_;
-//   size_t offset_;
-//   size_t capacity_;
+class SnappySink : public snappy::Sink, public IBuffer {
+private:
+  char* ptr_;
+  size_t capacity_;
+  size_t offset_;
 
-// public:
-//   SnappySink();
+public:
+  SnappySink();
 
-//   ~SnappySink() override;
+  ~SnappySink() override;
 
-// private:
-//   size_t Growth(size_t new_size) const;
+private:
+  void Growth(size_t new_size);
 
-// public:
-//   void Append(const char* bytes, size_t n) override;
+public:
+  char* ptr() const;
 
-//   char* GetAppendBuffer(size_t length, char* scratch) override;
+  size_t capacity() const;
 
-//   void AppendAndTakeOwnership(char* bytes, size_t n,
-//                               void (*deleter)(void*, const char*, size_t),
-//                               void* deleter_arg) override;
+  size_t offset() const;
 
-//   char* GetAppendBufferVariable(size_t min_size, size_t desired_size_hint,
-//                                 char* scratch, size_t scratch_size,
-//                                 size_t* allocated_size) override;
-// };
+  // Fo IBuffer.
+  void Attach(const char* bytes, size_t n) override;
+
+  void TransferForZMQ(ZMQBuffer* z_buf) override;
+
+  // For snappy sink.
+  void Append(const char* bytes, size_t n) override;
+
+  char* GetAppendBuffer(size_t length, char* scratch) override;
+
+  void AppendAndTakeOwnership(char* bytes, size_t n,
+                              void (*deleter)(void*, const char*, size_t),
+                              void* deleter_arg) override;
+
+  char* GetAppendBufferVariable(size_t min_size, size_t desired_size_hint,
+                                char* scratch, size_t scratch_size,
+                                size_t* allocated_size) override;
+
+public:
+  static void* Malloc(size_t);
+  static void Free(void*);
+  static void ZMQFree(void*, void*);
+};
 
 }  // namespace kraken

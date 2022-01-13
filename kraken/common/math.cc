@@ -3,6 +3,8 @@
 #include <eigen/Eigen/Dense>
 #include <random>
 
+#include "common/utils.h"
+
 #ifdef HAVE_OPENMP
 #include <omp.h>
 #endif
@@ -40,6 +42,21 @@ std::vector<int64_t> CalFanInAndFanOut(const Tensor& t) {
   int64_t fan_out = num_output_fmaps * receptive_field_size;
 
   return {fan_in, fan_out};
+}
+
+int64_t CalculateCorrectFan(const Tensor& t, const std::string& mode) {
+  std::string l_mode = utils::ToLower(mode);
+
+  ARGUMENT_CHECK(l_mode == "fan_in" || l_mode == "fan_out",
+                 "CalculateCorrectFan need mode is fan_in/fan_out.");
+
+  auto fan_in_out = CalFanInAndFanOut(t);
+
+  if (l_mode == "fan_in") {
+    return fan_in_out[0];
+  } else {
+    return fan_in_out[1];
+  }
 }
 
 template <typename T>

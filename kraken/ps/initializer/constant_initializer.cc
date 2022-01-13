@@ -4,10 +4,13 @@
 
 namespace kraken {
 
+ConstantInitializer::ConstantInitializer(float value)
+    : Initializer(InitializerType::kConstant), value_(value) {
+}
+
 ConstantInitializer::ConstantInitializer(
-    InitializerType type,
     const std::unordered_map<std::string, std::string>& conf)
-    : Initializer(type, conf), value_(0) {
+    : Initializer(InitializerType::kConstant, conf), value_(0) {
   // Parse value.
   GetConf<float>("value", &value_);
 

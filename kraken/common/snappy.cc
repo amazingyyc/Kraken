@@ -1,34 +1,27 @@
 #include "common/snappy.h"
 
+#include <algorithm>
 #include <cstdlib>
+#include <cstring>
 
 namespace kraken {
 
-SnappySource::SnappySource(char* ptr, size_t capacity, void (*deleter)(void*))
-    : ::snappy::Source(),
-      ptr_(ptr),
-      offset_(0),
-      capacity_(capacity),
-      deleter_(deleter) {
+SnappySource::SnappySource(const char* ptr, size_t length)
+    : ::snappy::Source(), ptr_(ptr), offset_(0), length_(length) {
 }
 
 SnappySource::~SnappySource() {
-  if (deleter_ != nullptr) {
-    (*deleter_)(ptr_);
-  }
-
   ptr_ = nullptr;
   offset_ = 0;
-  capacity_ = 0;
-  deleter_ = nullptr;
+  length_ = 0;
 }
 
 size_t SnappySource::Available() const {
-  return (capacity_ - offset_);
+  return (length_ - offset_);
 }
 
 const char* SnappySource::Peek(size_t* len) {
-  *len = (capacity_ - offset_);
+  *len = (length_ - offset_);
   return ptr_ + offset_;
 }
 
@@ -36,74 +29,130 @@ void SnappySource::Skip(size_t n) {
   offset_ += n;
 }
 
-// SnappySink::SnappySink() : ptr_(nullptr), offset_(0), capacity_(0) {
-// }
+SnappySink::SnappySink() : ptr_(nullptr), capacity_(0), offset_(0) {
+}
 
-// SnappySink::~SnappySink() {
-//   if (ptr_ != nullptr) {
-//     std::free(ptr_);
-//   }
+SnappySink::~SnappySink() {
+  if (ptr_ != nullptr) {
+    SnappySink::Free(ptr_);
+  }
 
-//   ptr_ = nullptr;
-//   offset_ = 0;
-//   capacity_ = 0;
-// }
+  ptr_ = nullptr;
+  capacity_ = 0;
+  offset_ = 0;
+}
 
-// size_t SnappySink::Growth(size_t new_size) const {
-//   size_t new_capacity = capacity_ + capacity_ / 2;
+void SnappySink::Growth(size_t new_size) {
+  size_t new_capacity = capacity_ + capacity_ / 2;
+  if (new_capacity < new_size) {
+    new_capacity = new_size;
+  }
 
-//   if (new_capacity >= new_size) {
-//     return new_capacity;
-//   }
+  if (new_capacity <= capacity_) {
+    return;
+  }
 
-//   return new_size;
-// }
+  char* new_ptr = (char*)SnappySink::Malloc(new_capacity);
 
-// void SnappySink::Append(const char* bytes, size_t n) {
-//   if (ptr_ == nullptr || offset_ + n > capacity_) {
-//     size_t new_capacity = Growth(offset_ + n);
+  if (ptr_ != nullptr) {
+    if (offset_ > 0) {
+      std::memcpy(new_ptr, ptr_, offset_);
+    }
 
-//     char* new_ptr = (char*)std::malloc(new_capacity);
+    SnappySink::Free(ptr_);
+  }
 
-//     // copy old data.
-//     if (offset_ > 0) {
-//       std::memcpy(new_ptr, ptr_, offset_);
-//     }
+  ptr_ = new_ptr;
+  capacity_ = new_capacity;
+}
 
-//     if (ptr_ != nullptr) {
-//       std::free(ptr_);
-//     }
+char* SnappySink::ptr() const {
+  return ptr_;
+}
 
-//     ptr_ = new_ptr;
-//     capacity_ = new_capacity;
-//   }
+size_t SnappySink::capacity() const {
+  return capacity_;
+}
 
-//   if (ptr_ + offset_ != bytes) {
-//     std::memcpy(ptr_ + offset_, bytes, n);
-//   }
+size_t SnappySink::offset() const {
+  return offset_;
+}
 
-//   offset_ += n;
-// }
+void SnappySink::Attach(const char* bytes, size_t n) {
+  Append(bytes, n);
+}
 
-// char* SnappySink::GetAppendBuffer(size_t length, char* scratch) {
-//   if (offset_ + length < capacity_) {
-//     return (char*)(ptr_ + offset_);
-//   }
+void SnappySink::Append(const char* bytes, size_t n) {
+  if (ptr_ == nullptr || offset_ + n > capacity_) {
+    Growth(offset_ + n);
+  }
 
-//   return scratch;
-// }
+  if (ptr_ + offset_ != bytes) {
+    std::memcpy(ptr_ + offset_, bytes, n);
+  }
 
-// void SnappySink::AppendAndTakeOwnership(char* bytes, size_t n,
-//                                         void (*deleter)(void*, const char*,
-//                                                         size_t),
-//                                         void* deleter_arg) {
-// }
+  offset_ += n;
+}
 
-// char* SnappySink::GetAppendBufferVariable(size_t min_size,
-//                                           size_t desired_size_hint,
-//                                           char* scratch, size_t scratch_size,
-//                                           size_t* allocated_size) {
-//   return scratch;
-// }
+char* SnappySink::GetAppendBuffer(size_t length, char* scratch) {
+  if (ptr_ != nullptr && offset_ + length < capacity_) {
+    return ptr_ + offset_;
+  }
+
+  return scratch;
+}
+
+void SnappySink::AppendAndTakeOwnership(char* bytes, size_t n,
+                                        void (*deleter)(void*, const char*,
+                                                        size_t),
+                                        void* deleter_arg) {
+  if (ptr_ == nullptr || (ptr_ + offset_) != bytes) {
+    if (ptr_ == nullptr || offset_ + n > capacity_) {
+      Growth(offset_ + n);
+    }
+
+    std::memcpy(ptr_ + offset_, bytes, n);
+
+    (*deleter)(deleter_arg, bytes, n);
+  }
+
+  offset_ += n;
+}
+
+char* SnappySink::GetAppendBufferVariable(size_t min_size,
+                                          size_t desired_size_hint,
+                                          char* scratch, size_t scratch_size,
+                                          size_t* allocated_size) {
+  if (ptr_ == nullptr || offset_ + min_size > capacity_) {
+    // No enough capacity for min size.
+    size_t need_size = std::max<size_t>(desired_size_hint, min_size);
+
+    Growth(offset_ + need_size);
+  }
+
+  *allocated_size = capacity_ - offset_;
+
+  return ptr_ + offset_;
+}
+
+void SnappySink::TransferForZMQ(ZMQBuffer* z_buf) {
+  z_buf->Reset(ptr_, capacity_, offset_, SnappySink::ZMQFree);
+
+  ptr_ = nullptr;
+  capacity_ = 0;
+  offset_ = 0;
+}
+
+void* SnappySink::Malloc(size_t size) {
+  return std::malloc(size);
+}
+
+void SnappySink::Free(void* ptr) {
+  std::free(ptr);
+}
+
+void SnappySink::ZMQFree(void* data, void* /*not use*/) {
+  SnappySink::Free(data);
+}
 
 }  // namespace kraken

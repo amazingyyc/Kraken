@@ -14,8 +14,7 @@ class DenseTable : public Table {
 private:
   std::shared_mutex mu_;
 
-  Tensor val_;
-  Bag bag_;
+  Value val_;
 
 public:
   DenseTable(Optim* optim, uint64_t id, const std::string& name,

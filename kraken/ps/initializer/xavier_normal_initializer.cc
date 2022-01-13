@@ -5,9 +5,8 @@
 namespace kraken {
 
 XavierNormalInitializer::XavierNormalInitializer(
-    InitializerType type,
     const std::unordered_map<std::string, std::string>& conf)
-    : Initializer(type, conf), gain_(1.0) {
+    : Initializer(InitializerType::kXavierNormal, conf), gain_(1.0) {
   GetConf<float>("gain", &gain_);
 
   LOG_INFO("XavierNormal Initializer, gain:" << gain_);

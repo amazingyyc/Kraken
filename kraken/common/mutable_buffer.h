@@ -2,6 +2,8 @@
 
 #include <cstdlib>
 
+#include "rpc/serialize.h"
+
 namespace kraken {
 
 /**
@@ -9,11 +11,11 @@ namespace kraken {
  *
  * This buffer use to store binary data and can be increase length automaticlly.
  */
-class MutableBuffer {
+class MutableBuffer : public IBuffer {
 private:
   char* ptr_;
 
-  size_t length_;
+  size_t capacity_;
   size_t offset_;
 
 public:
@@ -33,35 +35,21 @@ private:
   size_t Growth(size_t new_size) const;
 
 public:
-  size_t Length() const;
+  char* ptr() const;
 
-  size_t Offset() const;
+  size_t capacity() const;
 
-  void Append(const char* data, size_t data_size);
+  size_t offset() const;
 
-  /**
-   * \brief Fetch the buffer outof this class, transfer the ownership to
-   * outside and the outsider must responsible to release it.
-   */
-  void Transfer(char** ptr);
+  void Attach(const char* bytes, size_t size) override;
 
-  /**
-   * \brief Transfer buffer to outside, the outsider must release the buffer by
-   * MutableBuffer::Malloc.
-   *
-   * \param ptr char** store memory pointer.
-   * \param length the memory byte num.
-   * \param offset how many bytes data the buffer stored.
-   */
-  void Transfer(char** ptr, size_t* length, size_t* offset);
+  void TransferForZMQ(ZMQBuffer* z_buf) override;
 
 public:
   static void* Malloc(size_t);
   static void Free(void*);
 
-  /**
-   * \brief A special free func for ZMQ.
-   */
+  // A special free func for ZMQ.
   static void ZMQFree(void*, void*);
 };
 

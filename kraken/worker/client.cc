@@ -6,11 +6,11 @@ Client::Client(uint32_t server_id, const std::string& addr)
     : server_id_(server_id), addr_(addr), caller_(addr) {
 }
 
-uint32_t Client::ServerId() const {
+uint32_t Client::server_id() const {
   return server_id_;
 }
 
-const std::string& Client::Addr() const {
+const std::string& Client::addr() const {
   return addr_;
 }
 

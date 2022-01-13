@@ -19,8 +19,7 @@ class Optimizer:
     else:
       self._lr = lr
 
-    self._optim_type = optim.type()
-    self._optim_conf = optim.conf()
+    self._optim = optim
     self._name_param = {}
     self._name_table_id = {}
 
@@ -28,7 +27,7 @@ class Optimizer:
     self._dense_async = dense_async
     logging.info(f'dense_async is:{self._dense_async}')
 
-    self._model_id = kraken_native.register_model(self._model_name, self._optim_type, self._optim_conf)
+    self._model_id = kraken_native.register_model(self._model_name, self._optim.type(), self._optim.conf())
     logging.info(f'Register model:[{self._model_name}], model_id:[{self._model_id}].')
 
     # We should update learning rate when initialize model.
@@ -44,7 +43,16 @@ class Optimizer:
           if param.name() is not None:
             real_name = param.name()
 
-          table_id = kraken_native.register_sparse_table(real_name, param.dimension(), param.dtype())
+          dimension = param.dimension()
+          dtype = param.dtype()
+          initializer = param.initializer()
+
+          table_id = kraken_native.register_sparse_table_v2(name=real_name,
+                                                            dimension=dimension,
+                                                            dtype=dtype,
+                                                            init_type=initializer.type(),
+                                                            init_conf=initializer.conf())
+
           param.set_table_id(table_id)
           param.set_name(real_name)
 

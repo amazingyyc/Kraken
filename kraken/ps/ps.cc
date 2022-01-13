@@ -2,6 +2,11 @@
 
 #include "common/error_code.h"
 #include "common/log.h"
+#include "ps/initializer/constant_initializer.h"
+#include "ps/initializer/normal_initializer.h"
+#include "ps/initializer/uniform_initializer.h"
+#include "ps/initializer/xavier_normal_initializer.h"
+#include "ps/initializer/xavier_uniform_initializer.h"
 #include "ps/optim/adagrad.h"
 #include "ps/optim/adam.h"
 #include "ps/optim/rmsprop.h"
@@ -27,7 +32,7 @@ int32_t Ps::RegisterModel(
   auto it = models_.find(id);
   if (it != models_.end()) {
     // (TODO) check name and optim type.
-    LOG_INFO("Registerd model: " << name << ", id: " << it->second->Id()
+    LOG_INFO("Registerd model: " << name << ", id: " << it->second->id()
                                  << " already exist.");
 
     return ErrorCode::kSuccess;
@@ -50,7 +55,7 @@ int32_t Ps::RegisterModel(
   models_.emplace(id, std::move(model));
 
   LOG_INFO("Register model:" << name << ", id:" << id
-                             << ", optim_type:" << optim_type);
+                             << ", optim_type:" << (uint32_t)optim_type);
 
   return ErrorCode::kSuccess;
 }
@@ -78,6 +83,36 @@ int32_t Ps::RegisterSparseTable(uint64_t model_id, uint64_t id,
   }
 
   return it->second->RegisterSparseTable(id, name, dimension, etype);
+}
+
+int32_t Ps::RegisterSparseTableV2(
+    uint64_t model_id, uint64_t id, const std::string& name, int64_t dimension,
+    ElementType etype, InitializerType init_type,
+    const std::unordered_map<std::string, std::string>& init_conf) {
+  std::unique_ptr<Initializer> initializer;
+  if (init_type == InitializerType::kConstant) {
+    initializer.reset(new ConstantInitializer(init_conf));
+  } else if (init_type == InitializerType::kNormal) {
+    initializer.reset(new NormalInitializer(init_conf));
+  } else if (init_type == InitializerType::kUniform) {
+    initializer.reset(new UniformInitializer(init_conf));
+  } else if (init_type == InitializerType::kXavierNormal) {
+    initializer.reset(new XavierNormalInitializer(init_conf));
+  } else if (init_type == InitializerType::kXavierUniform) {
+    initializer.reset(new XavierUniformInitializer(init_conf));
+  } else {
+    return ErrorCode::kUnSupportInitializerTypeError;
+  }
+
+  std::shared_lock<std::shared_mutex> lock(mu_);
+
+  auto it = models_.find(model_id);
+  if (it == models_.end()) {
+    return ErrorCode::kUnRegisterModelError;
+  }
+
+  return it->second->RegisterSparseTable(id, name, dimension, etype,
+                                         std::move(initializer));
 }
 
 int32_t Ps::PushDenseTable(uint64_t model_id, uint64_t table_id,

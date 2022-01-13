@@ -8,7 +8,7 @@
 
 namespace kraken {
 
-enum InitializerType : uint8_t {
+enum class InitializerType : uint8_t {
   kConstant = 0,
   kUniform = 1,
   kNormal = 2,
@@ -22,21 +22,27 @@ protected:
 
   std::unordered_map<std::string, std::string> conf_;
 
-public:
+protected:
+  Initializer(InitializerType type) : type_(type) {
+  }
+
   Initializer(InitializerType type,
               const std::unordered_map<std::string, std::string>& conf)
       : type_(type), conf_(conf) {
   }
 
-  virtual ~Initializer() = default;
-
-protected:
   template <typename T>
   bool GetConf(const std::string& k, T* v) {
     return false;
   }
 
 public:
+  virtual ~Initializer() = default;
+
+  InitializerType type() const {
+    return type_;
+  }
+
   virtual void Initialize(Tensor* val) const = 0;
 };
 

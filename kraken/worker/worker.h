@@ -374,6 +374,23 @@ public:
                                ElementType etype);
 
   /**
+   * \brief Register a sparse table. thread-safe.
+   *
+   * A sparse table will register in all server.
+   *
+   * \param name Sparse table name.
+   * \param dimension the table dimension
+   * \param etype table element type.
+   * \param init_type Initialize type.
+   * \param init_conf Initialize config.
+   * \return uint64_t table id.
+   */
+  uint64_t RegisterSparseTableV2(
+      const std::string& name, int64_t dimension, ElementType etype,
+      InitializerType init_type,
+      const std::unordered_map<std::string, std::string>& init_conf);
+
+  /**
    * \brief Push gradient for special dense table.
    *
    * \param table_id Table id.

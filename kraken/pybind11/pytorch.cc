@@ -132,6 +132,17 @@ uint64_t RegisterSparseTable(const std::string& name, int64_t dimension,
   return worker.RegisterSparseTable(name, dimension, etype);
 }
 
+uint64_t RegisterSparseTableV2(
+    const std::string& name, int64_t dimension, pybind11::object dtype,
+    InitializerType init_type,
+    const std::unordered_map<std::string, std::string>& init_conf) {
+  torch::Dtype ttype = torch::python::detail::py_object_to_dtype(dtype);
+  ElementType etype = TorchDTypeToElementType(ttype);
+
+  return worker.RegisterSparseTableV2(name, dimension, etype, init_type,
+                                      init_conf);
+}
+
 void PushDenseTable(uint64_t table_id, torch::Tensor grad) {
   ARGUMENT_CHECK(!grad.is_cuda(), "PushDenseTable need torch::Tensor is CPU.");
 

@@ -11,8 +11,11 @@
 
 namespace kraken {
 
-Caller::Caller(const std::string& addr)
-    : addr_(addr), started_(false), stop_(false) {
+Caller::Caller(const std::string& addr, CompressType compress_type)
+    : addr_(addr),
+      compress_type_(compress_type),
+      started_(false),
+      stop_(false) {
 }
 
 Caller::~Caller() {
@@ -42,7 +45,8 @@ void Caller::HandleMsg(zmq_msg_t& reply) {
     callback_funcs_.erase(it);
   }
 
-  callback(reply_header, deserializer);
+  callback(reply_header, reply_data + sizeof(reply_header),
+           reply_size - sizeof(reply_header));
 }
 
 void Caller::Run(void* zmp_context, const std::string& addr, zmq_fd_t efd) {
@@ -95,7 +99,7 @@ void Caller::Run(void* zmp_context, const std::string& addr, zmq_fd_t efd) {
 
       for (;;) {
         // Read buffer from queue.
-        MutableBuffer buffer;
+        ZMQBuffer buffer;
         {
           std::unique_lock<std::mutex> lock(buf_que_mu_);
 
@@ -107,18 +111,18 @@ void Caller::Run(void* zmp_context, const std::string& addr, zmq_fd_t efd) {
           buf_que_.pop();
         }
 
-        char* ptr;
-        size_t length;
+        void* ptr;
+        size_t capacity;
         size_t offset;
+        void (*zmq_free)(void*, void*);
 
-        buffer.Transfer(&ptr, &length, &offset);
+        buffer.Transfer(&ptr, &capacity, &offset, &zmq_free);
 
         // send by socket.
         zmq_msg_t msg;
 
         // zero copy.
-        ZMQ_CALL(zmq_msg_init_data(&msg, ptr, offset, MutableBuffer::ZMQFree,
-                                   nullptr));
+        ZMQ_CALL(zmq_msg_init_data(&msg, ptr, offset, zmq_free, nullptr));
         ZMQ_CALL(zmq_msg_send(&msg, zsocket, 0));
         ZMQ_CALL(zmq_msg_close(&msg));
       }
@@ -128,7 +132,7 @@ void Caller::Run(void* zmp_context, const std::string& addr, zmq_fd_t efd) {
   ZMQ_CALL(zmq_close(zsocket));
 }
 
-void Caller::SendBuffer(MutableBuffer&& buffer) {
+void Caller::SendBuffer(ZMQBuffer&& buffer) {
   {
     std::unique_lock<std::mutex> lock(buf_que_mu_);
     buf_que_.emplace(std::move(buffer));

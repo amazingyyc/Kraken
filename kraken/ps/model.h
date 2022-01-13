@@ -4,6 +4,7 @@
 #include <shared_mutex>
 #include <unordered_map>
 
+#include "ps/initializer/initializer.h"
 #include "ps/optim/optim.h"
 #include "ps/table.h"
 
@@ -20,7 +21,7 @@ private:
   std::shared_mutex mu_;
 
   std::unique_ptr<Optim> optim_;
-  std::unordered_map<uint64_t, std::unique_ptr<Table>> tables_;
+  phmap::flat_hash_map<uint64_t, std::unique_ptr<Table>> tables_;
 
 public:
   Model(uint64_t id, const std::string& name, std::unique_ptr<Optim>&& optim);
@@ -28,15 +29,19 @@ public:
   ~Model() = default;
 
 public:
-  uint16_t Id() const;
+  uint16_t id() const;
 
-  const std::string& Name() const;
+  const std::string& name() const;
 
   int32_t RegisterDenseTable(uint64_t id, const std::string& name,
                              const Tensor& var);
 
   int32_t RegisterSparseTable(uint64_t id, const std::string& name,
                               int64_t dimension, ElementType etype);
+
+  int32_t RegisterSparseTable(uint64_t id, const std::string& name,
+                              int64_t dimension, ElementType etype,
+                              std::unique_ptr<Initializer>&& initializer);
 
   int32_t PushDenseTable(uint64_t table_id, const Tensor& grad, float lr);
 

@@ -37,6 +37,9 @@ private:
   int32_t RegisterSparseTable(const RegisterSparseTableRequest&,
                               RegisterSparseTableResponse*);
 
+  int32_t RegisterSparseTableV2(const RegisterSparseTableV2Request&,
+                                RegisterSparseTableV2Response*);
+
   int32_t PushDenseTable(const PushDenseTableRequest&, PushDenseTableResponse*);
 
   int32_t PullDenseTable(const PullDenseTableRequest&, PullDenseTableResponse*);

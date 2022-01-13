@@ -19,9 +19,10 @@ void Server::HandleError(uint64_t timestamp, int32_t error_code,
   ReplyHeader reply_header;
   reply_header.timestamp = timestamp;
   reply_header.error_code = error_code;
+  reply_header.compress_type = CompressType::kNo;
 
-  MutableBuffer reply_buffer;
-  Serialize serializer(&reply_buffer);
+  MutableBuffer buf;
+  Serialize serializer(&buf);
 
   ARGUMENT_CHECK(serializer << reply_header, "serialize reply header error!");
 
@@ -30,16 +31,19 @@ void Server::HandleError(uint64_t timestamp, int32_t error_code,
   ZMQ_CALL(zmq_msg_init(&replyid));
   ZMQ_CALL(zmq_msg_copy(&replyid, &identity));
 
-  char* ptr;
-  size_t length;
-  size_t offset;
+  ZMQBuffer z_buf;
+  buf.TransferForZMQ(&z_buf);
 
-  reply_buffer.Transfer(&ptr, &length, &offset);
+  void* ptr = nullptr;
+  size_t capacity = 0;
+  size_t offset = 0;
+  void (*zmq_free)(void*, void*) = nullptr;
+
+  z_buf.Transfer(&ptr, &capacity, &offset, &zmq_free);
 
   // init reply
   zmq_msg_t reply;
-  ZMQ_CALL(
-      zmq_msg_init_data(&reply, ptr, offset, MutableBuffer::ZMQFree, nullptr));
+  ZMQ_CALL(zmq_msg_init_data(&reply, ptr, offset, zmq_free, nullptr));
 
   ZMQ_CALL(zmq_msg_send(&replyid, socket, ZMQ_SNDMORE));
   ZMQ_CALL(zmq_msg_send(&reply, socket, 0));
@@ -52,12 +56,10 @@ void Server::HandleMsg(zmq_msg_t& identity, zmq_msg_t& msg, void* socket) {
   size_t req_size = zmq_msg_size(&msg);
   const char* req_data = (const char*)zmq_msg_data(&msg);
 
-  // try to deserialize request header.
-  Deserialize deserializer(req_data, req_size);
+  Deserialize header_d(req_data, req_size);
 
   RequestHeader req_header;
-  ARGUMENT_CHECK(deserializer >> req_header,
-                 "deserialize request header error!");
+  ARGUMENT_CHECK(header_d >> req_header, "Deserialize request header error!");
 
   auto it = funcs_.find(req_header.type);
   if (it == funcs_.end()) {
@@ -66,29 +68,29 @@ void Server::HandleMsg(zmq_msg_t& identity, zmq_msg_t& msg, void* socket) {
     return;
   }
 
-  MutableBuffer reply_buf;
-  Serialize serializer(&reply_buf);
+  ZMQBuffer z_buf;
+  int32_t ecode = it->second(req_header, req_data + sizeof(req_header),
+                             req_size - sizeof(req_header), &z_buf);
 
-  int32_t error_code = it->second(req_header, deserializer, &serializer);
-  if (error_code != ErrorCode::kSuccess) {
-    HandleError(req_header.timestamp, error_code, identity, socket);
+  if (ecode != ErrorCode::kSuccess) {
+    HandleError(req_header.timestamp, ecode, identity, socket);
     return;
   }
+
+  void* ptr = nullptr;
+  size_t capacity = 0;
+  size_t offset = 0;
+  void (*zmq_free)(void*, void*) = nullptr;
+
+  z_buf.Transfer(&ptr, &capacity, &offset, &zmq_free);
 
   // send reply.
   zmq_msg_t replyid;
   ZMQ_CALL(zmq_msg_init(&replyid));
   ZMQ_CALL(zmq_msg_copy(&replyid, &identity));
 
-  char* ptr;
-  size_t length;
-  size_t offset;
-
-  reply_buf.Transfer(&ptr, &length, &offset);
-
   zmq_msg_t reply;
-  ZMQ_CALL(
-      zmq_msg_init_data(&reply, ptr, offset, MutableBuffer::ZMQFree, nullptr));
+  ZMQ_CALL(zmq_msg_init_data(&reply, ptr, offset, zmq_free, nullptr));
 
   ZMQ_CALL(zmq_msg_send(&replyid, socket, ZMQ_SNDMORE));
   ZMQ_CALL(zmq_msg_send(&reply, socket, 0));

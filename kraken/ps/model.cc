@@ -3,6 +3,7 @@
 #include "common/error_code.h"
 #include "common/log.h"
 #include "ps/dense_table.h"
+#include "ps/initializer/normal_initializer.h"
 #include "ps/sparse_table.h"
 
 namespace kraken {
@@ -12,11 +13,11 @@ Model::Model(uint64_t id, const std::string& name,
     : id_(id), name_(name), optim_(std::move(optim)) {
 }
 
-uint16_t Model::Id() const {
+uint16_t Model::id() const {
   return id_;
 }
 
-const std::string& Model::Name() const {
+const std::string& Model::name() const {
   return name_;
 }
 
@@ -58,6 +59,15 @@ int32_t Model::RegisterDenseTable(uint64_t id, const std::string& name,
 
 int32_t Model::RegisterSparseTable(uint64_t id, const std::string& name,
                                    int64_t dimension, ElementType etype) {
+  std::unique_ptr<Initializer> initializer(new NormalInitializer(0, 1.0));
+
+  return RegisterSparseTable(id, name, dimension, etype,
+                             std::move(initializer));
+}
+
+int32_t Model::RegisterSparseTable(uint64_t id, const std::string& name,
+                                   int64_t dimension, ElementType etype,
+                                   std::unique_ptr<Initializer>&& initializer) {
   std::unique_lock<std::shared_mutex> lock(mu_);
 
   if (dimension <= 0) {
@@ -83,8 +93,8 @@ int32_t Model::RegisterSparseTable(uint64_t id, const std::string& name,
     return ErrorCode::kSuccess;
   }
 
-  std::unique_ptr<SparseTable> table(
-      new SparseTable(optim_.get(), id, name, dimension, etype));
+  std::unique_ptr<SparseTable> table(new SparseTable(
+      optim_.get(), id, name, dimension, etype, std::move(initializer)));
 
   tables_.emplace(id, std::move(table));
 

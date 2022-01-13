@@ -5,20 +5,18 @@
 
 #include "common/tensor.h"
 #include "common/utils.h"
+#include "parallel_hashmap/parallel_hashmap/phmap.h"
 
 namespace kraken {
 
-/**
- * \brief Optim type.
- */
-enum OptimType : uint8_t {
+enum class OptimType : uint8_t {
   kAdagrad = 0,
   kAdam = 1,
   kRMSprop = 2,
   kSGD = 3,
 };
 
-enum StateType : uint32_t {
+enum class StateType : uint32_t {
   kSteps = 0,
   kMomentumBuffer = 1,
   kStateSum = 2,
@@ -35,10 +33,10 @@ enum StateType : uint32_t {
  */
 struct Bag {
   // tensor state.
-  std::unordered_map<uint32_t, Tensor> state;
+  phmap::flat_hash_map<StateType, Tensor> state;
 
   // integer state.
-  std::unordered_map<uint32_t, int64_t> state_i;
+  phmap::flat_hash_map<StateType, int64_t> state_i;
 };
 
 class Optim {

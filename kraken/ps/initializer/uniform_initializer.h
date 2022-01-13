@@ -15,8 +15,7 @@ private:
   float upper_;
 
 public:
-  UniformInitializer(InitializerType type,
-                     const std::unordered_map<std::string, std::string>& conf);
+  UniformInitializer(const std::unordered_map<std::string, std::string>& conf);
 
   void Initialize(Tensor* val) const override;
 };

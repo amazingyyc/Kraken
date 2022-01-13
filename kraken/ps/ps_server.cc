@@ -35,6 +35,13 @@ int32_t PsServer::RegisterSparseTable(const RegisterSparseTableRequest& req,
                                  req.etype);
 }
 
+int32_t PsServer::RegisterSparseTableV2(const RegisterSparseTableV2Request& req,
+                                        RegisterSparseTableV2Response* rsp) {
+  return ps_.RegisterSparseTableV2(req.model_id, req.id, req.name,
+                                   req.dimension, req.etype, req.init_type,
+                                   req.init_conf);
+}
+
 int32_t PsServer::PushDenseTable(const PushDenseTableRequest& req,
                                  PushDenseTableResponse* rsp) {
   return ps_.PushDenseTable(req.model_id, req.table_id, req.grad, req.lr);
@@ -80,6 +87,7 @@ void PsServer::RegisterFuncs() {
   REGISTER_FUNC(RegisterModel, RegisterModel);
   REGISTER_FUNC(RegisterDenseTable, RegisterDenseTable);
   REGISTER_FUNC(RegisterSparseTable, RegisterSparseTable);
+  REGISTER_FUNC(RegisterSparseTableV2, RegisterSparseTableV2);
   REGISTER_FUNC(PushDenseTable, PushDenseTable);
   REGISTER_FUNC(PullDenseTable, PullDenseTable);
   REGISTER_FUNC(PullListDenseTable, PullListDenseTable);
