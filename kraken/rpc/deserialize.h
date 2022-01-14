@@ -10,6 +10,7 @@
 #include "common/shape.h"
 #include "common/tensor.h"
 #include "common/tensor_storage.h"
+#include "ps/initializer/initializer.h"
 #include "ps/optim/optim.h"
 #include "ps/table.h"
 #include "rpc/protocol.h"
@@ -19,18 +20,27 @@ namespace kraken {
 class Deserialize {
 private:
   const char* ptr_;
-  size_t len_;
+  size_t length_;
   size_t offset_;
 
 public:
-  Deserialize(const char* ptr, size_t len) : ptr_(ptr), len_(len), offset_(0) {
+  Deserialize(const char* ptr, size_t length)
+      : ptr_(ptr), length_(length), offset_(0) {
   }
 
-  ~Deserialize() = default;
+  ~Deserialize() {
+    ptr_ = nullptr;
+    length_ = 0;
+    offset_ = 0;
+  }
 
 public:
-  bool read(void* target, size_t size) {
-    if (offset_ + size > len_) {
+  size_t offset() const {
+    return offset_;
+  }
+
+  bool Read(void* target, size_t size) {
+    if (ptr_ == nullptr || offset_ + size > length_) {
       return false;
     }
 
@@ -50,7 +60,7 @@ public:
   template <> \
   inline bool Deserialize::operator>>(T& v) { \
     static_assert(std::is_pod<T>::value, #T " must be a POD type."); \
-    return read(&v, sizeof(v)); \
+    return Read(&v, sizeof(v)); \
   }
 
 BASIC_TYPE_DESERIALIZE(bool);
@@ -76,7 +86,7 @@ BASIC_TYPE_DESERIALIZE(double);
       return false; \
     } \
     v.resize(size); \
-    return read(&(v[0]), size * sizeof(T)); \
+    return Read(&(v[0]), size * sizeof(T)); \
   }
 
 VEC_BASIC_TYPE_DESERIALIZE(uint8_t);
@@ -101,17 +111,45 @@ inline bool Deserialize::operator>>(std::string& v) {
 
   v.resize(size);
 
-  return read((void*)v.data(), size);
+  return Read((void*)v.data(), size);
+}
+
+template <>
+inline bool Deserialize::operator>>(CompressType& v) {
+  uint8_t type;
+  if (!((*this) >> type)) {
+    return false;
+  }
+
+  v = (CompressType)type;
+
+  return true;
 }
 
 template <>
 inline bool Deserialize::operator>>(RequestHeader& v) {
-  return (*this) >> v.timestamp && (*this) >> v.type;
+  static_assert(std::is_pod<RequestHeader>::value,
+                "RequestHeader must be a POD type.");
+  return Read(&v, sizeof(v));
 }
 
 template <>
 inline bool Deserialize::operator>>(ReplyHeader& v) {
-  return (*this) >> v.timestamp && (*this) >> v.error_code;
+  static_assert(std::is_pod<ReplyHeader>::value,
+                "ReplyHeader must be a POD type.");
+  return Read(&v, sizeof(v));
+}
+
+template <>
+inline bool Deserialize::operator>>(InitializerType& v) {
+  uint8_t type;
+  if (!((*this) >> type)) {
+    return false;
+  }
+
+  v = (InitializerType)type;
+
+  return true;
 }
 
 template <>
@@ -205,7 +243,7 @@ inline bool Deserialize::operator>>(Tensor& v) {
   size_t size = shape.Size() * etype.ByteWidth();
   auto storage = TensorStorage::Create(size);
 
-  if (read(storage->ptr(), size) == false) {
+  if (Read(storage->ptr(), size) == false) {
     return false;
   }
 

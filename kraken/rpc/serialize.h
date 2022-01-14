@@ -6,28 +6,36 @@
 #include <vector>
 
 #include "common/element_type.h"
-#include "common/mutable_buffer.h"
 #include "common/shape.h"
 #include "common/tensor.h"
+#include "common/zmq_buffer.h"
+#include "ps/initializer/initializer.h"
 #include "ps/optim/optim.h"
 #include "ps/table.h"
 #include "rpc/protocol.h"
 
 namespace kraken {
 
+class IBuffer {
+public:
+  virtual void Write(const char* ptr, size_t size) = 0;
+
+  virtual void TransferForZMQ(ZMQBuffer* z_buf) = 0;
+};
+
 class Serialize {
 private:
   // We donot remove or clear the buffer, just append data.
-  MutableBuffer* buf_;
+  IBuffer* buf_;
 
 public:
-  Serialize(MutableBuffer* buf) : buf_(buf) {
+  Serialize(IBuffer* buf) : buf_(buf) {
   }
 
   ~Serialize() = default;
 
-  bool Append(const void* ptr, size_t size) {
-    buf_->Append((const char*)ptr, size);
+  bool Write(const void* ptr, size_t size) {
+    buf_->Write((const char*)ptr, size);
     return true;
   }
 
@@ -41,7 +49,7 @@ public:
   template <> \
   inline bool Serialize::operator<<(const T& v) { \
     static_assert(std::is_pod<T>::value, #T " must be a POD type."); \
-    return Append(&v, sizeof(v)); \
+    return Write(&v, sizeof(v)); \
   }
 
 BASIC_TYPE_SERIALIZE(bool);
@@ -66,7 +74,7 @@ BASIC_TYPE_SERIALIZE(double);
     if (((*this) << size) == false) { \
       return false; \
     } \
-    return Append(&(v[0]), size * sizeof(T)); \
+    return Write(&(v[0]), size * sizeof(T)); \
   }
 
 VEC_BASIC_TYPE_SERIALIZE(uint8_t);
@@ -89,17 +97,31 @@ inline bool Serialize::operator<<(const std::string& v) {
     return false;
   }
 
-  return Append(v.data(), v.size());
+  return Write(v.data(), v.size());
+}
+
+template <>
+inline bool Serialize::operator<<(const CompressType& v) {
+  return (*this) << (uint8_t)v;
 }
 
 template <>
 inline bool Serialize::operator<<(const RequestHeader& v) {
-  return (*this) << v.timestamp && (*this) << v.type;
+  static_assert(std::is_pod<RequestHeader>::value,
+                "RequestHeader must be a POD type.");
+  return Write(&v, sizeof(v));
 }
 
 template <>
 inline bool Serialize::operator<<(const ReplyHeader& v) {
-  return (*this) << v.timestamp && (*this) << v.error_code;
+  static_assert(std::is_pod<ReplyHeader>::value,
+                "ReplyHeader must be a POD type.");
+  return Write(&v, sizeof(v));
+}
+
+template <>
+inline bool Serialize::operator<<(const InitializerType& v) {
+  return (*this) << (uint8_t)v;
 }
 
 template <>
@@ -151,7 +173,7 @@ inline bool Serialize::operator<<(const Tensor& v) {
     return false;
   }
 
-  return Append(v.Ptr(), v.NumBytes());
+  return Write(v.Ptr(), v.NumBytes());
 }
 
 template <>

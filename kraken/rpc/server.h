@@ -13,17 +13,20 @@
 #include "common/error_code.h"
 #include "common/exception.h"
 #include "common/log.h"
+#include "common/snappy.h"
+#include "common/zmq_buffer.h"
 #include "rpc/deserialize.h"
 #include "rpc/protocol.h"
 #include "rpc/serialize.h"
+#include "snappy.h"
 
 namespace kraken {
 
 // A RPC server will bind a port and RPC functions to responds client's request.
 class Server {
 private:
-  using FUNC =
-      std::function<int32_t(const RequestHeader&, Deserialize&, Serialize*)>;
+  using FUNC = std::function<int32_t(const RequestHeader&, const char*, size_t,
+                                     ZMQBuffer*)>;
 
   uint32_t port_;
 
@@ -61,9 +64,89 @@ private:
 
   void WorkerRun(void* zmp_context);
 
+  template <typename RequestType>
+  int32_t NoUnCompress(const char* body, size_t body_len, RequestType* req) {
+    Deserialize deserialize(body, body_len);
+    if ((deserialize >> (*req)) == false) {
+      return ErrorCode::kDeserializeRequestError;
+    }
+
+    return ErrorCode::kSuccess;
+  }
+
+  template <typename RequestType>
+  int32_t SnappyUnCompress(const char* body, size_t body_len,
+                           RequestType* req) {
+    SnappySource source(body, body_len);
+    SnappySink sink;
+
+    if (snappy::Uncompress(&source, &sink) == false) {
+      return ErrorCode::kSnappyUncompressError;
+    }
+
+    Deserialize deserialize(sink.ptr(), sink.offset());
+    if ((deserialize >> (*req)) == false) {
+      return ErrorCode::kDeserializeRequestError;
+    }
+
+    return ErrorCode::kSuccess;
+  }
+
+  template <typename ReplyType>
+  int32_t NoCompress(const ReplyHeader& reply_header, const ReplyType& reply,
+                     ZMQBuffer* z_buf) {
+    MutableBuffer buffer;
+    Serialize serialize(&buffer);
+
+    ARGUMENT_CHECK(serialize << reply_header, "Serialize reply header error!");
+
+    if ((serialize << reply) == false) {
+      return ErrorCode::kSerializeReplyError;
+    }
+
+    // Transfer to ZMQBuffer.
+    buffer.TransferForZMQ(z_buf);
+
+    return ErrorCode::kSuccess;
+  }
+
+  template <typename ReplyType>
+  int32_t SnappyCompress(const ReplyHeader& reply_header,
+                         const ReplyType& reply, ZMQBuffer* z_buf) {
+    SnappySink sink;
+
+    // step1 serialize header.
+    {
+      Serialize serialize(&sink);
+      ARGUMENT_CHECK(serialize << reply_header,
+                     "Serialize reply header error!");
+    }
+
+    // step2 serialize body to tmp buffer.
+    MutableBuffer body_buf;
+    {
+      Serialize serialize(&body_buf);
+      if ((serialize << reply) == false) {
+        return ErrorCode::kSerializeReplyError;
+      }
+    }
+
+    // Step3 compress body data to sink.
+    {
+      SnappySource source(body_buf.ptr(), body_buf.offset());
+      if (snappy::Compress(&source, &sink) == false) {
+        return ErrorCode::kSnappyCompressError;
+      }
+    }
+
+    sink.TransferForZMQ(z_buf);
+
+    return ErrorCode::kSuccess;
+  }
+
 public:
   /**
-   * \brief Reguster a RPC function to this server.
+   * \brief Reguster a RPC function to this server. Not thread-safe.
    *
    * Every RPC func has a Request and Response, the server accept the request
    * and return the response.
@@ -82,37 +165,44 @@ public:
                    "The server has been started, must call register_func "
                    "before call start.");
 
-    auto func = [callback{std::move(callback)}](
-                    const RequestHeader& req_header, Deserialize& deserializer,
-                    Serialize* serializer) mutable -> int32_t {
-      // deserializer has been fetch the RequestHeader
-      // serializer is empty, this func should responsible to insert reply
-      // header.
+    auto func = [this, callback{std::move(callback)}](
+                    const RequestHeader& req_header, const char* body,
+                    size_t body_len, ZMQBuffer* z_buf) -> int32_t {
       RequestType req;
       ReplyType reply;
 
-      if ((deserializer >> req) == false) {
-        return ErrorCode::kDeserializeRequestError;
+      auto ecode = ErrorCode::kSuccess;
+
+      if (req_header.compress_type == CompressType::kNo) {
+        ecode = this->NoUnCompress<RequestType>(body, body_len, &req);
+      } else if (req_header.compress_type == CompressType::kSnappy) {
+        ecode = this->SnappyUnCompress<RequestType>(body, body_len, &req);
+      } else {
+        return ErrorCode::kUnSupportCompressTypeError;
       }
 
-      int32_t error_code = callback(req, &reply);
-      if (error_code != ErrorCode::kSuccess) {
-        return error_code;
+      if (ecode != ErrorCode::kSuccess) {
+        return ecode;
+      }
+
+      ecode = callback(req, &reply);
+
+      if (ecode != ErrorCode::kSuccess) {
+        return ecode;
       }
 
       ReplyHeader reply_header;
       reply_header.timestamp = req_header.timestamp;
       reply_header.error_code = ErrorCode::kSuccess;
+      reply_header.compress_type = req_header.compress_type;
 
-      // serialize repy header just crash.
-      ARGUMENT_CHECK((*serializer) << reply_header,
-                     "serialize reply header error!");
-
-      if (((*serializer) << reply) == false) {
-        return ErrorCode::kSerializeReplyError;
+      if (reply_header.compress_type == CompressType::kNo) {
+        return this->NoCompress<ReplyType>(reply_header, reply, z_buf);
+      } else if (reply_header.compress_type == CompressType::kSnappy) {
+        return this->SnappyCompress<ReplyType>(reply_header, reply, z_buf);
+      } else {
+        return ErrorCode::kUnSupportCompressTypeError;
       }
-
-      return ErrorCode::kSuccess;
     };
 
     funcs_.emplace(type, std::move(func));

@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "parallel_hashmap/parallel_hashmap/phmap.h"
 #include "ps/table.h"
 
 namespace kraken {
@@ -24,15 +25,15 @@ private:
     std::string name;
     uint64_t id;
 
-    std::unordered_map<std::string, uint64_t> table_id_map_;
-    std::unordered_map<uint64_t, Table> tables_;
+    phmap::flat_hash_map<std::string, uint64_t> table_id_map_;
+    phmap::flat_hash_map<uint64_t, Table> tables_;
   };
 
 private:
   std::shared_mutex mu_;
 
-  std::unordered_map<std::string, uint64_t> model_id_map_;
-  std::unordered_map<uint64_t, Model> models_;
+  phmap::flat_hash_map<std::string, uint64_t> model_id_map_;
+  phmap::flat_hash_map<uint64_t, Model> models_;
 
 public:
   /**

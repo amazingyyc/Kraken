@@ -94,8 +94,16 @@ public:
   // Zero current
   Tensor Zero();
 
-  // normalize initialize
-  Tensor Norm(float lower, float upper);
+  // Normal initialize
+  Tensor Normal(float mean, float stddev);
+
+  Tensor XavierNormal(float gain);
+
+  Tensor Uniform(float lower, float upper);
+
+  Tensor XavierUniform(float gain);
+
+  Tensor Constant(float v);
 
   // Fetch one vector from a tesnor. the tensor must be a matrix.
   // Shape the same storage.
@@ -110,14 +118,14 @@ public:
   // Concat to matrix.
   Tensor ConcatVec(const std::vector<Tensor>& vecs) const;
 
-  // x = x  ^ 2
-  Tensor Square(bool in_place=false);
+  // x = x ^ 2
+  Tensor Square(bool in_place = false);
 
   // x = sqrt(x)
-  Tensor Sqrt(bool in_place=false);
+  Tensor Sqrt(bool in_place = false);
 
   // ret = max(this, other)
-  Tensor Max(const Tensor &other);
+  Tensor Max(const Tensor& other);
 };
 
 // operator override

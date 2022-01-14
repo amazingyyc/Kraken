@@ -10,6 +10,7 @@
 #include "protocol/apply_model_prot.h"
 #include "protocol/apply_table_prot.h"
 #include "protocol/pull_dense_table_prot.h"
+#include "protocol/pull_list_dense_table_prot.h"
 #include "protocol/pull_sparse_table_prot.h"
 #include "protocol/push_dense_table_prot.h"
 #include "protocol/push_pull_dense_table_prot.h"
@@ -212,6 +213,54 @@ uint64_t Worker::RegisterSparseTable(const std::string& name, int64_t dimension,
   return table_id;
 }
 
+uint64_t Worker::RegisterSparseTableV2(
+    const std::string& name, int64_t dimension, ElementType etype,
+    InitializerType init_type,
+    const std::unordered_map<std::string, std::string>& init_conf) {
+  ARGUMENT_CHECK(initialized_.load(), "The worker not initialize.");
+
+  uint64_t table_id;
+
+  {
+    // Apply table id.
+    ApplyTableRequest req;
+    ApplyTableResponse rsp;
+
+    req.model_id = model_id_;
+    req.table_name = name;
+    req.table_type = TableType::kSparse;
+
+    RPC_CALL(clients_[0]->Call(RPCFuncType::kApplyTableType, req, &rsp));
+
+    table_id = rsp.table_id;
+
+    LOG_INFO("Apply SparseTable: " << name << ", id: " << table_id
+                                   << ", from server 0.");
+  }
+
+  {
+    // Register sparse table in all server.
+    RegisterSparseTableV2Request req;
+    std::vector<RegisterSparseTableV2Response> rsps;
+
+    req.model_id = model_id_;
+    req.id = table_id;
+    req.name = name;
+    req.dimension = dimension;
+    req.etype = etype;
+    req.init_type = init_type;
+    req.init_conf = init_conf;
+
+    RPC_CALL(
+        ParallelCallAll(RPCFuncType::kRegisterSparseTableV2Type, req, &rsps));
+
+    LOG_INFO("Register SparseTable: " << name << ", id: " << table_id
+                                      << ", in all server.");
+  }
+
+  return table_id;
+}
+
 void Worker::PushDenseTable(uint64_t table_id, const Tensor& grad) {
   ARGUMENT_CHECK(initialized_.load(), "The worker not initialize.");
 
@@ -246,6 +295,59 @@ Tensor Worker::PullDenseTable(uint64_t table_id) {
       clients_[server_id]->Call(RPCFuncType::kPullDenseTableType, req, &rsp));
 
   return rsp.val;
+}
+
+std::vector<Tensor> Worker::PullListDenseTable(
+    const std::vector<uint64_t>& table_ids) {
+  std::unordered_map<size_t, PullListDenseTableRequest> server_reqs;
+  std::unordered_map<size_t, std::vector<size_t>> origin_indice_map;
+
+  for (size_t i = 0; i < table_ids.size(); ++i) {
+    uint64_t table_id = table_ids[i];
+    size_t server_id = DenseTableRouter(model_id_, table_id);
+
+    if (server_reqs.find(server_id) == server_reqs.end()) {
+      PullListDenseTableRequest req;
+      req.model_id = model_id_;
+
+      server_reqs.emplace(server_id, req);
+    }
+
+    server_reqs[server_id].table_ids.emplace_back(table_id);
+    origin_indice_map[server_id].emplace_back(i);
+  }
+
+  std::vector<size_t> server_indices;
+  server_indices.reserve(server_reqs.size());
+
+  std::vector<PullListDenseTableRequest> reqs;
+  std::vector<PullListDenseTableResponse> rsps;
+
+  reqs.reserve(server_reqs.size());
+  for (auto& item : server_reqs) {
+    server_indices.emplace_back(item.first);
+    reqs.emplace_back(std::move(item.second));
+  }
+
+  RPC_CALL(ParallelCall(RPCFuncType::kPullListDenseTableType, server_indices,
+                        reqs, &rsps));
+
+  std::vector<Tensor> vals;
+  vals.resize(table_ids.size());
+
+  for (size_t i = 0; i < server_indices.size(); ++i) {
+    uint64_t server_id = server_indices[i];
+    const auto& origin_indice = origin_indice_map[server_id];
+    const auto& rsp_vals = rsps[i].vals;
+
+    ARGUMENT_CHECK(origin_indice.size() == rsp_vals.size(), "Internal error.");
+
+    for (size_t j = 0; j < origin_indice.size(); ++j) {
+      vals[origin_indice[j]] = rsp_vals[j];
+    }
+  }
+
+  return vals;
 }
 
 Tensor Worker::PushPullDenseTable(uint64_t table_id, const Tensor& grad) {

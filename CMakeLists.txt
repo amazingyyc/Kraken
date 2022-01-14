@@ -51,7 +51,9 @@ SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -Wall")
 
 # include dir
 include_directories(kraken)
-include_directories(third_party)
+
+# use SYSTEM avoid warning
+include_directories(SYSTEM third_party)
 
 # source file
 file(GLOB_RECURSE KRAKEN_HEAD_FILES "kraken/*.h")
@@ -81,13 +83,15 @@ include(eigen)
 include(pybind11)
 include(gflags)
 
+set(SNAPPY_BUILD_TESTS OFF CACHE BOOL "Close snappy test build" FORCE)
+set(SNAPPY_BUILD_BENCHMARKS OFF CACHE BOOL "Close snappy benchmark build" FORCE)
+set(SNAPPY_INSTALL OFF CACHE BOOL "Close snappy install" FORCE)
+include(snappy)
+
 set(BUILD_TESTS OFF CACHE BOOL "set libzmq BUILD_TESTS to be OFF")
 include(libzmq)
 
-#########################################################################################
-# static library
-# add_library(kraken_base ${KRAKEN_HEAD_FILES} ${KRAKEN_SRC_FILES})
-# target_link_libraries(kraken_base libzmq-static)
+include(parallel_hashmap)
 
 #########################################################################################
 # dynamic library
@@ -103,11 +107,18 @@ add_library(kraken_native SHARED
                     ${KRAKEN_PYBIND11_HEAD_FILES}
                     ${KRAKEN_PYBIND11_SRC_FILES})
 
+# snappy disable RTTI by default so we should disable the sub-class
+set_source_files_properties(kraken/common/snappy.cc
+                            PROPERTIES
+                            COMPILE_FLAGS
+                            -fno-rtti)
+
 # remove lib prefix for kraken_native
 set_target_properties(kraken_native PROPERTIES PREFIX "")
 target_include_directories(kraken_native PUBLIC ${PYTHON_INCLUDE_DIRS})
 target_link_libraries(kraken_native
                       libzmq-static
+                      snappy
                       pybind11_headers
                       ${PYTHON_LIBRARIES}
                       ${TORCH_LIBRARIES}
@@ -119,4 +130,4 @@ add_executable(kraken_server
                 kraken/executable/server_main.cc
                 ${KRAKEN_HEAD_FILES}
                 ${KRAKEN_SRC_FILES})
-target_link_libraries(kraken_server libzmq-static gflags)
+target_link_libraries(kraken_server libzmq-static snappy gflags)

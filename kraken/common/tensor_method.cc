@@ -177,8 +177,32 @@ Tensor Tensor::Zero() {
   return *this;
 }
 
-Tensor Tensor::Norm(float lower, float upper) {
-  math::Norm(*this, lower, upper);
+Tensor Tensor::Normal(float mean, float stddev) {
+  math::Normal(*this, mean, stddev);
+
+  return *this;
+}
+
+Tensor Tensor::XavierNormal(float gain) {
+  math::XavierNormal(*this, gain);
+
+  return *this;
+}
+
+Tensor Tensor::Uniform(float lower, float upper) {
+  math::Uniform(*this, lower, upper);
+
+  return *this;
+}
+
+Tensor Tensor::XavierUniform(float gain) {
+  math::XavierUniform(*this, gain);
+
+  return *this;
+}
+
+Tensor Tensor::Constant(float v) {
+  math::Constant(*this, v);
 
   return *this;
 }

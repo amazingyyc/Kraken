@@ -7,6 +7,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "ps/initializer/initializer.h"
 #include "ps/optim/optim.h"
 #include "pybind11/pytorch.h"
 
@@ -15,11 +16,17 @@ namespace py {
 
 PYBIND11_MODULE(kraken_native, m) {
   pybind11::enum_<OptimType>(m, "OptimType")
-      .value("kAdagrad", kAdagrad)
-      .value("kAdam", kAdam)
-      .value("kRMSprop", kRMSprop)
-      .value("kSGD", kSGD)
-      .export_values();
+      .value("kAdagrad", OptimType::kAdagrad)
+      .value("kAdam", OptimType::kAdam)
+      .value("kRMSprop", OptimType::kRMSprop)
+      .value("kSGD", OptimType::kSGD);
+
+  pybind11::enum_<InitializerType>(m, "InitializerType")
+      .value("kConstant", InitializerType::kConstant)
+      .value("kUniform", InitializerType::kUniform)
+      .value("kNormal", InitializerType::kNormal)
+      .value("kXavierUniform", InitializerType::kXavierUniform)
+      .value("kXavierNormal", InitializerType::kXavierNormal);
 
   m.def("initialize", &Initialize, pybind11::arg("addrs"));
 
@@ -38,10 +45,18 @@ PYBIND11_MODULE(kraken_native, m) {
   m.def("register_sparse_table", &RegisterSparseTable, pybind11::arg("name"),
         pybind11::arg("dimension"), pybind11::arg("dtype"));
 
+  m.def("register_sparse_table_v2", &RegisterSparseTableV2,
+        pybind11::arg("name"), pybind11::arg("dimension"),
+        pybind11::arg("dtype"), pybind11::arg("init_type"),
+        pybind11::arg("init_conf"));
+
   m.def("push_dense_table", &PushDenseTable, pybind11::arg("table_id"),
         pybind11::arg("grad"));
 
   m.def("pull_dense_table", &PullDenseTable, pybind11::arg("table_id"));
+
+  m.def("pull_list_dense_table", &PullListDenseTable,
+        pybind11::arg("table_ids"));
 
   m.def("push_pull_dense_table", &PushPullDenseTable, pybind11::arg("table_id"),
         pybind11::arg("grad"));

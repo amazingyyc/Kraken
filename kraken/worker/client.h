@@ -19,9 +19,9 @@ public:
   Client(uint32_t server_id, const std::string& addr);
 
 public:
-  uint32_t ServerId() const;
+  uint32_t server_id() const;
 
-  const std::string& Addr() const;
+  const std::string& addr() const;
 
   void Start();
 

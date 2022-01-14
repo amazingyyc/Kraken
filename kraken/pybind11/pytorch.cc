@@ -132,6 +132,17 @@ uint64_t RegisterSparseTable(const std::string& name, int64_t dimension,
   return worker.RegisterSparseTable(name, dimension, etype);
 }
 
+uint64_t RegisterSparseTableV2(
+    const std::string& name, int64_t dimension, pybind11::object dtype,
+    InitializerType init_type,
+    const std::unordered_map<std::string, std::string>& init_conf) {
+  torch::Dtype ttype = torch::python::detail::py_object_to_dtype(dtype);
+  ElementType etype = TorchDTypeToElementType(ttype);
+
+  return worker.RegisterSparseTableV2(name, dimension, etype, init_type,
+                                      init_conf);
+}
+
 void PushDenseTable(uint64_t table_id, torch::Tensor grad) {
   ARGUMENT_CHECK(!grad.is_cuda(), "PushDenseTable need torch::Tensor is CPU.");
 
@@ -158,6 +169,25 @@ torch::Tensor PullDenseTable(uint64_t table_id) {
   memcpy(val.data_ptr(), kval.Ptr(), kval.NumBytes());
 
   return val;
+}
+
+std::vector<torch::Tensor> PullListDenseTable(
+    const std::vector<uint64_t>& table_ids) {
+  std::vector<Tensor> kvals = worker.PullListDenseTable(table_ids);
+  std::vector<torch::Tensor> vals;
+
+  for (auto& kv : kvals) {
+    torch::IntArrayRef sizes = ShapeToTorchSizes(kv.shape());
+    torch::Dtype dtype = ElementTypeToTorchDType(kv.element_type());
+
+    torch::Tensor v = torch::zeros(sizes, dtype);
+
+    memcpy(v.data_ptr(), kv.Ptr(), kv.NumBytes());
+
+    vals.emplace_back(v);
+  }
+
+  return vals;
 }
 
 torch::Tensor PushPullDenseTable(uint64_t table_id, torch::Tensor grad) {

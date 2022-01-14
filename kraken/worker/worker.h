@@ -374,6 +374,23 @@ public:
                                ElementType etype);
 
   /**
+   * \brief Register a sparse table. thread-safe.
+   *
+   * A sparse table will register in all server.
+   *
+   * \param name Sparse table name.
+   * \param dimension the table dimension
+   * \param etype table element type.
+   * \param init_type Initialize type.
+   * \param init_conf Initialize config.
+   * \return uint64_t table id.
+   */
+  uint64_t RegisterSparseTableV2(
+      const std::string& name, int64_t dimension, ElementType etype,
+      InitializerType init_type,
+      const std::unordered_map<std::string, std::string>& init_conf);
+
+  /**
    * \brief Push gradient for special dense table.
    *
    * \param table_id Table id.
@@ -388,6 +405,15 @@ public:
    * \return Tensor The dense table.
    */
   Tensor PullDenseTable(uint64_t table_id);
+
+  /**
+   * \brief Pull a list of dense table from server.
+   *
+   * \param table_ids The list of dense table ids.
+   * \return std::vector<Tensor> Dense table value.
+   */
+  std::vector<Tensor> PullListDenseTable(
+      const std::vector<uint64_t>& table_ids);
 
   /**
    * \brief Push gradient and pull val from server.

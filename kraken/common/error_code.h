@@ -24,6 +24,10 @@ struct ErrorCode {
   static constexpr int32_t kSparseTableIdError = 15;
   static constexpr int32_t kSparseTableIdNotExistError = 16;
   static constexpr int32_t kPushSparseTableParameterError = 17;
+  static constexpr int32_t kUnSupportInitializerTypeError = 18;
+  static constexpr int32_t kUnSupportCompressTypeError = 19;
+  static constexpr int32_t kSnappyUncompressError = 20;
+  static constexpr int32_t kSnappyCompressError = 21;
 
   static const char* Msg(int32_t code) {
     switch (code) {
@@ -61,6 +65,8 @@ struct ErrorCode {
         return "Sparse table id not exist.";
       case ErrorCode::kPushSparseTableParameterError:
         return "Push sparse table parameter error.";
+      case ErrorCode::kUnSupportInitializerTypeError:
+        return "UnSupport initializer type.";
       default:
         return "Unknow error.";
     }

@@ -3,14 +3,12 @@
 namespace kraken {
 
 SparseTable::SparseTable(Optim* optim, uint64_t id, const std::string& name,
-                         int64_t dimension, ElementType etype, size_t s_count)
+                         int64_t dimension, ElementType etype,
+                         std::unique_ptr<Initializer>&& initializer)
     : Table(TableType::kSparse, optim, id, name),
       dimension_(dimension),
       etype_(etype),
-      s_count_(s_count),
-      lockers_(s_count),
-      vals_(s_count),
-      bags_(s_count) {
+      initializer_(std::move(initializer)) {
 }
 
 int64_t SparseTable::dimension() const {
@@ -21,34 +19,34 @@ ElementType SparseTable::etype() const {
   return etype_;
 }
 
+Initializer* SparseTable::initializer() const {
+  return initializer_.get();
+}
+
 int32_t SparseTable::Push(const std::vector<int64_t>& indices,
                           const std::vector<Tensor>& grads, float lr) {
   if (indices.size() != grads.size()) {
     return ErrorCode::kPushSparseTableParameterError;
   }
 
+  Optim* l_optim = optim_;
+
   for (size_t i = 0; i < indices.size(); ++i) {
-    int64_t id = indices[i];
-    if (id < 0) {
+    int64_t sparse_id = indices[i];
+    if (sparse_id < 0) {
       return ErrorCode::kSparseTableIdError;
     }
 
-    int64_t vidx = (size_t)id % s_count_;
+    int32_t ecode;
+    bool exist =
+        vals_.modify_if(sparse_id, [l_optim, &grads, i, lr, &ecode](Value& v) {
+          ecode = l_optim->Update(grads[i], lr, &v.val, &v.bag);
+        });
 
-    SpinLockerHandler handler(lockers_[vidx]);
-
-    auto it = vals_[vidx].find(id);
-    if (it == vals_[vidx].end()) {
+    if (exist == false) {
       return ErrorCode::kSparseTableIdNotExistError;
     }
 
-    // Try to find Bag.
-    auto bit = bags_[vidx].find(id);
-    if (bit == bags_[vidx].end()) {
-      return ErrorCode::kSparseTableIdNotExistError;
-    }
-
-    int32_t ecode = optim_->Update(grads[i], lr, &(it->second), &(bit->second));
     if (ecode != ErrorCode::kSuccess) {
       return ecode;
     }
@@ -64,28 +62,28 @@ int32_t SparseTable::Pull(const std::vector<int64_t>& indices,
   vals->resize(indices.size());
 
   for (size_t i = 0; i < indices.size(); ++i) {
-    int64_t id = indices[i];
-    if (id < 0) {
+    int64_t sparse_id = indices[i];
+    if (sparse_id < 0) {
       return ErrorCode::kSparseTableIdError;
     }
 
-    int64_t vidx = (size_t)id % s_count_;
+    bool exist = vals_.if_contains(
+        sparse_id, [vals, i](const Value& v) { (*vals)[i] = v.val.Clone(); });
 
-    SpinLockerHandler handler(lockers_[vidx]);
-
-    auto it = vals_[vidx].find(id);
-    if (it == vals_[vidx].end()) {
+    if (exist == false) {
+      // can not find, insert a new one.
       Tensor t = Tensor::Create({dimension_}, etype_);
+      initializer_->Initialize(&t);
 
-      // (TODO) other initialize method.
-      t.Norm(0, 1.0);
+      // for result.
+      (*vals)[i] = t.Clone();
 
-      vals_[vidx].emplace(id, t);
-      bags_[vidx].emplace(id, Bag());
+      Value v;
+      v.val = t;
+      v.bag = Bag();
+
+      vals_.emplace(sparse_id, v);
     }
-
-    // Must clone or will not thread-safe.
-    (*vals)[i] = vals_[vidx][id].Clone();
   }
 
   return ErrorCode::kSuccess;

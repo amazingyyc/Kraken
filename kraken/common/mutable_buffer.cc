@@ -4,18 +4,18 @@
 
 namespace kraken {
 
-MutableBuffer::MutableBuffer() : ptr_(nullptr), length_(0), offset_(0) {
+MutableBuffer::MutableBuffer() : ptr_(nullptr), capacity_(0), offset_(0) {
 }
 
 MutableBuffer::MutableBuffer(size_t expect) : ptr_(nullptr), offset_(0) {
   ptr_ = (char*)MutableBuffer::Malloc(expect);
-  length_ = expect;
+  capacity_ = expect;
 }
 
 MutableBuffer::MutableBuffer(MutableBuffer&& other)
-    : ptr_(other.ptr_), length_(other.length_), offset_(other.offset_) {
+    : ptr_(other.ptr_), capacity_(other.capacity_), offset_(other.offset_) {
   other.ptr_ = nullptr;
-  other.length_ = 0;
+  other.capacity_ = 0;
   other.offset_ = 0;
 }
 
@@ -24,16 +24,16 @@ const MutableBuffer& MutableBuffer::operator=(MutableBuffer&& other) {
     MutableBuffer::Free(ptr_);
 
     ptr_ = nullptr;
-    length_ = 0;
+    capacity_ = 0;
     offset_ = 0;
   }
 
   ptr_ = other.ptr_;
-  length_ = other.length_;
+  capacity_ = other.capacity_;
   offset_ = other.offset_;
 
   other.ptr_ = nullptr;
-  other.length_ = 0;
+  other.capacity_ = 0;
   other.offset_ = 0;
 
   return *this;
@@ -45,38 +45,42 @@ MutableBuffer::~MutableBuffer() {
   }
 
   ptr_ = nullptr;
-  length_ = 0;
+  capacity_ = 0;
   offset_ = 0;
 }
 
 size_t MutableBuffer::Growth(size_t new_size) const {
-  size_t new_length = length_ + length_ / 2;
+  size_t new_capacity = capacity_ + capacity_ / 2;
 
-  if (new_length >= new_size) {
-    return new_length;
+  if (new_capacity >= new_size) {
+    return new_capacity;
   }
 
   return new_size;
 }
 
-size_t MutableBuffer::Length() const {
-  return length_;
+char* MutableBuffer::ptr() const {
+  return ptr_;
 }
 
-size_t MutableBuffer::Offset() const {
+size_t MutableBuffer::capacity() const {
+  return capacity_;
+}
+
+size_t MutableBuffer::offset() const {
   return offset_;
 }
 
-void MutableBuffer::Append(const char* data, size_t size) {
-  if (ptr_ == nullptr || offset_ + size > length_) {
+void MutableBuffer::Write(const char* bytes, size_t size) {
+  if (ptr_ == nullptr || offset_ + size > capacity_) {
     // increase the buffer.
-    size_t new_length = Growth(offset_ + size);
+    size_t new_capacity = Growth(offset_ + size);
 
-    char* new_ptr = (char*)MutableBuffer::Malloc(new_length);
+    char* new_ptr = (char*)MutableBuffer::Malloc(new_capacity);
 
     // copy old data
     if (offset_ > 0) {
-      memcpy(new_ptr, ptr_, offset_);
+      std::memcpy(new_ptr, ptr_, offset_);
     }
 
     if (ptr_ != nullptr) {
@@ -84,38 +88,28 @@ void MutableBuffer::Append(const char* data, size_t size) {
     }
 
     ptr_ = new_ptr;
-    length_ = new_length;
+    capacity_ = new_capacity;
   }
 
-  memcpy(ptr_ + offset_, data, size);
+  std::memcpy(ptr_ + offset_, bytes, size);
 
   offset_ += size;
 }
 
-void MutableBuffer::Transfer(char** ptr) {
-  *ptr = ptr_;
+void MutableBuffer::TransferForZMQ(ZMQBuffer* z_buf) {
+  z_buf->Reset(ptr_, capacity_, offset_, MutableBuffer::ZMQFree);
 
   ptr_ = nullptr;
-  length_ = 0;
-  offset_ = 0;
-}
-
-void MutableBuffer::Transfer(char** ptr, size_t* length, size_t* offset) {
-  *ptr = ptr_;
-  *length = length_;
-  *offset = offset_;
-
-  ptr_ = nullptr;
-  length_ = 0;
+  capacity_ = 0;
   offset_ = 0;
 }
 
 void* MutableBuffer::Malloc(size_t size) {
-  return malloc(size);
+  return std::malloc(size);
 }
 
 void MutableBuffer::Free(void* ptr) {
-  free(ptr);
+  std::free(ptr);
 }
 
 void MutableBuffer::ZMQFree(void* data, void* /*no use*/) {

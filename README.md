@@ -1,5 +1,5 @@
 # Kraken
-Large Scale Embedding for Sparse Features in PyTorch.
+Large-Scaled, Distributed Deep Learning Training Framework for High-Dimensional Sparse Data Based on PyTorch.
 
 ## Install
 ```python
