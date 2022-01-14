@@ -46,7 +46,7 @@ public:
   size_t offset() const;
 
   // Fo IBuffer.
-  void Attach(const char* bytes, size_t n) override;
+  void Write(const char* bytes, size_t n) override;
 
   void TransferForZMQ(ZMQBuffer* z_buf) override;
 

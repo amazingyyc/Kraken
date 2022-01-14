@@ -71,7 +71,7 @@ size_t MutableBuffer::offset() const {
   return offset_;
 }
 
-void MutableBuffer::Attach(const char* bytes, size_t size) {
+void MutableBuffer::Write(const char* bytes, size_t size) {
   if (ptr_ == nullptr || offset_ + size > capacity_) {
     // increase the buffer.
     size_t new_capacity = Growth(offset_ + size);

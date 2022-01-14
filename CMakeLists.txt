@@ -51,7 +51,9 @@ SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -Wall")
 
 # include dir
 include_directories(kraken)
-include_directories(third_party)
+
+# use SYSTEM avoid warning
+include_directories(SYSTEM third_party)
 
 # source file
 file(GLOB_RECURSE KRAKEN_HEAD_FILES "kraken/*.h")

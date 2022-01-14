@@ -18,7 +18,7 @@ namespace kraken {
 
 class IBuffer {
 public:
-  virtual void Attach(const char* ptr, size_t size) = 0;
+  virtual void Write(const char* ptr, size_t size) = 0;
 
   virtual void TransferForZMQ(ZMQBuffer* z_buf) = 0;
 };
@@ -34,8 +34,8 @@ public:
 
   ~Serialize() = default;
 
-  bool Attach(const void* ptr, size_t size) {
-    buf_->Attach((const char*)ptr, size);
+  bool Write(const void* ptr, size_t size) {
+    buf_->Write((const char*)ptr, size);
     return true;
   }
 
@@ -49,7 +49,7 @@ public:
   template <> \
   inline bool Serialize::operator<<(const T& v) { \
     static_assert(std::is_pod<T>::value, #T " must be a POD type."); \
-    return Attach(&v, sizeof(v)); \
+    return Write(&v, sizeof(v)); \
   }
 
 BASIC_TYPE_SERIALIZE(bool);
@@ -74,7 +74,7 @@ BASIC_TYPE_SERIALIZE(double);
     if (((*this) << size) == false) { \
       return false; \
     } \
-    return Attach(&(v[0]), size * sizeof(T)); \
+    return Write(&(v[0]), size * sizeof(T)); \
   }
 
 VEC_BASIC_TYPE_SERIALIZE(uint8_t);
@@ -97,7 +97,7 @@ inline bool Serialize::operator<<(const std::string& v) {
     return false;
   }
 
-  return Attach(v.data(), v.size());
+  return Write(v.data(), v.size());
 }
 
 template <>
@@ -109,14 +109,14 @@ template <>
 inline bool Serialize::operator<<(const RequestHeader& v) {
   static_assert(std::is_pod<RequestHeader>::value,
                 "RequestHeader must be a POD type.");
-  return Attach(&v, sizeof(v));
+  return Write(&v, sizeof(v));
 }
 
 template <>
 inline bool Serialize::operator<<(const ReplyHeader& v) {
   static_assert(std::is_pod<ReplyHeader>::value,
                 "ReplyHeader must be a POD type.");
-  return Attach(&v, sizeof(v));
+  return Write(&v, sizeof(v));
 }
 
 template <>
@@ -173,7 +173,7 @@ inline bool Serialize::operator<<(const Tensor& v) {
     return false;
   }
 
-  return Attach(v.Ptr(), v.NumBytes());
+  return Write(v.Ptr(), v.NumBytes());
 }
 
 template <>

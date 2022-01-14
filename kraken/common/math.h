@@ -63,5 +63,8 @@ void Sqrt(const Tensor& x, Tensor& y);
 
 void Max(const Tensor& x, const Tensor& y, Tensor& z);
 
+// y = x >= v. y is bool.
+void Ge(const Tensor& x, float v, Tensor& y);
+
 }  // namespace math
 }  // namespace kraken

@@ -39,7 +39,7 @@ enum class DType : uint8_t {
 struct ElementType {
   DType dtype;
 
-  std::string Name() const {
+  const char* Name() const {
     switch (dtype) {
       case DType::kUnKnown:
         return "UnKnown";

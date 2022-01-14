@@ -489,5 +489,26 @@ void Max(const Tensor& x, const Tensor& y, Tensor& z) {
   }
 }
 
+template <typename T>
+void GeImpl(T* x, T v, bool* y, int64_t n) {
+  EVector<T> xv(x, n);
+  EVector<bool> yv(y, n);
+
+  yv.noalias() = (xv.array() >= v).template cast<bool>().matrix();
+}
+
+void Ge(const Tensor& x, float v, Tensor& y) {
+  ARGUMENT_CHECK(x.Size() == y.Size(), "Ge need parameter has same size.");
+  ARGUMENT_CHECK(y.element_type().Is<bool>(), "Ge need y is bool.");
+
+  if (x.element_type().Is<float>()) {
+    GeImpl<float>(x.Data<float>(), v, y.Data<bool>(), x.Size());
+  } else if (x.element_type().Is<double>()) {
+    GeImpl<double>(x.Data<double>(), v, y.Data<bool>(), x.Size());
+  } else {
+    RUNTIME_ERROR("Ge not support ElementType:" << x.element_type().Name());
+  }
+}
+
 }  // namespace math
 }  // namespace kraken
