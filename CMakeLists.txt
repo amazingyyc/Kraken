@@ -5,7 +5,7 @@ if(APPLE)
   set(CMAKE_CXX_COMPILER "g++")
 endif(APPLE)
 
-project(kGraph LANGUAGES C CXX)
+project(Kraken LANGUAGES C CXX)
 
 # c use c11 c++ use 14 avoid zmq build error.
 set(CMAKE_C_STANDARD 11)

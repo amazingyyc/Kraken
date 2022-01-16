@@ -39,6 +39,8 @@ public:
     return impl_->Data<T>();
   }
 
+  std::string Str() const;
+
 public:
   static Tensor Dense(const std::vector<int64_t>& dims, ElementType etype);
 

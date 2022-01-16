@@ -275,7 +275,7 @@ inline bool Deserialize::operator>>(Tensor& v) {
       return false;
     }
 
-    auto impl = std::make_shared<TensorImpl>(shape, storage, 0, etype);
+    auto impl = TensorImpl::Dense(shape, storage, 0, etype);
     v = Tensor(impl);
 
     return true;

@@ -10,7 +10,7 @@
 
 namespace kraken {
 
-class TensorImpl : std::enable_shared_from_this<TensorImpl> {
+class TensorImpl : public std::enable_shared_from_this<TensorImpl> {
 protected:
   // Which kind tensor.
   Layout layout_;
@@ -31,22 +31,26 @@ protected:
   // For sub-class.
   TensorImpl(Layout layout, const Shape& shape);
 
+  // For dense tensor.
+  TensorImpl(const Shape& shape, std::shared_ptr<Storage> storage,
+             size_t offset, ElementType etype);
+
   TensorImpl(const TensorImpl&) = delete;
   TensorImpl& operator=(const TensorImpl&) = delete;
   TensorImpl(TensorImpl&&) = delete;
   TensorImpl& operator=(TensorImpl&&) = delete;
 
 public:
-  // For dense tensor.
-  TensorImpl(const Shape& shape, std::shared_ptr<Storage> storage,
-             size_t offset, ElementType element_type);
-
   virtual ~TensorImpl() = default;
 
 public:
   // Create a Dense TensorImpl.
   static std::shared_ptr<TensorImpl> Dense(const Shape& shape,
                                            ElementType etype);
+
+  static std::shared_ptr<TensorImpl> Dense(const Shape& shape,
+                                           std::shared_ptr<Storage> storage,
+                                           size_t offset, ElementType etype);
 
 public:
   Layout layout() const;

@@ -14,19 +14,27 @@ TensorImpl::TensorImpl(Layout layout, const Shape& shape)
 }
 
 TensorImpl::TensorImpl(const Shape& shape, std::shared_ptr<Storage> storage,
-                       size_t offset, ElementType element_type)
+                       size_t offset, ElementType etype)
     : layout_(Layout::kStride),
       shape_(shape),
       storage_(storage),
       offset_(offset),
-      element_type_(element_type) {
+      element_type_(etype) {
 }
 
 std::shared_ptr<TensorImpl> TensorImpl::Dense(const Shape& shape,
                                               ElementType etype) {
   auto storage = Storage::Create(shape.Size() * etype.ByteWidth());
 
-  return std::make_shared<TensorImpl>(shape, storage, 0, etype);
+  return std::shared_ptr<TensorImpl>(new TensorImpl(shape, storage, 0, etype));
+}
+
+std::shared_ptr<TensorImpl> TensorImpl::Dense(const Shape& shape,
+                                              std::shared_ptr<Storage> storage,
+                                              size_t offset,
+                                              ElementType etype) {
+  return std::shared_ptr<TensorImpl>(
+      new TensorImpl(shape, storage, offset, etype));
 }
 
 Layout TensorImpl::layout() const {
@@ -178,7 +186,7 @@ std::shared_ptr<TensorImpl> TensorImpl::Sub(float v) const {
   ARGUMENT_CHECK(IsDense(), "Sub need Dense TensorImpl.");
 
   auto out = TensorImpl::Dense(shape_, element_type_);
-  math::Sub(v, *this, *out);
+  math::Sub(*this, v, *out);
 
   return out;
 }
@@ -196,7 +204,7 @@ std::shared_ptr<TensorImpl> TensorImpl::Div(float v) const {
   ARGUMENT_CHECK(IsDense(), "Div need Dense TensorImpl.");
 
   auto out = TensorImpl::Dense(shape_, element_type_);
-  math::Div(v, *this, *out);
+  math::Div(*this, v, *out);
 
   return out;
 }
@@ -212,7 +220,7 @@ std::shared_ptr<TensorImpl> TensorImpl::AddAssign(float v) {
 std::shared_ptr<TensorImpl> TensorImpl::SubAssign(float v) {
   ARGUMENT_CHECK(IsDense(), "SubAssign need Dense TensorImpl.");
 
-  math::Sub(v, *this, *this);
+  math::Sub(*this, v, *this);
 
   return shared_from_this();
 }
@@ -228,7 +236,7 @@ std::shared_ptr<TensorImpl> TensorImpl::MulAssign(float v) {
 std::shared_ptr<TensorImpl> TensorImpl::DivAssign(float v) {
   ARGUMENT_CHECK(IsDense(), "DivAssign need Dense TensorImpl.");
 
-  math::Div(v, *this, *this);
+  math::Div(*this, v, *this);
 
   return shared_from_this();
 }
@@ -256,7 +264,7 @@ std::shared_ptr<TensorImpl> TensorImpl::Reshape(const Shape& nshape) const {
   ARGUMENT_CHECK(shape_.Size() == nshape.Size(),
                  "Rshape need shape's size same.");
 
-  return std::make_shared<TensorImpl>(nshape, storage_, offset_, element_type_);
+  return TensorImpl::Dense(nshape, storage_, offset_, element_type_);
 }
 
 std::shared_ptr<TensorImpl> TensorImpl::Reshape(
@@ -349,7 +357,7 @@ std::shared_ptr<TensorImpl> TensorImpl::Vector(int64_t idx) const {
   size_t noffset = offset_ + (idx * col) * element_type_.ByteWidth();
   Shape nshape({col});
 
-  return std::make_shared<TensorImpl>(nshape, storage_, noffset, element_type_);
+  return TensorImpl::Dense(nshape, storage_, noffset, element_type_);
 }
 
 std::shared_ptr<TensorImpl> TensorImpl::ConcatVector(

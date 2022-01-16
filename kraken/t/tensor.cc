@@ -1,5 +1,9 @@
 #include "t/tensor.h"
 
+#include <sstream>
+
+#include "common/exception.h"
+
 namespace kraken {
 
 Tensor::Tensor(std::shared_ptr<TensorImpl> impl) : impl_(impl) {
@@ -41,6 +45,27 @@ void* Tensor::Ptr() const {
   return impl_->Ptr();
 }
 
+std::string Tensor::Str() const {
+  std::stringstream ss;
+  ss << "[";
+
+  int64_t size = Shape().Size();
+  if (element_type().Is<float>()) {
+    for (int64_t i = 0; i < size; ++i) {
+      ss << Data<float>()[i] << ", ";
+    }
+  } else if (element_type().Is<float>()) {
+    for (int64_t i = 0; i < size; ++i) {
+      ss << Data<double>()[i] << ", ";
+    }
+  } else {
+    RUNTIME_ERROR("Type:" << element_type().Name() << " not support str().");
+  }
+
+  ss << "]";
+  return ss.str();
+}
+
 Tensor Tensor::Dense(const std::vector<int64_t>& dims, ElementType etype) {
   Shape shape(dims);
 
@@ -54,7 +79,7 @@ Tensor Tensor::Dense(const Shape& shape, ElementType etype) {
 
 Tensor Tensor::Dense(const Shape& shape, std::shared_ptr<Storage> storage,
                      size_t offset, ElementType etype) {
-  auto impl = std::make_shared<TensorImpl>(shape, storage, offset, etype);
+  auto impl = TensorImpl::Dense(shape, storage, offset, etype);
   return Tensor(impl);
 }
 
