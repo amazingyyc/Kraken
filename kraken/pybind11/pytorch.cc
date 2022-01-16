@@ -4,10 +4,11 @@
 #include <memory>
 #include <vector>
 
-#include "common/element_type.h"
 #include "common/exception.h"
-#include "common/shape.h"
-#include "common/tensor.h"
+#include "t/element_type.h"
+#include "t/shape.h"
+#include "t/storage.h"
+#include "t/tensor.h"
 #include "worker/worker.h"
 
 namespace kraken {
@@ -90,13 +91,12 @@ Tensor TorchTensorToTensor(const torch::Tensor& tval) {
   ARGUMENT_CHECK(tval.is_contiguous(),
                  "TorchTensorToTensor need torch tensor is contiguous.");
 
-  std::shared_ptr<TensorStorage> storage =
-      TensorStorage::From(tval.data_ptr(), tval.nbytes());
+  auto storage = Storage::From(tval.data_ptr(), tval.nbytes());
 
   Shape shape = TorchSizesToShape(tval.sizes());
   ElementType etype = TorchDTypeToElementType(tval.scalar_type());
 
-  return Tensor::Create(storage, 0, shape, etype);
+  return Tensor::Dense(shape, storage, 0, etype);
 }
 
 uint64_t RegisterModel(

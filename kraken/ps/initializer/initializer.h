@@ -3,8 +3,8 @@
 #include <cinttypes>
 #include <unordered_map>
 
-#include "common/tensor.h"
 #include "common/utils.h"
+#include "t/tensor.h"
 
 namespace kraken {
 

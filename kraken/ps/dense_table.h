@@ -2,11 +2,11 @@
 
 #include <shared_mutex>
 
-#include "common/element_type.h"
-#include "common/shape.h"
-#include "common/tensor.h"
 #include "ps/optim/optim.h"
 #include "ps/table.h"
+#include "t/element_type.h"
+#include "t/shape.h"
+#include "t/tensor.h"
 
 namespace kraken {
 

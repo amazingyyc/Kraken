@@ -1,4 +1,4 @@
-#include "common/shape.h"
+#include "t/shape.h"
 
 #include <sstream>
 
@@ -99,7 +99,7 @@ int64_t Shape::Size() const {
 }
 
 int64_t Shape::Dim(int64_t axis) const {
-  if (axis < 0) {
+  while (axis < 0) {
     axis += NDims();
   }
 
@@ -110,7 +110,7 @@ int64_t Shape::Dim(int64_t axis) const {
 }
 
 int64_t Shape::Stride(int64_t axis) const {
-  if (axis < 0) {
+  while (axis < 0) {
     axis += NDims();
   }
 

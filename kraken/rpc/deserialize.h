@@ -5,15 +5,18 @@
 #include <unordered_map>
 #include <vector>
 
-#include "common/element_type.h"
 #include "common/mutable_buffer.h"
-#include "common/shape.h"
-#include "common/tensor.h"
-#include "common/tensor_storage.h"
 #include "ps/initializer/initializer.h"
 #include "ps/optim/optim.h"
 #include "ps/table.h"
 #include "rpc/protocol.h"
+#include "t/coo_tensor_impl.h"
+#include "t/element_type.h"
+#include "t/layout.h"
+#include "t/shape.h"
+#include "t/storage.h"
+#include "t/tensor.h"
+#include "t/tensor_impl.h"
 
 namespace kraken {
 
@@ -232,24 +235,74 @@ inline bool Deserialize::operator>>(Shape& v) {
 }
 
 template <>
-inline bool Deserialize::operator>>(Tensor& v) {
-  Shape shape;
-  ElementType etype;
+inline bool Deserialize::operator>>(Layout& v) {
+  uint8_t uv;
 
-  if (((*this) >> shape) == false || ((*this) >> etype) == false) {
+  if (((*this) >> uv) == false) {
     return false;
   }
 
-  size_t size = shape.Size() * etype.ByteWidth();
-  auto storage = TensorStorage::Create(size);
-
-  if (Read(storage->ptr(), size) == false) {
-    return false;
-  }
-
-  v = Tensor::Create(storage, 0, shape, etype);
+  v = (Layout)uv;
 
   return true;
+}
+
+template <>
+inline bool Deserialize::operator>>(Tensor& v) {
+  // Firstly read the layout.
+  Layout layout;
+  if ((*this) >> layout == false) {
+    return false;
+  }
+
+  if (layout == Layout::kStride) {
+    Shape shape;
+    ElementType etype;
+
+    if ((*this) >> shape == false) {
+      return false;
+    }
+
+    if ((*this) >> etype == false) {
+      return false;
+    }
+
+    // Read storage.
+    size_t nbytes = shape.Size() * etype.ByteWidth();
+    auto storage = Storage::Create(nbytes);
+
+    if (Read(storage->ptr(), nbytes) == false) {
+      return false;
+    }
+
+    auto impl = std::make_shared<TensorImpl>(shape, storage, 0, etype);
+    v = Tensor(impl);
+
+    return true;
+  } else if (layout == Layout::kCoo) {
+    Tensor indices;
+    Tensor values;
+    Shape shape;
+
+    if ((*this) >> indices == false) {
+      return false;
+    }
+
+    if ((*this) >> values == false) {
+      return false;
+    }
+
+    if ((*this) >> shape == false) {
+      return false;
+    }
+
+    auto impl = std::make_shared<CooTensorImpl>(indices, values, shape);
+    v = Tensor(impl);
+
+    return true;
+  } else {
+    return false;
+  }
 }
 
 template <>

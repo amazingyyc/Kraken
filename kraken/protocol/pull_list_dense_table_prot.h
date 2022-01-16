@@ -3,7 +3,7 @@
 #include <cinttypes>
 #include <vector>
 
-#include "common/tensor.h"
+#include "t/tensor.h"
 #include "rpc/deserialize.h"
 #include "rpc/serialize.h"
 

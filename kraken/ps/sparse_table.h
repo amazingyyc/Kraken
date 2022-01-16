@@ -3,14 +3,14 @@
 #include <unordered_map>
 #include <vector>
 
-#include "common/element_type.h"
 #include "common/error_code.h"
 #include "common/spin_locker.h"
-#include "common/tensor.h"
 #include "parallel_hashmap/parallel_hashmap/phmap.h"
 #include "ps/initializer/initializer.h"
 #include "ps/optim/optim.h"
 #include "ps/table.h"
+#include "t/element_type.h"
+#include "t/tensor.h"
 
 namespace kraken {
 

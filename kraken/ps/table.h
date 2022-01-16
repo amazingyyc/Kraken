@@ -3,6 +3,7 @@
 #include <string>
 
 #include "ps/optim/optim.h"
+#include "t/tensor.h"
 
 namespace kraken {
 

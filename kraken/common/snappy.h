@@ -1,6 +1,6 @@
 #pragma once
 
-#include "rpc/serialize.h"
+#include "rpc/ibuffer.h"
 #include "snappy-sinksource.h"
 
 namespace kraken {

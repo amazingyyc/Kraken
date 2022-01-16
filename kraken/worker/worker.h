@@ -308,7 +308,7 @@ private:
     }
 
     // concat to matrix than reshape.
-    Tensor val = indices.ConcatVec(vecs);
+    Tensor val = indices.ConcatVector(vecs);
 
     std::vector<int64_t> dims = indices.shape().dims();
     int64_t col = val.Size() / indices.Size();

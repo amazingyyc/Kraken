@@ -3,9 +3,9 @@
 #include <cinttypes>
 #include <unordered_map>
 
-#include "common/tensor.h"
 #include "common/utils.h"
 #include "parallel_hashmap/parallel_hashmap/phmap.h"
+#include "t/tensor.h"
 
 namespace kraken {
 

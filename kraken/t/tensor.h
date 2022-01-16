@@ -1,0 +1,108 @@
+#pragma once
+
+#include "t/tensor_impl.h"
+
+namespace kraken {
+
+class Tensor {
+private:
+  std::shared_ptr<TensorImpl> impl_;
+
+public:
+  Tensor() = default;
+
+  explicit Tensor(std::shared_ptr<TensorImpl> impl);
+
+  ~Tensor() = default;
+
+public:
+  std::shared_ptr<TensorImpl> impl() const;
+
+  Layout layout() const;
+
+  const Shape& shape() const;
+
+  ElementType element_type() const;
+
+  bool IsCoo() const;
+
+  bool IsDense() const;
+
+  int64_t Size() const;
+
+  int64_t NumBytes() const;
+
+  void* Ptr() const;
+
+  template <typename T>
+  T* Data() const {
+    return impl_->Data<T>();
+  }
+
+public:
+  static Tensor Dense(const std::vector<int64_t>& dims, ElementType etype);
+
+  static Tensor Dense(const Shape& shape, ElementType etype);
+
+  static Tensor Dense(const Shape& shape, std::shared_ptr<Storage> storage,
+                      size_t offset, ElementType etype);
+
+public:
+  Tensor operator+(const Tensor& other) const;
+  Tensor operator-(const Tensor& other) const;
+  Tensor operator*(const Tensor& other) const;
+  Tensor operator/(const Tensor& other) const;
+
+  Tensor operator+=(const Tensor& other);
+  Tensor operator-=(const Tensor& other);
+  Tensor operator*=(const Tensor& other);
+  Tensor operator/=(const Tensor& other);
+
+  Tensor operator+(float v) const;
+  Tensor operator-(float v) const;
+  Tensor operator*(float v) const;
+  Tensor operator/(float v) const;
+
+  Tensor operator+=(float v);
+  Tensor operator-=(float v);
+  Tensor operator*=(float v);
+  Tensor operator/=(float v);
+
+  Tensor Reshape(const Shape& nshape) const;
+
+  Tensor Reshape(const std::vector<int64_t>& dims) const;
+
+  Tensor Zero();
+
+  Tensor Like() const;
+
+  Tensor Clone() const;
+
+  Tensor Constant(float v);
+
+  Tensor Square(bool in_place = false);
+
+  Tensor Sqrt(bool in_place = false);
+
+  Tensor Max(const Tensor& other) const;
+
+  Tensor Vector(int64_t idx) const;
+
+  Tensor ConcatVector(const std::vector<Tensor>& vecs) const;
+
+  Tensor Normal(float mean, float stddev);
+
+  Tensor XavierNormal(float gain);
+
+  Tensor Uniform(float lower, float upper);
+
+  Tensor XavierUniform(float gain);
+};
+
+// operator override
+Tensor operator+(float v, const Tensor& t);
+Tensor operator-(float v, const Tensor& t);
+Tensor operator*(float v, const Tensor& t);
+Tensor operator/(float v, const Tensor& t);
+
+}  // namespace kraken

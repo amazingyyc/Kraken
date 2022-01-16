@@ -17,24 +17,24 @@ class IAllocator {
 public:
   virtual ~IAllocator() = default;
 
-  virtual void* malloc(size_t) = 0;
+  virtual void* Malloc(size_t) = 0;
 
-  virtual void free(void*) = 0;
+  virtual void Free(void*) = 0;
 
-  virtual void zero(void*, size_t) = 0;
+  virtual void Zero(void*, size_t) = 0;
 
-  virtual void memcpy(void*, const void*, size_t) = 0;
+  virtual void Memcpy(void*, const void*, size_t) = 0;
 };
 
 class CPUAllocator : public IAllocator {
 public:
-  void* malloc(size_t) override;
+  void* Malloc(size_t) override;
 
-  void free(void*) override;
+  void Free(void*) override;
 
-  void zero(void*, size_t) override;
+  void Zero(void*, size_t) override;
 
-  void memcpy(void*, const void*, size_t) override;
+  void Memcpy(void*, const void*, size_t) override;
 };
 
 class Device {
@@ -55,13 +55,13 @@ public:
 
   DeviceType type();
 
-  void* malloc(size_t);
+  void* Malloc(size_t);
 
-  void free(void*);
+  void Free(void*);
 
-  void zero(void*, size_t);
+  void Zero(void*, size_t);
 
-  void memcpy(void*, const void*, size_t);
+  void Memcpy(void*, const void*, size_t);
 
 public:
   static Device* Shared();

@@ -72,7 +72,7 @@ int32_t SparseTable::Pull(const std::vector<int64_t>& indices,
 
     if (exist == false) {
       // can not find, insert a new one.
-      Tensor t = Tensor::Create({dimension_}, etype_);
+      Tensor t = Tensor::Dense({dimension_}, etype_);
       initializer_->Initialize(&t);
 
       // for result.

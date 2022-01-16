@@ -3,7 +3,6 @@
 #include <cinttypes>
 #include <string>
 
-#include "common/tensor.h"
 #include "ps/table.h"
 #include "rpc/deserialize.h"
 #include "rpc/serialize.h"

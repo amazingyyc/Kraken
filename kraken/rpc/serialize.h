@@ -5,23 +5,20 @@
 #include <unordered_map>
 #include <vector>
 
-#include "common/element_type.h"
-#include "common/shape.h"
-#include "common/tensor.h"
 #include "common/zmq_buffer.h"
 #include "ps/initializer/initializer.h"
 #include "ps/optim/optim.h"
 #include "ps/table.h"
+#include "rpc/ibuffer.h"
 #include "rpc/protocol.h"
+#include "t/coo_tensor_impl.h"
+#include "t/element_type.h"
+#include "t/layout.h"
+#include "t/shape.h"
+#include "t/tensor.h"
+#include "t/tensor_impl.h"
 
 namespace kraken {
-
-class IBuffer {
-public:
-  virtual void Write(const char* ptr, size_t size) = 0;
-
-  virtual void TransferForZMQ(ZMQBuffer* z_buf) = 0;
-};
 
 class Serialize {
 private:
@@ -167,13 +164,50 @@ inline bool Serialize::operator<<(const Shape& v) {
 }
 
 template <>
+inline bool Serialize::operator<<(const Layout& v) {
+  return (*this) << ((uint8_t)v);
+}
+
+template <>
 inline bool Serialize::operator<<(const Tensor& v) {
-  if (((*this) << v.shape()) == false ||
-      ((*this) << v.element_type()) == false) {
+  if (v.layout() != Layout::kStride && v.layout() != Layout::kCoo) {
     return false;
   }
 
-  return Write(v.Ptr(), v.NumBytes());
+  if ((*this) << v.layout() == false) {
+    return false;
+  }
+
+  if (v.layout() == Layout::kStride) {
+    if ((*this) << v.shape() == false) {
+      return false;
+    }
+
+    if ((*this) << v.element_type() == false) {
+      return false;
+    }
+
+    // Storage.
+    return Write(v.Ptr(), v.NumBytes());
+  } else if (v.layout() == Layout::kCoo) {
+    auto coo_impl = std::dynamic_pointer_cast<CooTensorImpl>(v.impl());
+
+    if ((*this) << coo_impl->indices() == false) {
+      return false;
+    }
+
+    if ((*this) << coo_impl->values() == false) {
+      return false;
+    }
+
+    if ((*this) << v.shape() == false) {
+      return false;
+    }
+
+    return true;
+  } else {
+    return false;
+  }
 }
 
 template <>

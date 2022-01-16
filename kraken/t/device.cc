@@ -1,22 +1,22 @@
-#include "common/device.h"
+#include "t/device.h"
 
 #include "common/exception.h"
 
 namespace kraken {
 
-void* CPUAllocator::malloc(size_t size) {
+void* CPUAllocator::Malloc(size_t size) {
   return std::malloc(size);
 }
 
-void CPUAllocator::free(void* ptr) {
+void CPUAllocator::Free(void* ptr) {
   std::free(ptr);
 }
 
-void CPUAllocator::zero(void* ptr, size_t size) {
+void CPUAllocator::Zero(void* ptr, size_t size) {
   std::memset(ptr, 0, size);
 }
 
-void CPUAllocator::memcpy(void* dst, const void* src, size_t n) {
+void CPUAllocator::Memcpy(void* dst, const void* src, size_t n) {
   std::memcpy(dst, src, n);
 }
 
@@ -36,20 +36,20 @@ DeviceType Device::type() {
   return type_;
 }
 
-void* Device::malloc(size_t size) {
-  return allocator_->malloc(size);
+void* Device::Malloc(size_t size) {
+  return allocator_->Malloc(size);
 }
 
-void Device::free(void* ptr) {
-  allocator_->free(ptr);
+void Device::Free(void* ptr) {
+  allocator_->Free(ptr);
 }
 
-void Device::zero(void* ptr, size_t size) {
-  allocator_->zero(ptr, size);
+void Device::Zero(void* ptr, size_t size) {
+  allocator_->Zero(ptr, size);
 }
 
-void Device::memcpy(void* dst, const void* src, size_t n) {
-  allocator_->memcpy(dst, src, n);
+void Device::Memcpy(void* dst, const void* src, size_t n) {
+  allocator_->Memcpy(dst, src, n);
 }
 
 Device* Device::Shared() {

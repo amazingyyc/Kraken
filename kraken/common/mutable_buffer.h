@@ -2,7 +2,7 @@
 
 #include <cstdlib>
 
-#include "rpc/serialize.h"
+#include "rpc/ibuffer.h"
 
 namespace kraken {
 
