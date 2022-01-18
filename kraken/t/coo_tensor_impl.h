@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cinttypes>
+
+#include "t/device.h"
 #include "t/layout.h"
 #include "t/tensor.h"
 #include "t/tensor_impl.h"
@@ -41,11 +44,15 @@ public:
 
   ElementType element_type() const override;
 
+  kraken::Device* Device() const override;
+
   int64_t Size() const override;
 
   int64_t NumBytes() const override;
 
   void* Ptr() const override;
+
+  bool IsEmpty() const override;
 
 public:
   std::shared_ptr<TensorImpl> Add(const TensorImpl& other) const override;
@@ -101,6 +108,21 @@ public:
   std::shared_ptr<TensorImpl> Uniform(float lower, float upper) override;
 
   std::shared_ptr<TensorImpl> XavierUniform(float gain) override;
+
+  std::shared_ptr<TensorImpl> Abs(bool in_place = false) override;
+
+  std::shared_ptr<TensorImpl> TopK(int64_t k) const override;
+
+  std::shared_ptr<TensorImpl> Take(const TensorImpl& indices) const override;
+
+  std::shared_ptr<TensorImpl> FlatNonZero(float th) const override;
+
+  std::shared_ptr<TensorImpl> NonZero(float th) const override;
+
+  std::shared_ptr<TensorImpl> Transpose(int64_t d0 = 0,
+                                        int64_t d1 = 1) const override;
+
+  std::shared_ptr<TensorImpl> ToDense() const override;
 };
 
 }  // namespace kraken

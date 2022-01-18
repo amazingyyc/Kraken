@@ -24,6 +24,8 @@ public:
 
   ElementType element_type() const;
 
+  kraken::Device* Device() const;
+
   bool IsCoo() const;
 
   bool IsDense() const;
@@ -33,6 +35,8 @@ public:
   int64_t NumBytes() const;
 
   void* Ptr() const;
+
+  bool IsEmpty() const;
 
   template <typename T>
   T* Data() const {
@@ -48,6 +52,8 @@ public:
 
   static Tensor Dense(const Shape& shape, std::shared_ptr<Storage> storage,
                       size_t offset, ElementType etype);
+
+  static Tensor Empty();
 
 public:
   Tensor operator+(const Tensor& other) const;
@@ -99,6 +105,20 @@ public:
   Tensor Uniform(float lower, float upper);
 
   Tensor XavierUniform(float gain);
+
+  Tensor Abs(bool in_place = false);
+
+  Tensor TopK(int64_t k) const;
+
+  Tensor Take(const TensorImpl& indices) const;
+
+  Tensor FlatNonZero(float th) const;
+
+  Tensor NonZero(float th) const;
+
+  Tensor Transpose(int64_t d0 = 0, int64_t d1 = 1) const;
+
+  Tensor ToDense() const;
 };
 
 // operator override

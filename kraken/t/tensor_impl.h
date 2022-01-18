@@ -3,6 +3,7 @@
 #include <cinttypes>
 #include <memory>
 
+#include "t/device.h"
 #include "t/element_type.h"
 #include "t/layout.h"
 #include "t/shape.h"
@@ -52,6 +53,8 @@ public:
                                            std::shared_ptr<Storage> storage,
                                            size_t offset, ElementType etype);
 
+  static std::shared_ptr<TensorImpl> Empty();
+
 public:
   Layout layout() const;
 
@@ -63,11 +66,15 @@ public:
 
   virtual ElementType element_type() const;
 
+  virtual kraken::Device* Device() const;
+
   virtual int64_t Size() const;
 
   virtual int64_t NumBytes() const;
 
   virtual void* Ptr() const;
+
+  virtual bool IsEmpty() const;
 
   template <typename T>
   T* Data() const {
@@ -136,6 +143,21 @@ public:
   virtual std::shared_ptr<TensorImpl> Uniform(float lower, float upper);
 
   virtual std::shared_ptr<TensorImpl> XavierUniform(float gain);
+
+  virtual std::shared_ptr<TensorImpl> Abs(bool in_place = false);
+
+  virtual std::shared_ptr<TensorImpl> TopK(int64_t k) const;
+
+  virtual std::shared_ptr<TensorImpl> Take(const TensorImpl& indices) const;
+
+  virtual std::shared_ptr<TensorImpl> FlatNonZero(float th) const;
+
+  virtual std::shared_ptr<TensorImpl> NonZero(float th) const;
+
+  virtual std::shared_ptr<TensorImpl> Transpose(int64_t d0 = 0,
+                                                int64_t d1 = 1) const;
+
+  virtual std::shared_ptr<TensorImpl> ToDense() const;
 };
 
 }  // namespace kraken

@@ -1,7 +1,10 @@
 #include "t/math.h"
 
 #include <eigen/Eigen/Dense>
+#include <queue>
 #include <random>
+#include <thread>
+#include <vector>
 
 #include "common/utils.h"
 
@@ -529,6 +532,549 @@ void Ge(const TensorImpl& x, float v, TensorImpl& y) {
     GeImpl<double>(x.Data<double>(), v, y.Data<bool>(), x.Size());
   } else {
     RUNTIME_ERROR("Ge not support ElementType:" << x.element_type().Name());
+  }
+}
+
+template <typename T>
+void AbsImpl(T* x, T* y, int64_t size) {
+  EVector<T> xv(x, size);
+  EVector<T> yv(y, size);
+
+  yv.noalias() = xv.cwiseAbs();
+}
+
+void Abs(const TensorImpl& x, TensorImpl& y) {
+  ARGUMENT_CHECK(x.IsDense() && y.IsDense(), "Abs need Dense TensorImpl.");
+  ARGUMENT_CHECK(x.element_type() == y.element_type(),
+                 "Abs need all TensorImpl has same ElementType.");
+  ARGUMENT_CHECK(x.Size() == y.Size(),
+                 "Abs need all TensorImpl has same size.");
+
+  if (x.element_type().Is<float>()) {
+    AbsImpl<float>(x.Data<float>(), y.Data<float>(), x.Size());
+  } else if (x.element_type().Is<double>()) {
+    AbsImpl<double>(x.Data<double>(), y.Data<double>(), x.Size());
+  } else {
+    RUNTIME_ERROR("Abs not support ElementType:" << x.element_type().Name());
+  }
+}
+
+template <typename T>
+void TopKParallelImpl(Device* d, T* x, int64_t n, T* y, int64_t k) {
+  ARGUMENT_CHECK(n >= k, "TopKParallelImpl need n >= k.");
+
+  int64_t max_t_num = n / k;
+
+  int64_t t_num = (int64_t)std::thread::hardware_concurrency();
+  t_num = std::min(max_t_num, t_num);
+
+  int64_t stride = n / t_num;
+
+  T* tp = (T*)d->Malloc(sizeof(T) * t_num * k);
+  std::vector<T*> tps;
+  tps.resize(t_num);
+
+  for (int64_t i = 0; i < t_num; ++i) {
+    tps[i] = tp + i * k;
+  }
+
+#pragma omp parallel for
+  for (int64_t i = 0; i < t_num; ++i) {
+    int64_t start = i * stride;
+    int64_t end = std::min(start + stride, n);
+
+    std::priority_queue<T, std::vector<T>, std::greater<T>> q;
+
+    for (int64_t j = start; j < end; ++j) {
+      if (q.size() < (size_t)k) {
+        q.push(x[j]);
+      } else if (q.top() < x[j]) {
+        q.pop();
+        q.push(x[j]);
+      }
+    }
+
+    int64_t l = k;
+    while (!q.empty()) {
+      (tps[i])[--l] = q.top();
+      q.pop();
+    }
+  }
+
+  std::priority_queue<T, std::vector<T>, std::greater<T>> q;
+
+  for (int64_t j = 0; j < t_num * k; ++j) {
+    if (q.size() < (size_t)k) {
+      q.push(tp[j]);
+    } else if (q.top() < tp[j]) {
+      q.pop();
+      q.push(tp[j]);
+    }
+  }
+
+  int64_t l = k;
+  while (!q.empty()) {
+    y[--l] = q.top();
+    q.pop();
+  }
+
+  tps.clear();
+
+  d->Free(tp);
+}
+
+template <typename T>
+void TopKImpl(T* x, int64_t n, T* y, int64_t k) {
+  std::priority_queue<T, std::vector<T>, std::greater<T>> q;
+
+  for (int64_t i = 0; i < n; ++i) {
+    if (q.size() < k) {
+      q.push(x[i]);
+    } else if (q.top() < x[i]) {
+      q.pop();
+      q.push(x[i]);
+    }
+  }
+
+  int64_t i = k;
+  while (!q.empty()) {
+    y[--i] = q.top();
+    q.pop();
+  }
+}
+
+void TopK(const TensorImpl& x, TensorImpl& y) {
+  ARGUMENT_CHECK(x.IsDense() && y.IsDense(), "TopK need Dense TensorImpl.");
+  ARGUMENT_CHECK(x.element_type() == y.element_type(),
+                 "TopK need all TensorImpl has same ElementType.");
+  ARGUMENT_CHECK(y.Size() > 0, "TopK need y size > 0.");
+  ARGUMENT_CHECK(x.Size() >= y.Size(), "TopK x size >= y size.");
+
+  if (x.element_type().Is<float>()) {
+    TopKParallelImpl<float>(x.Device(), x.Data<float>(), x.Size(),
+                            y.Data<float>(), y.Size());
+  } else if (x.element_type().Is<double>()) {
+    TopKParallelImpl<double>(x.Device(), x.Data<double>(), x.Size(),
+                             y.Data<double>(), y.Size());
+  } else {
+    RUNTIME_ERROR("TopK not support ElementType:" << x.element_type().Name());
+  }
+}
+
+template <typename T>
+void CountNonZeroImpl(T* x, int64_t n, T th, int64_t* count) {
+  int64_t t_num = (int64_t)std::thread::hardware_concurrency();
+  if (n <= 256) {
+    t_num = 1;
+  }
+
+  int64_t stride = (n + t_num - 1) / t_num;
+  t_num = (n + stride - 1) / stride;
+
+  std::vector<int64_t> counts(t_num, 0);
+
+  th = std::abs(th);
+
+#pragma omp parallel for
+  for (int64_t i = 0; i < t_num; ++i) {
+    int64_t start = i * stride;
+    int64_t end = std::min(start + stride, n);
+
+    for (int64_t j = start; j < end; ++j) {
+      if (std::abs(x[j]) >= th) {
+        counts[i] += 1;
+      }
+    }
+  }
+
+  *count = 0;
+  for (auto c : counts) {
+    *count += c;
+  }
+}
+
+void CountNonZero(const TensorImpl& x, float th, int64_t* count) {
+  ARGUMENT_CHECK(x.IsDense(), "CountNonZero need Dense TensorImpl.");
+
+  if (x.Size() == 0) {
+    *count = 0;
+    return;
+  }
+
+  if (x.element_type().Is<float>()) {
+    CountNonZeroImpl<float>(x.Data<float>(), x.Size(), th, count);
+  } else if (x.element_type().Is<double>()) {
+    CountNonZeroImpl<double>(x.Data<double>(), x.Size(), th, count);
+  } else {
+    RUNTIME_ERROR(
+        "CountNonZero not support ElementType:" << x.element_type().Name());
+  }
+}
+
+template <typename T, typename IT>
+void TakeImpl(T* x, int64_t n, IT* id, T* y, int64_t k) {
+  int64_t t_num = (int64_t)std::thread::hardware_concurrency();
+  if (k <= 256) {
+    t_num = 1;
+  }
+
+  int64_t stride = (k + t_num - 1) / t_num;
+  t_num = (k + stride - 1) / stride;
+
+#pragma omp parallel for
+  for (int64_t i = 0; i < t_num; ++i) {
+    int64_t start = i * stride;
+    int64_t end = std::min(start + stride, k);
+
+    for (int64_t j = start; j < end; ++j) {
+      IT rid = id[j];
+
+      if (rid < 0 || (int64_t)rid >= n) {
+        RUNTIME_ERROR("Take outof range.");
+      }
+
+      y[j] = x[rid];
+    }
+  }
+}
+
+void Take(const TensorImpl& x, const TensorImpl& indices, TensorImpl& y) {
+  ARGUMENT_CHECK(x.IsDense() && y.IsDense() && x.IsDense(),
+                 "Take need TensorImpl is Dense.");
+  ARGUMENT_CHECK(x.element_type() == y.element_type(),
+                 "Take need x/y has same element_type.");
+  ARGUMENT_CHECK(indices.Size() > 0, "Take need indices size > 0.");
+  ARGUMENT_CHECK(indices.shape() == y.shape(),
+                 "Take need indices/y has same shape.");
+
+  if (x.element_type().Is<float>()) {
+    if (indices.element_type().Is<uint32_t>()) {
+      TakeImpl<float, uint32_t>(x.Data<float>(), x.Size(),
+                                indices.Data<uint32_t>(), y.Data<float>(),
+                                y.Size());
+    } else if (indices.element_type().Is<int32_t>()) {
+      TakeImpl<float, int32_t>(x.Data<float>(), x.Size(),
+                               indices.Data<int32_t>(), y.Data<float>(),
+                               y.Size());
+    } else if (indices.element_type().Is<uint64_t>()) {
+      TakeImpl<float, uint64_t>(x.Data<float>(), x.Size(),
+                                indices.Data<uint64_t>(), y.Data<float>(),
+                                y.Size());
+    } else if (indices.element_type().Is<int64_t>()) {
+      TakeImpl<float, int64_t>(x.Data<float>(), x.Size(),
+                               indices.Data<int64_t>(), y.Data<float>(),
+                               y.Size());
+    } else {
+      RUNTIME_ERROR(
+          "Take not support ElementType:" << indices.element_type().Name());
+    }
+  } else if (x.element_type().Is<double>()) {
+    if (indices.element_type().Is<uint32_t>()) {
+      TakeImpl<double, uint32_t>(x.Data<double>(), x.Size(),
+                                 indices.Data<uint32_t>(), y.Data<double>(),
+                                 y.Size());
+    } else if (indices.element_type().Is<int32_t>()) {
+      TakeImpl<double, int32_t>(x.Data<double>(), x.Size(),
+                                indices.Data<int32_t>(), y.Data<double>(),
+                                y.Size());
+    } else if (indices.element_type().Is<uint64_t>()) {
+      TakeImpl<double, uint64_t>(x.Data<double>(), x.Size(),
+                                 indices.Data<uint64_t>(), y.Data<double>(),
+                                 y.Size());
+    } else if (indices.element_type().Is<int64_t>()) {
+      TakeImpl<double, int64_t>(x.Data<double>(), x.Size(),
+                                indices.Data<int64_t>(), y.Data<double>(),
+                                y.Size());
+    } else {
+      RUNTIME_ERROR(
+          "Take not support ElementType:" << indices.element_type().Name());
+    }
+  } else {
+    RUNTIME_ERROR("Take not support ElementType:" << x.element_type().Name());
+  }
+}
+
+template <typename T>
+std::shared_ptr<TensorImpl> FlatNonZeroImpl(T* x, int64_t n, T th) {
+  int64_t t_num = (int64_t)std::thread::hardware_concurrency();
+  if (n <= 256) {
+    t_num = 1;
+  }
+
+  int64_t stride = (n + t_num - 1) / t_num;
+  t_num = (n + stride - 1) / stride;
+
+  std::vector<std::vector<int64_t>> ids;
+  ids.resize(t_num);
+
+#pragma omp parallel for
+  for (int64_t i = 0; i < t_num; ++i) {
+    int64_t start = i * stride;
+    int64_t end = std::min(start + stride, n);
+
+    for (int64_t j = start; j < end; ++j) {
+      if (std::abs(x[j]) >= th) {
+        ids[i].emplace_back(j);
+      }
+    }
+  }
+
+  int64_t num = 0;
+  for (int64_t i = 0; i < t_num; ++i) {
+    num += (int64_t)ids[i].size();
+  }
+
+  if (num <= 0) {
+    return TensorImpl::Empty();
+  }
+
+  auto storage = Storage::Create(sizeof(int64_t) * num);
+
+  int64_t* ptr = (int64_t*)storage->ptr();
+  size_t offset = 0;
+  for (int64_t i = 0; i < t_num; ++i) {
+    storage->device()->Memcpy(ptr, ids[i].data(),
+                              sizeof(int64_t) * ids[i].size());
+    offset += ids[i].size();
+  }
+
+  Shape shape({num});
+
+  return TensorImpl::Dense(shape, storage, 0, ElementType::From<int64_t>());
+}
+
+std::shared_ptr<TensorImpl> FlatNonZero(const TensorImpl& x, float th) {
+  ARGUMENT_CHECK(x.IsDense(), "FlatNonZero need TensorImpl is Dense.");
+
+  if (x.IsEmpty()) {
+    return TensorImpl::Empty();
+  }
+
+  if (x.element_type().Is<float>()) {
+    return FlatNonZeroImpl<float>(x.Data<float>(), x.Size(), th);
+  } else if (x.element_type().Is<double>()) {
+    return FlatNonZeroImpl<double>(x.Data<double>(), x.Size(), th);
+  } else {
+    RUNTIME_ERROR(
+        "FlatNonZero not support ElementType:" << x.element_type().Name());
+  }
+}
+
+// fid shape: [nnz]
+// id shape: [nnz, shape.NDims()]
+void NonZeroImpl(int64_t* fid, int64_t nnz, int64_t* id, const Shape& shape) {
+  int64_t t_num = (int64_t)std::thread::hardware_concurrency();
+  if (nnz <= 256) {
+    t_num = 1;
+  }
+
+  int64_t stride = (nnz + t_num - 1) / t_num;
+  t_num = (nnz + stride - 1) / stride;
+
+  int64_t ndims = shape.NDims();
+
+#pragma omp parallel for
+  for (int64_t i = 0; i < t_num; ++i) {
+    int64_t start = i * stride;
+    int64_t end = std::min(start + stride, nnz);
+
+    for (int64_t j = start; j < end; ++j) {
+      int64_t* rid = id + j * ndims;
+      int64_t fi = fid[j];
+
+      for (int64_t k = 0; k < ndims; ++k) {
+        rid[k] = fi / shape.Stride(k);
+        fi %= shape.Stride(k);
+      }
+    }
+  }
+}
+
+std::shared_ptr<TensorImpl> NonZero(const TensorImpl& x, float th) {
+  ARGUMENT_CHECK(x.IsDense(), "NonZero need TensorImpl is Dense.");
+
+  if (x.IsEmpty()) {
+    return TensorImpl::Empty();
+  }
+
+  std::shared_ptr<TensorImpl> f_indices = FlatNonZero(x, th);
+  if (f_indices->IsEmpty()) {
+    return TensorImpl::Empty();
+  }
+
+  int64_t nnz = f_indices->Size();
+  int64_t ndims = x.shape().NDims();
+
+  if (ndims == 1) {
+    return f_indices;
+  }
+
+  auto storage = Storage::Create(sizeof(int64_t) * nnz * ndims);
+
+  NonZeroImpl(f_indices->Data<int64_t>(), nnz, (int64_t*)storage->ptr(),
+              x.shape());
+
+  return TensorImpl::Dense(Shape({nnz, ndims}), storage, 0,
+                           ElementType::From<int64_t>());
+}
+
+template <typename T>
+void TransposeImpl(T* x, const Shape& xshape, T* y, const Shape& yshape,
+                   int64_t n, int64_t d0, int64_t d1) {
+  int64_t t_num = (int64_t)std::thread::hardware_concurrency();
+  if (n <= 256) {
+    t_num = 1;
+  }
+
+  int64_t stride = (n + t_num - 1) / t_num;
+  t_num = (n + stride - 1) / stride;
+
+  int64_t ndims = xshape.NDims();
+
+#pragma omp parallel for
+  for (int64_t i = 0; i < t_num; ++i) {
+    int64_t start = i * stride;
+    int64_t end = std::min(start + stride, n);
+
+    std::vector<int64_t> dims;
+    dims.resize(ndims);
+
+    for (int64_t j = start; j < end; ++j) {
+      int64_t o = j;
+      for (int64_t l = 0; l < ndims; ++l) {
+        dims[l] = o / yshape.Stride(l);
+        o %= yshape.Stride(l);
+      }
+
+      std::swap(dims[d0], dims[d1]);
+
+      o = 0;
+      for (int64_t l = 0; l < ndims; ++l) {
+        o += dims[l] * xshape.Stride(l);
+      }
+
+      y[j] = x[o];
+    }
+  }
+}
+
+void Transpose(const TensorImpl& x, TensorImpl& y, int64_t d0, int64_t d1) {
+  ARGUMENT_CHECK(x.element_type() == y.element_type(),
+                 "Transpose need x/y has same ElementType.");
+  ARGUMENT_CHECK(x.shape().Size() == y.shape().Size(),
+                 "Transpose need x/y has same size.");
+  ARGUMENT_CHECK(x.shape().NDims() == y.shape().NDims(),
+                 "Transpose need x/y has same ndims.")
+
+  while (d0 < 0) {
+    d0 += x.shape().NDims();
+  }
+
+  while (d1 < 0) {
+    d1 += x.shape().NDims();
+  }
+
+  ARGUMENT_CHECK(d0 < x.shape().NDims() && d1 < x.shape().NDims() && d0 != d1,
+                 "Transpose d0/d1 error.");
+
+  if (x.element_type().Is<float>()) {
+    TransposeImpl<float>(x.Data<float>(), x.shape(), y.Data<float>(), y.shape(),
+                         x.shape().Size(), d0, d1);
+  } else if (x.element_type().Is<double>()) {
+    TransposeImpl<double>(x.Data<double>(), x.shape(), y.Data<double>(),
+                          y.shape(), x.shape().Size(), d0, d1);
+  } else {
+    RUNTIME_ERROR(
+        "Transpose not support ElementType:" << x.element_type().Name());
+  }
+}
+
+template <typename IT, typename T>
+void CooToDenseImpl(Device* device, IT* indices, T* values, T* out,
+                    int64_t sparse_dim, int64_t nnz, const Shape& shape) {
+  // indices shape: [sparse_dim, nnz]
+  // values shape: [nnz, shape[sparse_dim:]]
+  std::vector<int64_t> s_dims;
+  for (int64_t i = 0; i < sparse_dim; ++i) {
+    s_dims.emplace_back(shape[i]);
+  }
+
+  Shape s_shape(s_dims);
+
+  int64_t row = s_shape.Size();
+  int64_t col = shape.Size() / row;
+
+  int64_t t_num = (int64_t)std::thread::hardware_concurrency();
+  if (nnz <= 256) {
+    t_num = 1;
+  }
+
+  int64_t stride = (nnz + t_num - 1) / t_num;
+  t_num = (nnz + stride - 1) / stride;
+
+#pragma omp parallel for
+  for (int64_t i = 0; i < t_num; ++i) {
+    int64_t start = i * stride;
+    int64_t end = std::min(start + stride, nnz);
+
+    for (int64_t j = start; j < end; ++j) {
+      int64_t r = 0;
+      for (int64_t l = 0; l < sparse_dim; ++l) {
+        r += indices[j + l * nnz] * s_shape.Stride(l);
+      }
+
+      device->Memcpy(out + r * col, values + j * col, sizeof(T) * col);
+    }
+  }
+}
+
+void CooToDense(const TensorImpl& indices, const TensorImpl& values,
+                TensorImpl& dense) {
+  ARGUMENT_CHECK(indices.IsDense() && values.IsDense() && dense.IsDense(),
+                 "CooToDense need indices/values/dense is dense.");
+  ARGUMENT_CHECK(!indices.IsEmpty() && !values.IsEmpty(),
+                 "CooToDense need indices/values not empty.");
+  ARGUMENT_CHECK(indices.shape().NDims() == 2,
+                 "CooToDense need indices's NDim is 2.");
+  ARGUMENT_CHECK(indices.shape()[-1] == values.shape()[0],
+                 "CooToDense need indices's last dimension same with values's "
+                 "first dimension.");
+  ARGUMENT_CHECK(
+      dense.shape().NDims() + 1 == indices.shape()[0] + values.shape().NDims(),
+      "CooToDense shape error!");
+
+  // make it zero.
+  dense.Zero();
+
+  int64_t sparse_dim = indices.shape()[0];
+  for (int64_t i = sparse_dim, j = 1; i < dense.shape().NDims(); ++i, ++j) {
+    ARGUMENT_CHECK(dense.shape()[i] == values.shape()[j],
+                   "CooToDense shape error!");
+  }
+
+  int64_t nnz = indices.shape()[1];
+
+  if (values.element_type().Is<float>()) {
+    if (indices.element_type().Is<int64_t>()) {
+      CooToDenseImpl<int64_t, float>(values.Device(), indices.Data<int64_t>(),
+                                     values.Data<float>(), dense.Data<float>(),
+                                     sparse_dim, nnz, dense.shape());
+    } else {
+      RUNTIME_ERROR("CooToDense not support ElementType:"
+                    << indices.element_type().Name());
+    }
+  } else if (values.element_type().Is<double>()) {
+    if (indices.element_type().Is<int64_t>()) {
+      CooToDenseImpl<int64_t, double>(
+          values.Device(), indices.Data<int64_t>(), values.Data<double>(),
+          dense.Data<double>(), sparse_dim, nnz, dense.shape());
+    } else {
+      RUNTIME_ERROR("CooToDense not support ElementType:"
+                    << indices.element_type().Name());
+    }
+  } else {
+    RUNTIME_ERROR(
+        "CooToDense not support ElementType:" << values.element_type().Name());
   }
 }
 

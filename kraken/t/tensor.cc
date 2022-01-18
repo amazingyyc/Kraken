@@ -25,6 +25,10 @@ ElementType Tensor::element_type() const {
   return impl_->element_type();
 }
 
+kraken::Device* Tensor::Device() const {
+  return impl_->Device();
+}
+
 bool Tensor::IsCoo() const {
   return impl_->IsCoo();
 }
@@ -43,6 +47,10 @@ int64_t Tensor::NumBytes() const {
 
 void* Tensor::Ptr() const {
   return impl_->Ptr();
+}
+
+bool Tensor::IsEmpty() const {
+  return impl_->IsEmpty();
 }
 
 std::string Tensor::Str() const {
@@ -81,6 +89,10 @@ Tensor Tensor::Dense(const Shape& shape, std::shared_ptr<Storage> storage,
                      size_t offset, ElementType etype) {
   auto impl = TensorImpl::Dense(shape, storage, offset, etype);
   return Tensor(impl);
+}
+
+Tensor Tensor::Empty() {
+  return Tensor(TensorImpl::Empty());
 }
 
 Tensor Tensor::operator+(const Tensor& other) const {
@@ -228,6 +240,34 @@ Tensor Tensor::Uniform(float lower, float upper) {
 
 Tensor Tensor::XavierUniform(float gain) {
   return Tensor(impl_->XavierUniform(gain));
+}
+
+Tensor Tensor::Abs(bool in_place) {
+  return Tensor(impl_->Abs(in_place));
+}
+
+Tensor Tensor::TopK(int64_t k) const {
+  return Tensor(impl_->TopK(k));
+}
+
+Tensor Tensor::Take(const TensorImpl& indices) const {
+  return Tensor(impl_->Take(indices));
+}
+
+Tensor Tensor::FlatNonZero(float th) const {
+  return Tensor(impl_->FlatNonZero(th));
+}
+
+Tensor Tensor::NonZero(float th) const {
+  return Tensor(impl_->NonZero(th));
+}
+
+Tensor Tensor::Transpose(int64_t d0, int64_t d1) const {
+  return Tensor(impl_->Transpose(d0, d1));
+}
+
+Tensor Tensor::ToDense() const {
+  return Tensor(impl_->ToDense());
 }
 
 }  // namespace kraken

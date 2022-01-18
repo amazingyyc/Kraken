@@ -1,5 +1,7 @@
 #include "t/tensor_impl.h"
 
+#include <algorithm>
+
 #include "common/exception.h"
 #include "t/math.h"
 
@@ -37,6 +39,14 @@ std::shared_ptr<TensorImpl> TensorImpl::Dense(const Shape& shape,
       new TensorImpl(shape, storage, offset, etype));
 }
 
+std::shared_ptr<TensorImpl> TensorImpl::Empty() {
+  // Empty still include a storage, avoid unexpected error.
+  auto storage = Storage::Create(0);
+
+  return std::shared_ptr<TensorImpl>(
+      new TensorImpl(Shape(), storage, 0, ElementType::From<UnKnown>()));
+}
+
 Layout TensorImpl::layout() const {
   return layout_;
 }
@@ -57,6 +67,10 @@ ElementType TensorImpl::element_type() const {
   return element_type_;
 }
 
+kraken::Device* TensorImpl::Device() const {
+  return storage_->device();
+}
+
 int64_t TensorImpl::Size() const {
   return shape_.Size();
 }
@@ -67,6 +81,10 @@ int64_t TensorImpl::NumBytes() const {
 
 void* TensorImpl::Ptr() const {
   return ((uint8_t*)storage_->ptr()) + offset_;
+}
+
+bool TensorImpl::IsEmpty() const {
+  return Size() == 0;
 }
 
 std::shared_ptr<TensorImpl> TensorImpl::Add(const TensorImpl& other) const {
@@ -412,6 +430,71 @@ std::shared_ptr<TensorImpl> TensorImpl::XavierUniform(float gain) {
   math::XavierUniform(*this, gain);
 
   return shared_from_this();
+}
+
+std::shared_ptr<TensorImpl> TensorImpl::Abs(bool in_place) {
+  if (in_place) {
+    math::Abs(*this, *this);
+
+    return shared_from_this();
+  } else {
+    auto out = Like();
+    math::Abs(*this, *out);
+
+    return out;
+  }
+}
+
+std::shared_ptr<TensorImpl> TensorImpl::TopK(int64_t k) const {
+  ARGUMENT_CHECK(k > 0 && k <= Size(), "k outof range.");
+
+  auto out = TensorImpl::Dense(Shape({k}), element_type_);
+  math::TopK(*this, *out);
+
+  return out;
+}
+
+std::shared_ptr<TensorImpl> TensorImpl::Take(const TensorImpl& indices) const {
+  ARGUMENT_CHECK(!indices.IsEmpty(), "Take need indices not empty.")
+
+  auto out = TensorImpl::Dense(indices.shape(), element_type_);
+  math::Take(*this, indices, *out);
+
+  return out;
+}
+
+std::shared_ptr<TensorImpl> TensorImpl::FlatNonZero(float th) const {
+  return math::FlatNonZero(*this, th);
+}
+
+std::shared_ptr<TensorImpl> TensorImpl::NonZero(float th) const {
+  return math::NonZero(*this, th);
+}
+
+std::shared_ptr<TensorImpl> TensorImpl::Transpose(int64_t d0,
+                                                  int64_t d1) const {
+  while (d0 < 0) {
+    d0 += shape_.NDims();
+  }
+
+  while (d1 < 0) {
+    d1 += shape_.NDims();
+  }
+
+  ARGUMENT_CHECK(d0 < shape_.NDims() && d1 < shape_.NDims(),
+                 "Transpose d0/d1 outof range.");
+
+  std::vector<int64_t> dims = shape_.dims();
+  std::swap(dims[d0], dims[d1]);
+
+  auto out = TensorImpl::Dense(Shape(dims), element_type_);
+  math::Transpose(*this, *out, d0, d1);
+
+  return out;
+}
+
+std::shared_ptr<TensorImpl> TensorImpl::ToDense() const {
+  RUNTIME_ERROR("Dense TensorImpl unsupport ToDense.");
 }
 
 }  // namespace kraken
