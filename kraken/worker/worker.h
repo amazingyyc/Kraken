@@ -17,13 +17,16 @@ public:
   Worker();
 
   /**
-   * \brief Initialize this worker, not thread-safe.
-   *
+   * \brief Initialize this work select Emitter and connect server.
+   * 
    * \param addrs Server address.
-   * \param emitter_type Which Emitter to use.
+   * \param emitter_type Emitter type.
+   * \param life_span For DCTEmitter.
+   * \param eta For DCTEmitter.
    */
   void Initialize(const std::string& addrs,
-                  EmitterType emitter_type = EmitterType::kDefault);
+                  EmitterType emitter_type = EmitterType::kDefault,
+                  uint64_t life_span = 1000, float eta = 0.75);
 
   /**
    * \brief Stop worker.

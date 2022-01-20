@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "common/exception.h"
+#include "t/coo_tensor_impl.h"
 #include "t/math.h"
 
 namespace kraken {
@@ -39,12 +40,32 @@ std::shared_ptr<TensorImpl> TensorImpl::Dense(const Shape& shape,
       new TensorImpl(shape, storage, offset, etype));
 }
 
-std::shared_ptr<TensorImpl> TensorImpl::Empty() {
+std::shared_ptr<TensorImpl> TensorImpl::Empty(ElementType etype) {
   // Empty still include a storage, avoid unexpected error.
   auto storage = Storage::Create(0);
 
   return std::shared_ptr<TensorImpl>(
-      new TensorImpl(Shape(), storage, 0, ElementType::From<UnKnown>()));
+      new TensorImpl(Shape(), storage, 0, etype));
+}
+
+std::shared_ptr<TensorImpl> TensorImpl::Coo(std::shared_ptr<TensorImpl> indices,
+                                            std::shared_ptr<TensorImpl> values,
+                                            const Shape& shape) {
+  ARGUMENT_CHECK(indices->IsDense() && values->IsDense(),
+                 "Coo need indices/values is Dense.")
+
+  Tensor t_indices(indices);
+  Tensor t_values(values);
+
+  return std::shared_ptr<CooTensorImpl>(
+      new CooTensorImpl(t_indices, t_values, shape));
+}
+
+std::shared_ptr<TensorImpl> TensorImpl::EmptyCoo(ElementType value_etype,
+                                                 const Shape& shape) {
+  return std::shared_ptr<CooTensorImpl>(
+      new CooTensorImpl(Tensor::Empty(ElementType::From<int64_t>()),
+                        Tensor::Empty(value_etype), shape));
 }
 
 Layout TensorImpl::layout() const {
@@ -61,6 +82,14 @@ bool TensorImpl::IsDense() const {
 
 const Shape& TensorImpl::shape() const {
   return shape_;
+}
+
+const Tensor& TensorImpl::indices() const {
+  RUNTIME_ERROR("Not Coo TensorImpl.");
+}
+
+const Tensor& TensorImpl::values() const {
+  RUNTIME_ERROR("Not Coo TensorImpl.");
 }
 
 ElementType TensorImpl::element_type() const {
@@ -455,7 +484,8 @@ std::shared_ptr<TensorImpl> TensorImpl::TopK(int64_t k) const {
 }
 
 std::shared_ptr<TensorImpl> TensorImpl::Take(const TensorImpl& indices) const {
-  ARGUMENT_CHECK(!indices.IsEmpty(), "Take need indices not empty.")
+  ARGUMENT_CHECK(indices.IsDense(), "Take need indices is Dense.");
+  ARGUMENT_CHECK(!indices.IsEmpty(), "Take need indices not empty.");
 
   auto out = TensorImpl::Dense(indices.shape(), element_type_);
   math::Take(*this, indices, *out);
@@ -495,6 +525,41 @@ std::shared_ptr<TensorImpl> TensorImpl::Transpose(int64_t d0,
 
 std::shared_ptr<TensorImpl> TensorImpl::ToDense() const {
   RUNTIME_ERROR("Dense TensorImpl unsupport ToDense.");
+}
+
+std::shared_ptr<TensorImpl> TensorImpl::ToCoo(float th) const {
+  ARGUMENT_CHECK(IsDense(), "ToCoo need Dense TensorImpl.");
+
+  // Current tensor element count.
+  int64_t size = Size();
+  Shape shape({size});
+
+  if (IsEmpty()) {
+    return TensorImpl::EmptyCoo(element_type_, shape);
+  }
+
+  // shape: [nnz]
+  auto indices = math::FlatNonZero(*this, th);
+  if (indices->IsEmpty()) {
+    return TensorImpl::EmptyCoo(element_type_, shape);
+  }
+
+  // to [1, nnz]
+  int64_t nnz = indices->Size();
+  indices = indices->Reshape({1, nnz});
+
+  // shape: [nnz]
+  auto values = Take(*indices);
+  values = values->Reshape({nnz});
+
+  return TensorImpl::Coo(indices, values, shape);
+}
+
+std::shared_ptr<TensorImpl> TensorImpl::LtKeep(float th) const {
+  auto out = Like();
+  math::LtKeep(*this, th, *out);
+
+  return out;
 }
 
 }  // namespace kraken

@@ -316,7 +316,7 @@ public:
   virtual ~Emitter() = default;
 
   /**
-   * \brief Initialize worker.
+   * \brief Initialize Emitter.
    *
    * \param addrs_
    * \param model_name
@@ -336,7 +336,7 @@ public:
    * \param optim_conf Optimizer config.
    * \return uint64_t Model id.
    */
-  uint64_t RegisterModel(
+  virtual uint64_t RegisterModel(
       const std::string& model_name, OptimType optim_type,
       const std::unordered_map<std::string, std::string>& optim_conf);
 
@@ -345,7 +345,7 @@ public:
    *
    * \param lr The learning rate.
    */
-  void UpdateLR(float lr);
+  virtual void UpdateLR(float lr);
 
   /**
    * \brief Register dense table in server.
@@ -354,7 +354,8 @@ public:
    * \param val The table value.
    * \return uint64_t Error code.
    */
-  uint64_t RegisterDenseTable(const std::string& name, const Tensor& val);
+  virtual uint64_t RegisterDenseTable(const std::string& name,
+                                      const Tensor& val);
 
   /**
    * \brief Register a sparse table. thread-safe.
@@ -366,8 +367,8 @@ public:
    * \param etype table element type.
    * \return uint64_t table id.
    */
-  uint64_t RegisterSparseTable(const std::string& name, int64_t dimension,
-                               ElementType etype);
+  virtual uint64_t RegisterSparseTable(const std::string& name,
+                                       int64_t dimension, ElementType etype);
 
   /**
    * \brief Register a sparse table. thread-safe.
@@ -381,7 +382,7 @@ public:
    * \param init_conf Initialize config.
    * \return uint64_t table id.
    */
-  uint64_t RegisterSparseTableV2(
+  virtual uint64_t RegisterSparseTableV2(
       const std::string& name, int64_t dimension, ElementType etype,
       InitializerType init_type,
       const std::unordered_map<std::string, std::string>& init_conf);

@@ -60,13 +60,21 @@ SGD::SGD(const std::unordered_map<std::string, std::string>& conf)
 }
 
 int32_t SGD::Update(const Tensor& grad, float lr, Tensor* val, Bag* bag) const {
-  if (grad.Size() != val->Size() ||
-      grad.element_type() != val->element_type()) {
+  // Grad maybe Coo tensor.
+  Tensor grad_t = grad;
+  if (grad_t.IsCoo()) {
+    if (grad_t.indices().IsEmpty()) {
+      return ErrorCode::kSuccess;
+    }
+
+    grad_t = grad_t.ToDense();
+  }
+
+  if (grad_t.Size() != val->Size() ||
+      grad_t.element_type() != val->element_type()) {
     return ErrorCode::kGradientUnCompatibleError;
   }
 
-  // Use = operator grad_t will share memory with grad.
-  Tensor grad_t = grad;
   if (has_weight_decay_) {
     grad_t += weight_decay_ * (*val);
   }

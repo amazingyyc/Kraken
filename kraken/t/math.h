@@ -58,7 +58,7 @@ void Abs(const TensorImpl& x, TensorImpl& y);
 void TopK(const TensorImpl& x, TensorImpl& y);
 
 // Get nonzero count.
-void CountNonZero(const TensorImpl& x, float th, int64_t* count);
+int64_t CountNonZero(const TensorImpl& x, float th);
 
 // Take element from x by indices to y
 // indices store the element index from 0.
@@ -78,6 +78,9 @@ void Transpose(const TensorImpl& x, TensorImpl& y, int64_t d0, int64_t d1);
 // Convert Coo to Dense.
 void CooToDense(const TensorImpl& indices, const TensorImpl& values,
                 TensorImpl& dense);
+
+// it the Abs(v) <= th than keep it. 
+void LtKeep(const TensorImpl& x, float th, TensorImpl& y);
 
 }  // namespace math
 }  // namespace kraken

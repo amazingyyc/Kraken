@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cinttypes>
+#include <iostream>
 
 #include "t/device.h"
 #include "t/layout.h"
@@ -29,7 +30,7 @@ public:
   CooTensorImpl(CooTensorImpl&&) = delete;
   CooTensorImpl& operator=(CooTensorImpl&&) = delete;
 
-  ~CooTensorImpl() override = default;
+  ~CooTensorImpl() = default;
 
 public:
   int64_t sparse_dim() const;
@@ -38,9 +39,9 @@ public:
 
   int64_t nnz() const;
 
-  const Tensor& indices() const;
+  const Tensor& indices() const override;
 
-  const Tensor& values() const;
+  const Tensor& values() const override;
 
   ElementType element_type() const override;
 
@@ -123,6 +124,10 @@ public:
                                         int64_t d1 = 1) const override;
 
   std::shared_ptr<TensorImpl> ToDense() const override;
+
+  std::shared_ptr<TensorImpl> ToCoo(float th) const override;
+
+  std::shared_ptr<TensorImpl> LtKeep(float th) const override;
 };
 
 }  // namespace kraken

@@ -4,6 +4,7 @@
 #include <unordered_map>
 
 #include "common/exception.h"
+#include "worker/dct_emitter.h"
 #include "worker/emitter.h"
 
 namespace kraken {
@@ -11,9 +12,12 @@ namespace kraken {
 Worker::Worker() {
 }
 
-void Worker::Initialize(const std::string& addrs, EmitterType emitter_type) {
+void Worker::Initialize(const std::string& addrs, EmitterType emitter_type,
+                        uint64_t life_span, float eta) {
   if (emitter_type == EmitterType::kDefault) {
     emitter_.reset(new Emitter());
+  } else if (emitter_type == EmitterType::kDCT) {
+    emitter_.reset(new DCTEmitter(life_span, eta));
   } else {
     RUNTIME_ERROR("Unsupport EmitterType:" << (uint32_t)emitter_type);
   }

@@ -1,8 +1,8 @@
 # coding=utf-8
 
+from kraken_native import EmitterType
 from kraken_native import initialize
 from kraken_native import stop
-from kraken_native import OptimType
 from kraken_native import register_model
 from kraken_native import update_lr
 from kraken_native import register_dense_table

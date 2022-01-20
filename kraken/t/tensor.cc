@@ -3,6 +3,7 @@
 #include <sstream>
 
 #include "common/exception.h"
+#include "t/coo_tensor_impl.h"
 
 namespace kraken {
 
@@ -19,6 +20,14 @@ Layout Tensor::layout() const {
 
 const Shape& Tensor::shape() const {
   return impl_->shape();
+}
+
+const Tensor& Tensor::indices() const {
+  return impl_->indices();
+}
+
+const Tensor& Tensor::values() const {
+  return impl_->values();
 }
 
 ElementType Tensor::element_type() const {
@@ -57,14 +66,18 @@ std::string Tensor::Str() const {
   std::stringstream ss;
   ss << "[";
 
-  int64_t size = Shape().Size();
+  int64_t size = Size();
   if (element_type().Is<float>()) {
     for (int64_t i = 0; i < size; ++i) {
       ss << Data<float>()[i] << ", ";
     }
-  } else if (element_type().Is<float>()) {
+  } else if (element_type().Is<double>()) {
     for (int64_t i = 0; i < size; ++i) {
       ss << Data<double>()[i] << ", ";
+    }
+  } else if (element_type().Is<int64_t>()) {
+    for (int64_t i = 0; i < size; ++i) {
+      ss << Data<int64_t>()[i] << ", ";
     }
   } else {
     RUNTIME_ERROR("Type:" << element_type().Name() << " not support str().");
@@ -91,8 +104,8 @@ Tensor Tensor::Dense(const Shape& shape, std::shared_ptr<Storage> storage,
   return Tensor(impl);
 }
 
-Tensor Tensor::Empty() {
-  return Tensor(TensorImpl::Empty());
+Tensor Tensor::Empty(ElementType etype) {
+  return Tensor(TensorImpl::Empty(etype));
 }
 
 Tensor Tensor::operator+(const Tensor& other) const {
@@ -157,6 +170,22 @@ Tensor Tensor::operator*=(float v) {
 
 Tensor Tensor::operator/=(float v) {
   return Tensor(impl_->DivAssign(v));
+}
+
+float Tensor::operator[](int64_t index) const {
+  ARGUMENT_CHECK(element_type().Is<float>(),
+                 "operator[] only support float type.");
+
+  int64_t size = Size();
+  while (index < 0) {
+    index += size;
+  }
+
+  ARGUMENT_CHECK(index < size, "Index outof range.");
+
+  float* ptr = Data<float>();
+
+  return ptr[index];
 }
 
 Tensor operator+(float v, const Tensor& t) {
@@ -250,8 +279,8 @@ Tensor Tensor::TopK(int64_t k) const {
   return Tensor(impl_->TopK(k));
 }
 
-Tensor Tensor::Take(const TensorImpl& indices) const {
-  return Tensor(impl_->Take(indices));
+Tensor Tensor::Take(const Tensor& indices) const {
+  return Tensor(impl_->Take(*indices.impl()));
 }
 
 Tensor Tensor::FlatNonZero(float th) const {
@@ -268,6 +297,14 @@ Tensor Tensor::Transpose(int64_t d0, int64_t d1) const {
 
 Tensor Tensor::ToDense() const {
   return Tensor(impl_->ToDense());
+}
+
+Tensor Tensor::ToCoo(float th) const {
+  return Tensor(impl_->ToCoo(th));
+}
+
+Tensor Tensor::LtKeep(float th) const {
+  return Tensor(impl_->LtKeep(th));
 }
 
 }  // namespace kraken

@@ -18,26 +18,32 @@ CooTensorImpl::CooTensorImpl(const Tensor& indices, const Tensor& values,
           indices_.element_type().Is<uint64_t>() ||
           indices_.element_type().Is<int64_t>(),
       "Coo Tensor need indices element type is:uint32/int32/uint64/int64.");
-  ARGUMENT_CHECK(indices_.shape().NDims() == 2,
-                 "Coo need indices's NDim is 2.");
-  ARGUMENT_CHECK(
-      indices_.shape()[-1] == values_.shape()[0],
-      "Coo need indices's last dimension same with values's first dimension.");
-  ARGUMENT_CHECK(
-      shape_.NDims() + 1 == indices_.shape()[0] + values_.shape().NDims(),
-      "Coo shape error!");
 
-  // indices_ shape is: [M, nse]
-  // values_ shape is: (nse,) + shape[M : M + K]
-  // sparse_dim_ >= 1
-  // dense_dim_ >= 0
-  sparse_dim_ = indices_.shape()[0];
+  if (indices_.IsEmpty()) {
+    sparse_dim_ = 0;
+    dense_dim_ = 0;
+  } else {
+    ARGUMENT_CHECK(indices_.shape().NDims() == 2,
+                   "Coo need indices's NDim is 2.");
+    ARGUMENT_CHECK(indices_.shape()[-1] == values_.shape()[0],
+                   "Coo need indices's last dimension same with values's first "
+                   "dimension.");
+    ARGUMENT_CHECK(
+        shape_.NDims() + 1 == indices_.shape()[0] + values_.shape().NDims(),
+        "Coo shape error!");
 
-  for (int64_t i = sparse_dim_, j = 1; i < shape_.NDims(); ++i, ++j) {
-    ARGUMENT_CHECK(shape_[i] == values_.shape()[j], "Coo shape error!");
+    // indices_ shape is: [M, nse]
+    // values_ shape is: (nse,) + shape[M : M + K]
+    // sparse_dim_ >= 1
+    // dense_dim_ >= 0
+    sparse_dim_ = indices_.shape()[0];
+
+    for (int64_t i = sparse_dim_, j = 1; i < shape_.NDims(); ++i, ++j) {
+      ARGUMENT_CHECK(shape_[i] == values_.shape()[j], "Coo shape error!");
+    }
+
+    dense_dim_ = values_.shape().NDims() - 1;
   }
-
-  dense_dim_ = values_.shape().NDims() - 1;
 }
 
 int64_t CooTensorImpl::sparse_dim() const {
@@ -81,7 +87,7 @@ void* CooTensorImpl::Ptr() const {
 }
 
 bool CooTensorImpl::IsEmpty() const {
-  return indices_.IsEmpty();
+  RUNTIME_ERROR("CooTensorImpl unsupport.");
 }
 
 std::shared_ptr<TensorImpl> CooTensorImpl::Add(const TensorImpl& other) const {
@@ -103,12 +109,15 @@ std::shared_ptr<TensorImpl> CooTensorImpl::Div(const TensorImpl& other) const {
 std::shared_ptr<TensorImpl> CooTensorImpl::AddAssign(const TensorImpl& other) {
   RUNTIME_ERROR("CooTensorImpl unsupport.");
 }
+
 std::shared_ptr<TensorImpl> CooTensorImpl::SubAssign(const TensorImpl& other) {
   RUNTIME_ERROR("CooTensorImpl unsupport.");
 }
+
 std::shared_ptr<TensorImpl> CooTensorImpl::MulAssign(const TensorImpl& other) {
   RUNTIME_ERROR("CooTensorImpl unsupport.");
 }
+
 std::shared_ptr<TensorImpl> CooTensorImpl::DivAssign(const TensorImpl& other) {
   RUNTIME_ERROR("CooTensorImpl unsupport.");
 }
@@ -116,12 +125,15 @@ std::shared_ptr<TensorImpl> CooTensorImpl::DivAssign(const TensorImpl& other) {
 std::shared_ptr<TensorImpl> CooTensorImpl::Add(float v) const {
   RUNTIME_ERROR("CooTensorImpl unsupport.");
 }
+
 std::shared_ptr<TensorImpl> CooTensorImpl::Sub(float v) const {
   RUNTIME_ERROR("CooTensorImpl unsupport.");
 }
+
 std::shared_ptr<TensorImpl> CooTensorImpl::Mul(float v) const {
   RUNTIME_ERROR("CooTensorImpl unsupport.");
 }
+
 std::shared_ptr<TensorImpl> CooTensorImpl::Div(float v) const {
   RUNTIME_ERROR("CooTensorImpl unsupport.");
 }
@@ -129,12 +141,15 @@ std::shared_ptr<TensorImpl> CooTensorImpl::Div(float v) const {
 std::shared_ptr<TensorImpl> CooTensorImpl::AddAssign(float v) {
   RUNTIME_ERROR("CooTensorImpl unsupport.");
 }
+
 std::shared_ptr<TensorImpl> CooTensorImpl::SubAssign(float v) {
   RUNTIME_ERROR("CooTensorImpl unsupport.");
 }
+
 std::shared_ptr<TensorImpl> CooTensorImpl::MulAssign(float v) {
   RUNTIME_ERROR("CooTensorImpl unsupport.");
 }
+
 std::shared_ptr<TensorImpl> CooTensorImpl::DivAssign(float v) {
   RUNTIME_ERROR("CooTensorImpl unsupport.");
 }
@@ -142,6 +157,7 @@ std::shared_ptr<TensorImpl> CooTensorImpl::DivAssign(float v) {
 std::shared_ptr<TensorImpl> CooTensorImpl::BeSub(float v) const {
   RUNTIME_ERROR("CooTensorImpl unsupport.");
 }
+
 std::shared_ptr<TensorImpl> CooTensorImpl::BeDiv(float v) const {
   RUNTIME_ERROR("CooTensorImpl unsupport.");
 }
@@ -149,6 +165,7 @@ std::shared_ptr<TensorImpl> CooTensorImpl::BeDiv(float v) const {
 std::shared_ptr<TensorImpl> CooTensorImpl::Reshape(const Shape& nshape) const {
   RUNTIME_ERROR("CooTensorImpl unsupport.");
 }
+
 std::shared_ptr<TensorImpl> CooTensorImpl::Reshape(
     const std::vector<int64_t>& dims) const {
   RUNTIME_ERROR("CooTensorImpl unsupport.");
@@ -237,11 +254,23 @@ std::shared_ptr<TensorImpl> CooTensorImpl::Transpose(int64_t d0,
 }
 
 std::shared_ptr<TensorImpl> CooTensorImpl::ToDense() const {
+  if (indices_.IsEmpty()) {
+    return TensorImpl::Dense(shape_, values_.element_type())->Zero();
+  }
+
   auto dense = TensorImpl::Dense(shape_, values_.element_type());
 
   math::CooToDense(*indices_.impl(), *values_.impl(), *dense);
 
   return dense;
+}
+
+std::shared_ptr<TensorImpl> CooTensorImpl::ToCoo(float th) const {
+  RUNTIME_ERROR("CooTensorImpl unsupport.");
+}
+
+std::shared_ptr<TensorImpl> CooTensorImpl::LtKeep(float th) const {
+  RUNTIME_ERROR("CooTensorImpl unsupport.");
 }
 
 }  // namespace kraken

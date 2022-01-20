@@ -2,7 +2,6 @@
 
 #include <memory>
 #include <shared_mutex>
-#include <unordered_map>
 
 #include "ps/initializer/initializer.h"
 #include "ps/optim/optim.h"

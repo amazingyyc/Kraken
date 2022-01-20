@@ -662,13 +662,15 @@ void TopK(const TensorImpl& x, TensorImpl& y) {
 }
 
 template <typename T>
-void CountNonZeroImpl(T* x, int64_t n, T th, int64_t* count) {
+int64_t CountNonZeroImpl(T* x, int64_t n, T th) {
   int64_t t_num = (int64_t)std::thread::hardware_concurrency();
   if (n <= 256) {
     t_num = 1;
   }
 
   int64_t stride = (n + t_num - 1) / t_num;
+  stride = std::max<int64_t>(256, stride);
+
   t_num = (n + stride - 1) / stride;
 
   std::vector<int64_t> counts(t_num, 0);
@@ -687,24 +689,25 @@ void CountNonZeroImpl(T* x, int64_t n, T th, int64_t* count) {
     }
   }
 
-  *count = 0;
+  int64_t count = 0;
   for (auto c : counts) {
-    *count += c;
+    count += c;
   }
+
+  return count;
 }
 
-void CountNonZero(const TensorImpl& x, float th, int64_t* count) {
+int64_t CountNonZero(const TensorImpl& x, float th) {
   ARGUMENT_CHECK(x.IsDense(), "CountNonZero need Dense TensorImpl.");
 
   if (x.Size() == 0) {
-    *count = 0;
-    return;
+    return 0;
   }
 
   if (x.element_type().Is<float>()) {
-    CountNonZeroImpl<float>(x.Data<float>(), x.Size(), th, count);
+    return CountNonZeroImpl<float>(x.Data<float>(), x.Size(), th);
   } else if (x.element_type().Is<double>()) {
-    CountNonZeroImpl<double>(x.Data<double>(), x.Size(), th, count);
+    return CountNonZeroImpl<double>(x.Data<double>(), x.Size(), th);
   } else {
     RUNTIME_ERROR(
         "CountNonZero not support ElementType:" << x.element_type().Name());
@@ -719,6 +722,8 @@ void TakeImpl(T* x, int64_t n, IT* id, T* y, int64_t k) {
   }
 
   int64_t stride = (k + t_num - 1) / t_num;
+  stride = std::max<int64_t>(256, stride);
+
   t_num = (k + stride - 1) / stride;
 
 #pragma omp parallel for
@@ -739,11 +744,11 @@ void TakeImpl(T* x, int64_t n, IT* id, T* y, int64_t k) {
 }
 
 void Take(const TensorImpl& x, const TensorImpl& indices, TensorImpl& y) {
-  ARGUMENT_CHECK(x.IsDense() && y.IsDense() && x.IsDense(),
+  ARGUMENT_CHECK(x.IsDense() && indices.IsDense() && y.IsDense(),
                  "Take need TensorImpl is Dense.");
   ARGUMENT_CHECK(x.element_type() == y.element_type(),
                  "Take need x/y has same element_type.");
-  ARGUMENT_CHECK(indices.Size() > 0, "Take need indices size > 0.");
+  ARGUMENT_CHECK(!indices.IsEmpty(), "Take need indices size > 0.");
   ARGUMENT_CHECK(indices.shape() == y.shape(),
                  "Take need indices/y has same shape.");
 
@@ -802,6 +807,8 @@ std::shared_ptr<TensorImpl> FlatNonZeroImpl(T* x, int64_t n, T th) {
   }
 
   int64_t stride = (n + t_num - 1) / t_num;
+  stride = std::max<int64_t>(256, stride);
+
   t_num = (n + stride - 1) / stride;
 
   std::vector<std::vector<int64_t>> ids;
@@ -825,7 +832,7 @@ std::shared_ptr<TensorImpl> FlatNonZeroImpl(T* x, int64_t n, T th) {
   }
 
   if (num <= 0) {
-    return TensorImpl::Empty();
+    return TensorImpl::Empty(ElementType::From<int64_t>());
   }
 
   auto storage = Storage::Create(sizeof(int64_t) * num);
@@ -833,21 +840,20 @@ std::shared_ptr<TensorImpl> FlatNonZeroImpl(T* x, int64_t n, T th) {
   int64_t* ptr = (int64_t*)storage->ptr();
   size_t offset = 0;
   for (int64_t i = 0; i < t_num; ++i) {
-    storage->device()->Memcpy(ptr, ids[i].data(),
+    storage->device()->Memcpy(ptr + offset, ids[i].data(),
                               sizeof(int64_t) * ids[i].size());
     offset += ids[i].size();
   }
 
-  Shape shape({num});
-
-  return TensorImpl::Dense(shape, storage, 0, ElementType::From<int64_t>());
+  return TensorImpl::Dense(Shape({num}), storage, 0,
+                           ElementType::From<int64_t>());
 }
 
 std::shared_ptr<TensorImpl> FlatNonZero(const TensorImpl& x, float th) {
   ARGUMENT_CHECK(x.IsDense(), "FlatNonZero need TensorImpl is Dense.");
 
   if (x.IsEmpty()) {
-    return TensorImpl::Empty();
+    return TensorImpl::Empty(ElementType::From<int64_t>());
   }
 
   if (x.element_type().Is<float>()) {
@@ -869,6 +875,8 @@ void NonZeroImpl(int64_t* fid, int64_t nnz, int64_t* id, const Shape& shape) {
   }
 
   int64_t stride = (nnz + t_num - 1) / t_num;
+  stride = std::max<int64_t>(256, stride);
+
   t_num = (nnz + stride - 1) / stride;
 
   int64_t ndims = shape.NDims();
@@ -894,19 +902,19 @@ std::shared_ptr<TensorImpl> NonZero(const TensorImpl& x, float th) {
   ARGUMENT_CHECK(x.IsDense(), "NonZero need TensorImpl is Dense.");
 
   if (x.IsEmpty()) {
-    return TensorImpl::Empty();
+    return TensorImpl::Empty(ElementType::From<int64_t>());
   }
 
   std::shared_ptr<TensorImpl> f_indices = FlatNonZero(x, th);
   if (f_indices->IsEmpty()) {
-    return TensorImpl::Empty();
+    return f_indices;
   }
 
   int64_t nnz = f_indices->Size();
   int64_t ndims = x.shape().NDims();
 
   if (ndims == 1) {
-    return f_indices;
+    return f_indices->Reshape({nnz, 1});
   }
 
   auto storage = Storage::Create(sizeof(int64_t) * nnz * ndims);
@@ -927,6 +935,8 @@ void TransposeImpl(T* x, const Shape& xshape, T* y, const Shape& yshape,
   }
 
   int64_t stride = (n + t_num - 1) / t_num;
+  stride = std::max<int64_t>(256, stride);
+
   t_num = (n + stride - 1) / stride;
 
   int64_t ndims = xshape.NDims();
@@ -1010,6 +1020,8 @@ void CooToDenseImpl(Device* device, IT* indices, T* values, T* out,
   }
 
   int64_t stride = (nnz + t_num - 1) / t_num;
+  stride = std::max<int64_t>(256, stride);
+
   t_num = (nnz + stride - 1) / stride;
 
 #pragma omp parallel for
@@ -1023,7 +1035,8 @@ void CooToDenseImpl(Device* device, IT* indices, T* values, T* out,
         r += indices[j + l * nnz] * s_shape.Stride(l);
       }
 
-      device->Memcpy(out + r * col, values + j * col, sizeof(T) * col);
+      // Should add the r maybe same.
+      AddImpl<T>(values + j * col, out + r * col, out + r * col, col);
     }
   }
 }
@@ -1075,6 +1088,48 @@ void CooToDense(const TensorImpl& indices, const TensorImpl& values,
   } else {
     RUNTIME_ERROR(
         "CooToDense not support ElementType:" << values.element_type().Name());
+  }
+}
+
+template <typename T>
+void LtKeepImpl(T* x, T th, T* y, int64_t n) {
+  int64_t t_num = (int64_t)std::thread::hardware_concurrency();
+  if (n <= 256) {
+    t_num = 1;
+  }
+
+  int64_t stride = (n + t_num - 1) / t_num;
+  stride = std::max<int64_t>(256, stride);
+
+  t_num = (n + stride - 1) / stride;
+
+#pragma omp parallel for
+  for (int64_t i = 0; i < t_num; ++i) {
+    int64_t start = i * stride;
+    int64_t end = std::min(start + stride, n);
+
+    for (int64_t j = start; j < end; ++j) {
+      if (std::abs(x[j]) < th) {
+        y[j] = x[j];
+      } else {
+        y[j] = 0;
+      }
+    }
+  }
+}
+
+void LtKeep(const TensorImpl& x, float th, TensorImpl& y) {
+  ARGUMENT_CHECK(x.IsDense() && y.IsDense(), "LtKeep need dense.");
+  ARGUMENT_CHECK(x.element_type() == y.element_type(),
+                 "LtKeep need input has same element type.");
+  ARGUMENT_CHECK(x.Size() == y.Size(), "LtKeep need input has same size.");
+
+  if (x.element_type().Is<float>()) {
+    LtKeepImpl<float>(x.Data<float>(), th, y.Data<float>(), x.Size());
+  } else if (x.element_type().Is<double>()) {
+    LtKeepImpl<double>(x.Data<double>(), th, y.Data<double>(), x.Size());
+  } else {
+    RUNTIME_ERROR("LtKeep not support ElementType:" << x.element_type().Name());
   }
 }
 

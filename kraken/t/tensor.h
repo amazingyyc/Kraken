@@ -22,6 +22,10 @@ public:
 
   const Shape& shape() const;
 
+  const Tensor& indices() const;
+
+  const Tensor& values() const;
+
   ElementType element_type() const;
 
   kraken::Device* Device() const;
@@ -53,7 +57,7 @@ public:
   static Tensor Dense(const Shape& shape, std::shared_ptr<Storage> storage,
                       size_t offset, ElementType etype);
 
-  static Tensor Empty();
+  static Tensor Empty(ElementType etype);
 
 public:
   Tensor operator+(const Tensor& other) const;
@@ -75,6 +79,8 @@ public:
   Tensor operator-=(float v);
   Tensor operator*=(float v);
   Tensor operator/=(float v);
+
+  float operator[](int64_t i) const;
 
   Tensor Reshape(const Shape& nshape) const;
 
@@ -110,7 +116,7 @@ public:
 
   Tensor TopK(int64_t k) const;
 
-  Tensor Take(const TensorImpl& indices) const;
+  Tensor Take(const Tensor& indices) const;
 
   Tensor FlatNonZero(float th) const;
 
@@ -119,6 +125,10 @@ public:
   Tensor Transpose(int64_t d0 = 0, int64_t d1 = 1) const;
 
   Tensor ToDense() const;
+
+  Tensor ToCoo(float th) const;
+
+  Tensor LtKeep(float th) const;
 };
 
 // operator override

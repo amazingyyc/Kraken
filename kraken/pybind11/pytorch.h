@@ -5,11 +5,13 @@
 
 #include "ps/initializer/initializer.h"
 #include "ps/optim/optim.h"
+#include "worker/emitter.h"
 
 namespace kraken {
 namespace py {
 
-void Initialize(const std::string& addrs);
+void Initialize(const std::string& addrs, EmitterType emitter_type,
+                uint64_t life_span, float eta);
 
 void Stop();
 

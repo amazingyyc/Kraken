@@ -17,8 +17,11 @@ namespace py {
 std::once_flag flag;
 Worker worker;
 
-void Initialize(const std::string& addrs) {
-  std::call_once(flag, [&addrs]() { worker.Initialize(addrs); });
+void Initialize(const std::string& addrs, EmitterType emitter_type,
+                uint64_t life_span, float eta) {
+  std::call_once(flag, [&addrs, emitter_type, life_span, eta]() {
+    worker.Initialize(addrs, emitter_type, life_span, eta);
+  });
 }
 
 void Stop() {

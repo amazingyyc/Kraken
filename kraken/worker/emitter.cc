@@ -17,7 +17,7 @@ namespace kraken {
 Emitter::Emitter() : Emitter(EmitterType::kDefault) {
 }
 
-Emitter::Emitter(EmitterType type) : type_(type) {
+Emitter::Emitter(EmitterType type) : type_(type), initialized_(false) {
 }
 
 size_t Emitter::DenseTableRouter(uint64_t model_id, uint64_t table_id) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cinttypes>
+#include <iostream>
 #include <memory>
 
 #include "t/device.h"
@@ -10,6 +11,7 @@
 #include "t/storage.h"
 
 namespace kraken {
+class Tensor;
 
 class TensorImpl : public std::enable_shared_from_this<TensorImpl> {
 protected:
@@ -53,7 +55,14 @@ public:
                                            std::shared_ptr<Storage> storage,
                                            size_t offset, ElementType etype);
 
-  static std::shared_ptr<TensorImpl> Empty();
+  static std::shared_ptr<TensorImpl> Empty(ElementType etype);
+
+  static std::shared_ptr<TensorImpl> Coo(std::shared_ptr<TensorImpl> indices,
+                                         std::shared_ptr<TensorImpl> values,
+                                         const Shape& shape);
+
+  static std::shared_ptr<TensorImpl> EmptyCoo(ElementType value_etype,
+                                              const Shape& shape);
 
 public:
   Layout layout() const;
@@ -63,6 +72,10 @@ public:
   bool IsDense() const;
 
   const Shape& shape() const;
+
+  virtual const Tensor& indices() const;
+
+  virtual const Tensor& values() const;
 
   virtual ElementType element_type() const;
 
@@ -158,6 +171,14 @@ public:
                                                 int64_t d1 = 1) const;
 
   virtual std::shared_ptr<TensorImpl> ToDense() const;
+
+  // Convert to Coo Tensor the indices always be int64.
+  // The indices shape will be: [1, nnz]
+  // The values shape will be: [nnz]
+  // The shape of Coo will be: [this->Size()]
+  virtual std::shared_ptr<TensorImpl> ToCoo(float th) const;
+
+  virtual std::shared_ptr<TensorImpl> LtKeep(float th) const;
 };
 
 }  // namespace kraken
