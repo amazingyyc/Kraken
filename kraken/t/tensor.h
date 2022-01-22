@@ -129,6 +129,8 @@ public:
   Tensor ToCoo(float th) const;
 
   Tensor LtKeep(float th) const;
+
+  Tensor Cast(ElementType to_type) const;
 };
 
 // operator override

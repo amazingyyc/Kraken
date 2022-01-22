@@ -273,4 +273,8 @@ std::shared_ptr<TensorImpl> CooTensorImpl::LtKeep(float th) const {
   RUNTIME_ERROR("CooTensorImpl unsupport.");
 }
 
+std::shared_ptr<TensorImpl> CooTensorImpl::Cast(ElementType to_type) {
+  RUNTIME_ERROR("CooTensorImpl unsupport.");
+}
+
 }  // namespace kraken

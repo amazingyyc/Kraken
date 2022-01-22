@@ -17,6 +17,7 @@ struct RPCFuncType {
   static constexpr uint32_t kPushPullDenseTableType = 9;
   static constexpr uint32_t kPushSparseTableType = 10;
   static constexpr uint32_t kPullSparseTableType = 11;
+  static constexpr uint32_t kCombinePullSparseTableType = 12;
 };
 
 }  // namespace kraken

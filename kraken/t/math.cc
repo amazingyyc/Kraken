@@ -1133,5 +1133,30 @@ void LtKeep(const TensorImpl& x, float th, TensorImpl& y) {
   }
 }
 
+template <typename From, typename To>
+void CastImpl(From* x, To* y, int64_t n) {
+  EVector<From> xv(x, n);
+  EVector<To> yv(y, n);
+
+  yv.noalias() = xv.template cast<To>();
+}
+
+void Cast(const TensorImpl& x, TensorImpl& y) {
+  ARGUMENT_CHECK(x.IsDense() && y.IsDense(), "Cast need TensorImpl.");
+  ARGUMENT_CHECK(x.Size() == y.Size(), "Cast need input has same size.");
+
+#define CONVERT_FUNC(From, To) \
+  if (x.element_type().Is<From>() && y.element_type().Is<To>()) { \
+    CastImpl<From, To>(x.Data<From>(), y.Data<To>(), x.Size()); \
+    return; \
+  }
+
+  CONVERT_FUNC(uint32_t, int64_t);
+  CONVERT_FUNC(int32_t, int64_t);
+
+  RUNTIME_ERROR("Unsupport convert from:" << x.element_type().Name()
+                                          << " to:" << y.element_type().Name());
+}
+
 }  // namespace math
 }  // namespace kraken

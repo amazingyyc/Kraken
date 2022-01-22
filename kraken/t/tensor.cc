@@ -307,4 +307,8 @@ Tensor Tensor::LtKeep(float th) const {
   return Tensor(impl_->LtKeep(th));
 }
 
+Tensor Tensor::Cast(ElementType to_type) const {
+  return Tensor(impl_->Cast(to_type));
+}
+
 }  // namespace kraken

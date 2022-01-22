@@ -179,6 +179,8 @@ public:
   virtual std::shared_ptr<TensorImpl> ToCoo(float th) const;
 
   virtual std::shared_ptr<TensorImpl> LtKeep(float th) const;
+
+  virtual std::shared_ptr<TensorImpl> Cast(ElementType to_type);
 };
 
 }  // namespace kraken

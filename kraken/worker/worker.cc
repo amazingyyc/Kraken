@@ -57,10 +57,6 @@ uint64_t Worker::RegisterSparseTableV2(
                                          init_conf);
 }
 
-void Worker::PushDenseTable(uint64_t table_id, const Tensor& grad) {
-  emitter_->PushDenseTable(table_id, grad);
-}
-
 Tensor Worker::PullDenseTable(uint64_t table_id) {
   return emitter_->PullDenseTable(table_id);
 }
@@ -70,17 +66,27 @@ std::vector<Tensor> Worker::PullListDenseTable(
   return emitter_->PullListDenseTable(table_ids);
 }
 
+void Worker::PushDenseTable(uint64_t table_id, const Tensor& grad) {
+  emitter_->PushDenseTable(table_id, grad);
+}
+
 Tensor Worker::PushPullDenseTable(uint64_t table_id, const Tensor& grad) {
   return emitter_->PushPullDenseTable(table_id, grad);
+}
+
+Tensor Worker::PullSparseTable(uint64_t table_id, const Tensor& indices) {
+  return emitter_->PullSparseTable(table_id, indices);
+}
+
+std::vector<Tensor> Worker::CombinePullSparseTable(
+    const std::vector<uint64_t>& table_ids,
+    const std::vector<Tensor>& indices) {
+  return emitter_->CombinePullSparseTable(table_ids, indices);
 }
 
 void Worker::PushSparseTable(uint64_t table_id, const Tensor& indices,
                              const Tensor& grads) {
   emitter_->PushSparseTable(table_id, indices, grads);
-}
-
-Tensor Worker::PullSparseTable(uint64_t table_id, const Tensor& indices) {
-  return emitter_->PullSparseTable(table_id, indices);
 }
 
 }  // namespace kraken

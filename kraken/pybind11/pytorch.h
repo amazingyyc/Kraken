@@ -31,19 +31,23 @@ uint64_t RegisterSparseTableV2(
     InitializerType init_type,
     const std::unordered_map<std::string, std::string>& init_conf);
 
-void PushDenseTable(uint64_t table_id, torch::Tensor grad);
-
 torch::Tensor PullDenseTable(uint64_t table_id);
 
 std::vector<torch::Tensor> PullListDenseTable(
     const std::vector<uint64_t>& table_ids);
 
+void PushDenseTable(uint64_t table_id, torch::Tensor grad);
+
 torch::Tensor PushPullDenseTable(uint64_t table_id, torch::Tensor grad);
+
+torch::Tensor PullSparseTable(uint64_t table_id, torch::Tensor indices);
+
+std::vector<torch::Tensor> CombinePullSparseTable(
+    const std::vector<uint64_t>& table_ids,
+    const std::vector<torch::Tensor>& indices);
 
 void PushSparseTable(uint64_t table_id, torch::Tensor indices,
                      torch::Tensor grads);
-
-torch::Tensor PullSparseTable(uint64_t table_id, torch::Tensor indices);
 
 }  // namespace py
 }  // namespace kraken

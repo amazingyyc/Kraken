@@ -128,6 +128,8 @@ public:
   std::shared_ptr<TensorImpl> ToCoo(float th) const override;
 
   std::shared_ptr<TensorImpl> LtKeep(float th) const override;
+
+  std::shared_ptr<TensorImpl> Cast(ElementType to_type) override;
 };
 
 }  // namespace kraken

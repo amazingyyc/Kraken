@@ -56,6 +56,9 @@ private:
   int32_t PullSparseTable(const PullSparseTableRequest&,
                           PullSparseTableResponse*);
 
+  int32_t CombinePullSparseTable(const CombinePullSparseTableRequest&,
+                                 CombinePullSparseTableResponse*);
+
   void RegisterFuncs();
 
 public:

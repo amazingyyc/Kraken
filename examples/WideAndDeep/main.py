@@ -65,6 +65,9 @@ widedeep_dataset = WideDeepLoader(train_dataset)
 train_loader = torch.utils.data.DataLoader(dataset=widedeep_dataset, batch_size=batch_size, shuffle=True)
 model.train()
 
+total_duration = 0
+count = 0
+
 for epoch in range(n_epochs):
   total = 0
   correct = 0

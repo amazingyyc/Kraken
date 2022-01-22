@@ -75,6 +75,24 @@ int32_t PsServer::PullSparseTable(const PullSparseTableRequest& req,
                              &(rsp->vals));
 }
 
+int32_t PsServer::CombinePullSparseTable(
+    const CombinePullSparseTableRequest& req,
+    CombinePullSparseTableResponse* rsp) {
+  rsp->vals.resize(req.indices.size());
+
+  for (size_t i = 0; i < req.indices.size(); ++i) {
+    auto ecode =
+        ps_.PullSparseTable(req.indices[i].model_id, req.indices[i].table_id,
+                            req.indices[i].indices, &(rsp->vals[i].vals));
+
+    if (ecode != ErrorCode::kSuccess) {
+      return ecode;
+    }
+  }
+
+  return ErrorCode::kSuccess;
+}
+
 void PsServer::RegisterFuncs() {
   using namespace std::placeholders;
 
@@ -94,6 +112,7 @@ void PsServer::RegisterFuncs() {
   REGISTER_FUNC(PushPullDenseTable, PushPullDenseTable);
   REGISTER_FUNC(PushSparseTable, PushSparseTable);
   REGISTER_FUNC(PullSparseTable, PullSparseTable);
+  REGISTER_FUNC(CombinePullSparseTable, CombinePullSparseTable);
 }
 
 void PsServer::Start() {

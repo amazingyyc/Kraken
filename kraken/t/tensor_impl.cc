@@ -562,4 +562,15 @@ std::shared_ptr<TensorImpl> TensorImpl::LtKeep(float th) const {
   return out;
 }
 
+std::shared_ptr<TensorImpl> TensorImpl::Cast(ElementType to_type) {
+  if (element_type_ == to_type) {
+    return shared_from_this();
+  }
+
+  auto to = TensorImpl::Dense(shape_, to_type);
+  math::Cast(*this, *to);
+
+  return to;
+}
+
 }  // namespace kraken

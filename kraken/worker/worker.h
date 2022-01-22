@@ -18,7 +18,7 @@ public:
 
   /**
    * \brief Initialize this work select Emitter and connect server.
-   * 
+   *
    * \param addrs Server address.
    * \param emitter_type Emitter type.
    * \param life_span For DCTEmitter.
@@ -92,14 +92,6 @@ public:
       const std::unordered_map<std::string, std::string>& init_conf);
 
   /**
-   * \brief Push gradient for special dense table.
-   *
-   * \param table_id Table id.
-   * \param grad Gradient.
-   */
-  void PushDenseTable(uint64_t table_id, const Tensor& grad);
-
-  /**
    * \brief Pull Dense table from server.
    *
    * \param table_id Table id.
@@ -117,6 +109,14 @@ public:
       const std::vector<uint64_t>& table_ids);
 
   /**
+   * \brief Push gradient for special dense table.
+   *
+   * \param table_id Table id.
+   * \param grad Gradient.
+   */
+  void PushDenseTable(uint64_t table_id, const Tensor& grad);
+
+  /**
    * \brief Push gradient and pull val from server.
    *
    * \param table_id Table id.
@@ -124,16 +124,6 @@ public:
    * \return Tensor The Dense value.
    */
   Tensor PushPullDenseTable(uint64_t table_id, const Tensor& grad);
-
-  /**
-   * \brief Push sparse table gradient to server.
-   *
-   * \param table_id Table id.
-   * \param indices Gradient index.
-   * \param grads Gradient.
-   */
-  void PushSparseTable(uint64_t table_id, const Tensor& indices,
-                       const Tensor& grads);
 
   /**
    * \brief Pull Sparse vector from server.
@@ -146,6 +136,27 @@ public:
    * \return The sparse embedding.
    */
   Tensor PullSparseTable(uint64_t table_id, const Tensor& indices);
+
+  /**
+   * \brief Combine Sparse Pull request.
+   *
+   * \param table_ids Table id list.
+   * \param indices The feature id.
+   * \return std::vector<Tensor> Sparse embeddings.
+   */
+  std::vector<Tensor> CombinePullSparseTable(
+      const std::vector<uint64_t>& table_ids,
+      const std::vector<Tensor>& indices);
+
+  /**
+   * \brief Push sparse table gradient to server.
+   *
+   * \param table_id Table id.
+   * \param indices Gradient index.
+   * \param grads Gradient.
+   */
+  void PushSparseTable(uint64_t table_id, const Tensor& indices,
+                       const Tensor& grads);
 };
 
 }  // namespace kraken

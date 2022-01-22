@@ -82,5 +82,7 @@ void CooToDense(const TensorImpl& indices, const TensorImpl& values,
 // it the Abs(v) <= th than keep it. 
 void LtKeep(const TensorImpl& x, float th, TensorImpl& y);
 
+void Cast(const TensorImpl& x, TensorImpl& y);
+
 }  // namespace math
 }  // namespace kraken

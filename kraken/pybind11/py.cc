@@ -57,22 +57,25 @@ PYBIND11_MODULE(kraken_native, m) {
         pybind11::arg("dtype"), pybind11::arg("init_type"),
         pybind11::arg("init_conf"));
 
-  m.def("push_dense_table", &PushDenseTable, pybind11::arg("table_id"),
-        pybind11::arg("grad"));
-
   m.def("pull_dense_table", &PullDenseTable, pybind11::arg("table_id"));
 
   m.def("pull_list_dense_table", &PullListDenseTable,
         pybind11::arg("table_ids"));
 
+  m.def("push_dense_table", &PushDenseTable, pybind11::arg("table_id"),
+        pybind11::arg("grad"));
+
   m.def("push_pull_dense_table", &PushPullDenseTable, pybind11::arg("table_id"),
         pybind11::arg("grad"));
 
-  m.def("push_sparse_table", &PushSparseTable, pybind11::arg("table_id"),
-        pybind11::arg("indices"), pybind11::arg("grads"));
-
   m.def("pull_sparse_table", &PullSparseTable, pybind11::arg("table_id"),
         pybind11::arg("indices"));
+
+  m.def("combine_pull_sparse_table", &CombinePullSparseTable,
+        pybind11::arg("table_ids"), pybind11::arg("indices"));
+
+  m.def("push_sparse_table", &PushSparseTable, pybind11::arg("table_id"),
+        pybind11::arg("indices"), pybind11::arg("grads"));
 }
 
 }  // namespace py
