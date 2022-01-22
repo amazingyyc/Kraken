@@ -155,6 +155,65 @@ protected:
     return ErrorCode::kSuccess;
   }
 
+  /**
+   * \brief Same like ParallelCall not the parameter include all server's request and mask.
+   *
+   * \tparam ReqType Request type.
+   * \tparam RspType Response type.
+   * \param type Which RPC func will be call.
+   * \param mask The server mask, true means will request this server.
+   * \param reqs Request.
+   * \param rsps Response
+   * \return int32_t Error code.
+   */
+  template <typename ReqType, typename RspType>
+  int32_t ParallelCall(uint32_t type, const std::vector<bool>& mask,
+                       const std::vector<ReqType>& reqs,
+                       std::vector<RspType>* rsps) {
+    rsps->clear();
+    rsps->resize(reqs.size());
+
+    uint32_t b_count = 0;
+    for (size_t i = 0; i < mask.size(); ++i) {
+      if (mask[i]) {
+        b_count += 1;
+      }
+    }
+
+    std::vector<int32_t> ecodes(mask.size());
+    ThreadBarrier barrier(b_count);
+
+    for (size_t i = 0; i < mask.size(); ++i) {
+      if (mask[i] == false) {
+        continue;
+      }
+
+      auto callback = [&ecodes, i, rsps, &barrier](int32_t code, RspType& rsp) {
+        ecodes[i] = code;
+        (*rsps)[i] = std::move(rsp);
+
+        barrier.Release();
+      };
+
+      clients_[i]->CallAsync<ReqType, RspType>(type, reqs[i],
+                                               std::move(callback));
+    }
+
+    barrier.Wait();
+
+    for (size_t i = 0; i < mask.size(); ++i) {
+      if (mask[i] == false) {
+        continue;
+      }
+
+      if (ecodes[i] != ErrorCode::kSuccess) {
+        return ecodes[i];
+      }
+    }
+
+    return ErrorCode::kSuccess;
+  }
+
   template <typename ReqType, typename RspType>
   void ParallelCallAsync(uint32_t type,
                          const std::vector<size_t>& server_indices,
@@ -170,6 +229,24 @@ protected:
 
       clients_[server_indices[i]]->CallAsync<ReqType, RspType>(
           type, reqs[i], std::move(callback));
+    }
+  }
+
+  template <typename ReqType, typename RspType>
+  void ParallelCallAsync(uint32_t type, const std::vector<bool>& mask,
+                         const std::vector<ReqType>& reqs) {
+    for (size_t i = 0; i < mask.size(); ++i) {
+      if (mask[i] == false) {
+        continue;
+      }
+
+      auto callback = [](int32_t ecode, RspType& rsp) {
+        // Donot handle the error code, just crash.
+        RPC_CALL(ecode);
+      };
+
+      clients_[i]->CallAsync<ReqType, RspType>(type, reqs[i],
+                                               std::move(callback));
     }
   }
 
