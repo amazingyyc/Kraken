@@ -98,17 +98,16 @@ void Caller::Run(void* zmp_context, const std::string& addr, zmq_fd_t efd) {
                      "read eventfd error.");
 
       for (;;) {
-        // Read buffer from queue.
-        ZMQBuffer buffer;
+        // Read message from queue.
+        Message msg;
         {
-          std::unique_lock<std::mutex> lock(buf_que_mu_);
-
-          if (buf_que_.empty()) {
+          std::unique_lock<std::mutex> lock(msg_que_mu_);
+          if (msg_que_.empty()) {
             break;
           }
 
-          buffer = std::move(buf_que_.front());
-          buf_que_.pop();
+          msg = std::move(msg_que_.front());
+          msg_que_.pop();
         }
 
         void* ptr;
@@ -116,15 +115,44 @@ void Caller::Run(void* zmp_context, const std::string& addr, zmq_fd_t efd) {
         size_t offset;
         void (*zmq_free)(void*, void*);
 
-        buffer.Transfer(&ptr, &capacity, &offset, &zmq_free);
+        if (compress_type_ == CompressType::kNo) {
+          // No need to compress the data.
+          msg.z_buf.Transfer(&ptr, &capacity, &offset, &zmq_free);
+        } else if (compress_type_ == CompressType::kSnappy) {
+          // Compress the data, becareful the raw data already include the
+          // RequestHeader but we only compress the body.
+          RequestHeader req_header;
+          req_header.timestamp = msg.timestamp;
+          req_header.type = msg.type;
+          req_header.compress_type = CompressType::kSnappy;
+
+          SnappySink sink;
+          // step1 serialize header.
+          {
+            Serialize serialize(&sink);
+            ARGUMENT_CHECK(serialize << req_header,
+                           "Serialize request header error!");
+          }
+
+          // Compress body.
+          {
+            SnappySource source((char*)msg.z_buf.ptr() + sizeof(req_header),
+                                msg.z_buf.offset() - sizeof(req_header));
+
+            ARGUMENT_CHECK(snappy::Compress(&source, &sink),
+                           "snappy::Compress error.");
+          }
+
+          sink.TransferForZMQ(&ptr, &capacity, &offset, &zmq_free);
+        }
 
         // send by socket.
-        zmq_msg_t msg;
+        zmq_msg_t zmq_msg;
 
         // zero copy.
-        ZMQ_CALL(zmq_msg_init_data(&msg, ptr, offset, zmq_free, nullptr));
-        ZMQ_CALL(zmq_msg_send(&msg, zsocket, 0));
-        ZMQ_CALL(zmq_msg_close(&msg));
+        ZMQ_CALL(zmq_msg_init_data(&zmq_msg, ptr, offset, zmq_free, nullptr));
+        ZMQ_CALL(zmq_msg_send(&zmq_msg, zsocket, 0));
+        ZMQ_CALL(zmq_msg_close(&zmq_msg));
       }
     }
   }
@@ -132,10 +160,10 @@ void Caller::Run(void* zmp_context, const std::string& addr, zmq_fd_t efd) {
   ZMQ_CALL(zmq_close(zsocket));
 }
 
-void Caller::SendBuffer(ZMQBuffer&& buffer) {
+void Caller::SendMessage(Caller::Message&& msg) {
   {
-    std::unique_lock<std::mutex> lock(buf_que_mu_);
-    buf_que_.emplace(std::move(buffer));
+    std::unique_lock<std::mutex> lock(msg_que_mu_);
+    msg_que_.emplace(std::move(msg));
   }
 
   // tell worker to send message.

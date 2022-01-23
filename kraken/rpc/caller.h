@@ -30,6 +30,14 @@ private:
   using CALLBACK_FUNC =
       std::function<void(const ReplyHeader&, const char*, size_t)>;
 
+  struct Message {
+    uint64_t timestamp;
+    uint32_t type;
+
+    // Becareful z_buf include the RequestHeader.
+    ZMQBuffer z_buf;
+  };
+
   // use thread to handle io
   std::thread woker_;
 
@@ -37,8 +45,8 @@ private:
   void* zmq_context_;
 
   // use a queue to store message that needed to be send.
-  std::mutex buf_que_mu_;
-  std::queue<ZMQBuffer> buf_que_;
+  std::mutex msg_que_mu_;
+  std::queue<Message> msg_que_;
   zmq_fd_t efd_;
 
   std::atomic_uint64_t timestamp_;
@@ -66,59 +74,7 @@ private:
 
   void Run(void* zmp_context, const std::string& addr, zmq_fd_t qfd);
 
-  void SendBuffer(ZMQBuffer&& buffer);
-
-  template <typename ReqType>
-  int32_t NoCompress(const RequestHeader& req_header, const ReqType& req,
-                     ZMQBuffer* z_buf) {
-    MutableBuffer buffer;
-    Serialize serialize(&buffer);
-
-    ARGUMENT_CHECK(serialize << req_header, "Serialize request header error!");
-
-    if ((serialize << req) == false) {
-      return ErrorCode::kSerializeRequestError;
-    }
-
-    // Transfer to ZMQBuffer.
-    buffer.TransferForZMQ(z_buf);
-
-    return ErrorCode::kSuccess;
-  }
-
-  template <typename ReqType>
-  int32_t SnappyCompress(const RequestHeader& req_header, const ReqType& req,
-                         ZMQBuffer* z_buf) {
-    SnappySink sink;
-
-    // step1 serialize header.
-    {
-      Serialize serialize(&sink);
-      ARGUMENT_CHECK(serialize << req_header,
-                     "Serialize request header error!");
-    }
-
-    // step2 serialize body to tmp buffer.
-    MutableBuffer body_buf;
-    {
-      Serialize serialize(&body_buf);
-      if ((serialize << req) == false) {
-        return ErrorCode::kSerializeRequestError;
-      }
-    }
-
-    // Step3 compress body data to sink.
-    {
-      SnappySource source(body_buf.ptr(), body_buf.offset());
-      if (snappy::Compress(&source, &sink) == false) {
-        return ErrorCode::kSnappyCompressError;
-      }
-    }
-
-    sink.TransferForZMQ(z_buf);
-
-    return ErrorCode::kSuccess;
-  }
+  void SendMessage(Message&& msg);
 
   template <typename ReplyType>
   int32_t NoUnCompress(const char* body, size_t body_len, ReplyType* reply) {
@@ -156,7 +112,6 @@ public:
   template <typename ReqType, typename ReplyType>
   int32_t Call(uint32_t type, const ReqType& req, ReplyType* reply) {
     ThreadBarrier barrier(1);
-
     int32_t ecode;
 
     auto callback = [&ecode, &barrier, reply](int32_t rcode,
@@ -184,23 +139,23 @@ public:
     RequestHeader req_header;
     req_header.timestamp = timestamp;
     req_header.type = type;
-    req_header.compress_type = compress_type_;
+    req_header.compress_type = CompressType::kNo;
 
-    auto ecode = ErrorCode::kSuccess;
+    // Serialize the header and request.
+    MutableBuffer buffer;
+    Serialize serialize(&buffer);
 
-    ZMQBuffer z_buf;
-    if (compress_type_ == CompressType::kNo) {
-      ecode = NoCompress<ReqType>(req_header, req, &z_buf);
-    } else if (compress_type_ == CompressType::kSnappy) {
-      ecode = SnappyCompress<ReqType>(req_header, req, &z_buf);
-    } else {
-      ecode = ErrorCode::kUnSupportCompressTypeError;
-    }
-
-    if (ecode != ErrorCode::kSuccess) {
-      callback(ecode, dummy_reply);
+    ARGUMENT_CHECK(serialize << req_header, "Serialize request header error!");
+    if ((serialize << req) == false) {
+      callback(ErrorCode::kSerializeRequestError, dummy_reply);
       return;
     }
+
+    // Wrapper a message and put in queue.
+    Message msg;
+    msg.timestamp = timestamp;
+    msg.type = type;
+    buffer.TransferForZMQ(&msg.z_buf);
 
     auto func = [this, callback{std::move(callback)}](const ReplyHeader& header,
                                                       const char* body,
@@ -230,8 +185,7 @@ public:
       callback_funcs_.emplace(timestamp, func);
     }
 
-    // send to server.
-    SendBuffer(std::move(z_buf));
+    SendMessage(std::move(msg));
   }
 };
 

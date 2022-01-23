@@ -48,6 +48,9 @@ public:
   // Fo IBuffer.
   void Write(const char* bytes, size_t n) override;
 
+  void TransferForZMQ(void** ptr, size_t* capacity, size_t* offset,
+                      void (**zmq_free)(void*, void*));
+
   void TransferForZMQ(ZMQBuffer* z_buf) override;
 
   // For snappy sink.

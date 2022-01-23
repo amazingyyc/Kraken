@@ -135,6 +135,18 @@ char* SnappySink::GetAppendBufferVariable(size_t min_size,
   return ptr_ + offset_;
 }
 
+void SnappySink::TransferForZMQ(void** ptr, size_t* capacity, size_t* offset,
+                                void (**zmq_free)(void*, void*)) {
+  *ptr = ptr_;
+  *capacity = capacity_;
+  *offset = offset_;
+  *zmq_free = SnappySink::ZMQFree;
+
+  ptr_ = nullptr;
+  capacity_ = 0;
+  offset_ = 0;
+}
+
 void SnappySink::TransferForZMQ(ZMQBuffer* z_buf) {
   z_buf->Reset(ptr_, capacity_, offset_, SnappySink::ZMQFree);
 

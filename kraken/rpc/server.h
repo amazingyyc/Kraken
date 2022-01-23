@@ -99,7 +99,6 @@ private:
     Serialize serialize(&buffer);
 
     ARGUMENT_CHECK(serialize << reply_header, "Serialize reply header error!");
-
     if ((serialize << reply) == false) {
       return ErrorCode::kSerializeReplyError;
     }
