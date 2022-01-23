@@ -134,8 +134,8 @@ int32_t Model::PullDenseTable(uint64_t table_id, Tensor* val) {
   return it->second->Pull(val);
 }
 
-int32_t Model::PullListDenseTable(const std::vector<uint64_t>& table_ids,
-                                  std::vector<Tensor>* vals) {
+int32_t Model::CombinePullDenseTable(const std::vector<uint64_t>& table_ids,
+                                     std::vector<Tensor>* vals) {
   vals->reserve(table_ids.size());
 
   std::shared_lock<std::shared_mutex> lock(mu_);

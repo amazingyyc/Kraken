@@ -33,7 +33,7 @@ uint64_t RegisterSparseTableV2(
 
 torch::Tensor PullDenseTable(uint64_t table_id);
 
-std::vector<torch::Tensor> PullListDenseTable(
+std::vector<torch::Tensor> CombinePullDenseTable(
     const std::vector<uint64_t>& table_ids);
 
 void PushDenseTable(uint64_t table_id, torch::Tensor grad);

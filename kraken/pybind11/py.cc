@@ -59,7 +59,7 @@ PYBIND11_MODULE(kraken_native, m) {
 
   m.def("pull_dense_table", &PullDenseTable, pybind11::arg("table_id"));
 
-  m.def("pull_list_dense_table", &PullListDenseTable,
+  m.def("combine_pull_dense_table", &CombinePullDenseTable,
         pybind11::arg("table_ids"));
 
   m.def("push_dense_table", &PushDenseTable, pybind11::arg("table_id"),

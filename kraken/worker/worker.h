@@ -105,7 +105,7 @@ public:
    * \param table_ids The list of dense table ids.
    * \return std::vector<Tensor> Dense table value.
    */
-  std::vector<Tensor> PullListDenseTable(
+  std::vector<Tensor> CombinePullDenseTable(
       const std::vector<uint64_t>& table_ids);
 
   /**

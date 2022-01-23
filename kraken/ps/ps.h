@@ -96,18 +96,6 @@ public:
       const std::unordered_map<std::string, std::string>& init_conf);
 
   /**
-   * \brief Push update dense table.
-   *
-   * \param model_id Model id.
-   * \param table_id Table id.
-   * \param grad The gradient.
-   * \param lr Learning rate.
-   * \return int32_t error code.
-   */
-  int32_t PushDenseTable(uint64_t model_id, uint64_t table_id,
-                         const Tensor& grad, float lr);
-
-  /**
    * \brief Pull Dense tensor
    *
    * \param model_id model id.
@@ -125,9 +113,9 @@ public:
    * \param vals The result.
    * \return int32_t Error code.
    */
-  int32_t PullListDenseTable(uint64_t model_id,
-                             const std::vector<uint64_t>& table_ids,
-                             std::vector<Tensor>* vals);
+  int32_t CombinePullDenseTable(uint64_t model_id,
+                                const std::vector<uint64_t>& table_ids,
+                                std::vector<Tensor>* vals);
 
   /**
    * \brief Push and Pull dense table.
@@ -143,18 +131,16 @@ public:
                              const Tensor& grad, float lr, Tensor* val);
 
   /**
-   * \brief Push gradient to server.
+   * \brief Push update dense table.
    *
    * \param model_id Model id.
    * \param table_id Table id.
-   * \param indices Gradient index.
-   * \param grads Gradient.
+   * \param grad The gradient.
    * \param lr Learning rate.
-   * \return int32_t Error code.
+   * \return int32_t error code.
    */
-  int32_t PushSparseTable(uint64_t model_id, uint64_t table_id,
-                          const std::vector<int64_t>& indices,
-                          const std::vector<Tensor>& grads, float lr);
+  int32_t PushDenseTable(uint64_t model_id, uint64_t table_id,
+                         const Tensor& grad, float lr);
 
   /**
    * \brief Pull sparse vector from server.
@@ -168,6 +154,20 @@ public:
   int32_t PullSparseTable(uint64_t model_id, uint64_t table_id,
                           const std::vector<int64_t>& indices,
                           std::vector<Tensor>* vals);
+
+  /**
+   * \brief Push gradient to server.
+   *
+   * \param model_id Model id.
+   * \param table_id Table id.
+   * \param indices Gradient index.
+   * \param grads Gradient.
+   * \param lr Learning rate.
+   * \return int32_t Error code.
+   */
+  int32_t PushSparseTable(uint64_t model_id, uint64_t table_id,
+                          const std::vector<int64_t>& indices,
+                          const std::vector<Tensor>& grads, float lr);
 };
 
 }  // namespace kraken

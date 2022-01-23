@@ -61,9 +61,9 @@ Tensor Worker::PullDenseTable(uint64_t table_id) {
   return emitter_->PullDenseTable(table_id);
 }
 
-std::vector<Tensor> Worker::PullListDenseTable(
+std::vector<Tensor> Worker::CombinePullDenseTable(
     const std::vector<uint64_t>& table_ids) {
-  return emitter_->PullListDenseTable(table_ids);
+  return emitter_->CombinePullDenseTable(table_ids);
 }
 
 void Worker::PushDenseTable(uint64_t table_id, const Tensor& grad) {

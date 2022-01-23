@@ -115,18 +115,6 @@ int32_t Ps::RegisterSparseTableV2(
                                          std::move(initializer));
 }
 
-int32_t Ps::PushDenseTable(uint64_t model_id, uint64_t table_id,
-                           const Tensor& grad, float lr) {
-  std::shared_lock<std::shared_mutex> lock(mu_);
-
-  auto it = models_.find(model_id);
-  if (it == models_.end()) {
-    return ErrorCode::kUnRegisterModelError;
-  }
-
-  return it->second->PushDenseTable(table_id, grad, lr);
-}
-
 int32_t Ps::PullDenseTable(uint64_t model_id, uint64_t table_id, Tensor* val) {
   std::shared_lock<std::shared_mutex> lock(mu_);
 
@@ -138,9 +126,9 @@ int32_t Ps::PullDenseTable(uint64_t model_id, uint64_t table_id, Tensor* val) {
   return it->second->PullDenseTable(table_id, val);
 }
 
-int32_t Ps::PullListDenseTable(uint64_t model_id,
-                               const std::vector<uint64_t>& table_ids,
-                               std::vector<Tensor>* vals) {
+int32_t Ps::CombinePullDenseTable(uint64_t model_id,
+                                  const std::vector<uint64_t>& table_ids,
+                                  std::vector<Tensor>* vals) {
   std::shared_lock<std::shared_mutex> lock(mu_);
 
   auto it = models_.find(model_id);
@@ -148,7 +136,7 @@ int32_t Ps::PullListDenseTable(uint64_t model_id,
     return ErrorCode::kUnRegisterModelError;
   }
 
-  return it->second->PullListDenseTable(table_ids, vals);
+  return it->second->CombinePullDenseTable(table_ids, vals);
 }
 
 int32_t Ps::PushPullDenseTable(uint64_t model_id, uint64_t table_id,
@@ -163,9 +151,8 @@ int32_t Ps::PushPullDenseTable(uint64_t model_id, uint64_t table_id,
   return it->second->PushPullDenseTable(table_id, grad, lr, val);
 }
 
-int32_t Ps::PushSparseTable(uint64_t model_id, uint64_t table_id,
-                            const std::vector<int64_t>& indices,
-                            const std::vector<Tensor>& grads, float lr) {
+int32_t Ps::PushDenseTable(uint64_t model_id, uint64_t table_id,
+                           const Tensor& grad, float lr) {
   std::shared_lock<std::shared_mutex> lock(mu_);
 
   auto it = models_.find(model_id);
@@ -173,7 +160,7 @@ int32_t Ps::PushSparseTable(uint64_t model_id, uint64_t table_id,
     return ErrorCode::kUnRegisterModelError;
   }
 
-  return it->second->PushSparseTable(table_id, indices, grads, lr);
+  return it->second->PushDenseTable(table_id, grad, lr);
 }
 
 int32_t Ps::PullSparseTable(uint64_t model_id, uint64_t table_id,
@@ -187,6 +174,19 @@ int32_t Ps::PullSparseTable(uint64_t model_id, uint64_t table_id,
   }
 
   return it->second->PullSparseTable(table_id, indices, vals);
+}
+
+int32_t Ps::PushSparseTable(uint64_t model_id, uint64_t table_id,
+                            const std::vector<int64_t>& indices,
+                            const std::vector<Tensor>& grads, float lr) {
+  std::shared_lock<std::shared_mutex> lock(mu_);
+
+  auto it = models_.find(model_id);
+  if (it == models_.end()) {
+    return ErrorCode::kUnRegisterModelError;
+  }
+
+  return it->second->PushSparseTable(table_id, indices, grads, lr);
 }
 
 }  // namespace kraken

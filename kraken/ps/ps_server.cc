@@ -42,19 +42,14 @@ int32_t PsServer::RegisterSparseTableV2(const RegisterSparseTableV2Request& req,
                                    req.init_conf);
 }
 
-int32_t PsServer::PushDenseTable(const PushDenseTableRequest& req,
-                                 PushDenseTableResponse* rsp) {
-  return ps_.PushDenseTable(req.model_id, req.table_id, req.grad, req.lr);
-}
-
 int32_t PsServer::PullDenseTable(const PullDenseTableRequest& req,
                                  PullDenseTableResponse* rsp) {
   return ps_.PullDenseTable(req.model_id, req.table_id, &(rsp->val));
 }
 
-int32_t PsServer::PullListDenseTable(const PullListDenseTableRequest& req,
-                                     PullListDenseTableResponse* rsp) {
-  return ps_.PullListDenseTable(req.model_id, req.table_ids, &(rsp->vals));
+int32_t PsServer::CombinePullDenseTable(const CombinePullDenseTableRequest& req,
+                                        CombinePullDenseTableResponse* rsp) {
+  return ps_.CombinePullDenseTable(req.model_id, req.table_ids, &(rsp->vals));
 }
 
 int32_t PsServer::PushPullDenseTable(const PushPullDenseTableRequest& req,
@@ -63,10 +58,9 @@ int32_t PsServer::PushPullDenseTable(const PushPullDenseTableRequest& req,
                                 &(rsp->val));
 }
 
-int32_t PsServer::PushSparseTable(const PushSparseTableRequest& req,
-                                  PushSparseTableResponse* rsp) {
-  return ps_.PushSparseTable(req.model_id, req.table_id, req.indices, req.grads,
-                             req.lr);
+int32_t PsServer::PushDenseTable(const PushDenseTableRequest& req,
+                                 PushDenseTableResponse* rsp) {
+  return ps_.PushDenseTable(req.model_id, req.table_id, req.grad, req.lr);
 }
 
 int32_t PsServer::PullSparseTable(const PullSparseTableRequest& req,
@@ -93,6 +87,12 @@ int32_t PsServer::CombinePullSparseTable(
   return ErrorCode::kSuccess;
 }
 
+int32_t PsServer::PushSparseTable(const PushSparseTableRequest& req,
+                                  PushSparseTableResponse* rsp) {
+  return ps_.PushSparseTable(req.model_id, req.table_id, req.indices, req.grads,
+                             req.lr);
+}
+
 void PsServer::RegisterFuncs() {
   using namespace std::placeholders;
 
@@ -106,13 +106,13 @@ void PsServer::RegisterFuncs() {
   REGISTER_FUNC(RegisterDenseTable, RegisterDenseTable);
   REGISTER_FUNC(RegisterSparseTable, RegisterSparseTable);
   REGISTER_FUNC(RegisterSparseTableV2, RegisterSparseTableV2);
-  REGISTER_FUNC(PushDenseTable, PushDenseTable);
   REGISTER_FUNC(PullDenseTable, PullDenseTable);
-  REGISTER_FUNC(PullListDenseTable, PullListDenseTable);
+  REGISTER_FUNC(CombinePullDenseTable, CombinePullDenseTable);
   REGISTER_FUNC(PushPullDenseTable, PushPullDenseTable);
-  REGISTER_FUNC(PushSparseTable, PushSparseTable);
+  REGISTER_FUNC(PushDenseTable, PushDenseTable);
   REGISTER_FUNC(PullSparseTable, PullSparseTable);
   REGISTER_FUNC(CombinePullSparseTable, CombinePullSparseTable);
+  REGISTER_FUNC(PushSparseTable, PushSparseTable);
 }
 
 void PsServer::Start() {

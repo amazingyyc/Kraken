@@ -46,8 +46,8 @@ public:
 
   int32_t PullDenseTable(uint64_t table_id, Tensor* val);
 
-  int32_t PullListDenseTable(const std::vector<uint64_t>& table_ids,
-                             std::vector<Tensor>* vals);
+  int32_t CombinePullDenseTable(const std::vector<uint64_t>& table_ids,
+                                std::vector<Tensor>* vals);
 
   int32_t PushPullDenseTable(uint64_t table_id, const Tensor& grad, float lr,
                              Tensor* val);

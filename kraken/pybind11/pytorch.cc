@@ -160,9 +160,9 @@ torch::Tensor PullDenseTable(uint64_t table_id) {
   return val;
 }
 
-std::vector<torch::Tensor> PullListDenseTable(
+std::vector<torch::Tensor> CombinePullDenseTable(
     const std::vector<uint64_t>& table_ids) {
-  std::vector<Tensor> kvals = worker.PullListDenseTable(table_ids);
+  std::vector<Tensor> kvals = worker.CombinePullDenseTable(table_ids);
   std::vector<torch::Tensor> vals;
 
   for (auto& kv : kvals) {
@@ -256,7 +256,8 @@ std::vector<torch::Tensor> CombinePullSparseTable(
     kindices.emplace_back(TorchTensorToTensor(cindice));
   }
 
-  std::vector<Tensor> kvals = worker.CombinePullSparseTable(table_ids, kindices);
+  std::vector<Tensor> kvals =
+      worker.CombinePullSparseTable(table_ids, kindices);
 
   std::vector<torch::Tensor> vals;
 
