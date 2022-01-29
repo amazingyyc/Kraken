@@ -2,9 +2,9 @@
 
 #include <cinttypes>
 
+#include "common/deserialize.h"
+#include "common/serialize.h"
 #include "t/tensor.h"
-#include "rpc/deserialize.h"
-#include "rpc/serialize.h"
 
 namespace kraken {
 

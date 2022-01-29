@@ -15,6 +15,14 @@
 
 namespace kraken {
 
+size_t Ps::shard_num() const {
+  return shard_num_;
+}
+
+size_t Ps::shard_id() const {
+  return shard_id_;
+}
+
 int32_t Ps::ApplyModel(const std::string& name, uint64_t* model_id) {
   return apply_mgr_.ApplyModel(name, model_id);
 }

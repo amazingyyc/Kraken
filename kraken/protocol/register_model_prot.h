@@ -3,9 +3,9 @@
 #include <string>
 #include <unordered_map>
 
+#include "common/deserialize.h"
+#include "common/serialize.h"
 #include "ps/optim/optim.h"
-#include "rpc/deserialize.h"
-#include "rpc/serialize.h"
 
 namespace kraken {
 

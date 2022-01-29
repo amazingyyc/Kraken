@@ -20,25 +20,17 @@ namespace kraken {
 Emitter::Emitter() : Emitter(EmitterType::kDefault) {
 }
 
-Emitter::Emitter(EmitterType type) : type_(type), initialized_(false) {
+Emitter::Emitter(EmitterType type)
+    : type_(type), initialized_(false), router_(1) {
 }
 
 size_t Emitter::DenseTableRouter(uint64_t model_id, uint64_t table_id) {
-  size_t seed = 0;
-  seed ^= model_id + 0x9e3779b9;
-  seed ^= table_id + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-
-  return seed % clients_.size();
+  return router_(model_id, table_id);
 }
 
 size_t Emitter::SparseTableRouter(uint64_t model_id, uint64_t table_id,
                                   int64_t sparse_id) {
-  size_t seed = 0;
-  seed ^= model_id + 0x9e3779b9;
-  seed ^= table_id + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-  seed ^= sparse_id + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-
-  return seed % clients_.size();
+  return router_(model_id, table_id, sparse_id);
 }
 
 void Emitter::Initialize(const std::string& addrs) {
@@ -59,6 +51,9 @@ void Emitter::Initialize(const std::string& addrs) {
   for (uint32_t i = 0; i < tokens.size(); ++i) {
     clients_[i]->Start();
   }
+
+  // Update router.
+  router_ = ConsistentHasher(clients_.size());
 
   LOG_INFO("Create connection with:" << addrs);
 

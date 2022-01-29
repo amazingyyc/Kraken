@@ -3,8 +3,8 @@
 #include <cinttypes>
 #include <string>
 
-#include "rpc/deserialize.h"
-#include "rpc/serialize.h"
+#include "common/deserialize.h"
+#include "common/serialize.h"
 
 namespace kraken {
 

@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 
+#include "common/consistent_hasher.h"
 #include "protocol/pull_sparse_table_prot.h"
 #include "protocol/push_sparse_table_prot.h"
 #include "protocol/rpc_func_type.h"
@@ -26,8 +27,10 @@ protected:
 
   std::vector<std::unique_ptr<Client>> clients_;
 
-  std::string model_name_;
+  // use concsisten hash to route.
+  ConsistentHasher router_;
 
+  std::string model_name_;
   uint64_t model_id_;
 
   /**

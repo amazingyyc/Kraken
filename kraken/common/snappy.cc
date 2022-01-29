@@ -78,8 +78,10 @@ size_t SnappySink::offset() const {
   return offset_;
 }
 
-void SnappySink::Write(const char* bytes, size_t n) {
+bool SnappySink::Write(const char* bytes, size_t n) {
   Append(bytes, n);
+
+  return true;
 }
 
 void SnappySink::Append(const char* bytes, size_t n) {

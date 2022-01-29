@@ -2,7 +2,8 @@
 
 #include <cstdlib>
 
-#include "rpc/ibuffer.h"
+#include "common/iwriter.h"
+#include "common/zmq_buffer.h"
 
 namespace kraken {
 
@@ -11,7 +12,7 @@ namespace kraken {
  *
  * This buffer use to store binary data and can be increase length automaticlly.
  */
-class MutableBuffer : public IBuffer {
+class MemBuffer : public IWriter {
 private:
   char* ptr_;
 
@@ -19,17 +20,17 @@ private:
   size_t offset_;
 
 public:
-  MutableBuffer();
+  MemBuffer();
 
-  explicit MutableBuffer(size_t expect);
-  explicit MutableBuffer(MutableBuffer&&);
+  explicit MemBuffer(size_t expect);
+  explicit MemBuffer(MemBuffer&&);
 
-  const MutableBuffer& operator=(MutableBuffer&&);
+  const MemBuffer& operator=(MemBuffer&&);
 
-  MutableBuffer(const MutableBuffer&) = delete;
-  MutableBuffer& operator=(const MutableBuffer&) = delete;
+  MemBuffer(const MemBuffer&) = delete;
+  MemBuffer& operator=(const MemBuffer&) = delete;
 
-  ~MutableBuffer();
+  ~MemBuffer();
 
 private:
   size_t Growth(size_t new_size) const;
@@ -41,9 +42,9 @@ public:
 
   size_t offset() const;
 
-  void Write(const char* bytes, size_t size) override;
+  bool Write(const char* bytes, size_t size) override;
 
-  void TransferForZMQ(ZMQBuffer* z_buf) override;
+  void TransferForZMQ(ZMQBuffer* z_buf);
 
 public:
   static void* Malloc(size_t);

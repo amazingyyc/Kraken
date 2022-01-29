@@ -7,6 +7,10 @@
 
 namespace kraken {
 
+namespace io {
+class Saver;
+}
+
 /**
  * \brief The table type.
  */
@@ -16,6 +20,8 @@ enum class TableType : uint8_t {
 };
 
 class Table {
+  friend class io::Saver;
+
 protected:
   struct Value {
     Tensor val;

@@ -3,9 +3,9 @@
 #include <cinttypes>
 #include <string>
 
+#include "common/deserialize.h"
+#include "common/serialize.h"
 #include "ps/table.h"
-#include "rpc/deserialize.h"
-#include "rpc/serialize.h"
 
 namespace kraken {
 

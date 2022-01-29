@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "common/mutable_buffer.h"
+#include "common/ireader.h"
 #include "ps/initializer/initializer.h"
 #include "ps/optim/optim.h"
 #include "ps/table.h"
@@ -22,35 +22,15 @@ namespace kraken {
 
 class Deserialize {
 private:
-  const char* ptr_;
-  size_t length_;
-  size_t offset_;
+  IReader* reader_;
 
 public:
-  Deserialize(const char* ptr, size_t length)
-      : ptr_(ptr), length_(length), offset_(0) {
-  }
-
-  ~Deserialize() {
-    ptr_ = nullptr;
-    length_ = 0;
-    offset_ = 0;
+  Deserialize(IReader* reader) : reader_(reader) {
   }
 
 public:
-  size_t offset() const {
-    return offset_;
-  }
-
   bool Read(void* target, size_t size) {
-    if (ptr_ == nullptr || offset_ + size > length_) {
-      return false;
-    }
-
-    memcpy(target, ptr_ + offset_, size);
-    offset_ += size;
-
-    return true;
+    return reader_->Read(target, size);
   }
 
   template <typename T>
@@ -168,6 +148,18 @@ inline bool Deserialize::operator>>(OptimType& v) {
 }
 
 template <>
+inline bool Deserialize::operator>>(StateType& v) {
+  uint32_t type;
+  if (!((*this) >> type)) {
+    return false;
+  }
+
+  v = (StateType)type;
+
+  return true;
+}
+
+template <>
 inline bool Deserialize::operator>>(
     std::unordered_map<std::string, std::string>& v) {
   v.clear();
@@ -176,6 +168,8 @@ inline bool Deserialize::operator>>(
   if (((*this) >> size) == false) {
     return false;
   }
+
+  v.reserve(size);
 
   std::string key;
   std::string value;
@@ -317,6 +311,82 @@ inline bool Deserialize::operator>>(std::vector<Tensor>& v) {
     if (((*this) >> v[i]) == false) {
       return false;
     }
+  }
+
+  return true;
+}
+
+template <>
+inline bool Deserialize::operator>>(std::unordered_map<StateType, Tensor>& v) {
+  v.clear();
+
+  uint64_t size;
+  if (((*this) >> size) == false) {
+    return false;
+  }
+
+  v.reserve(size);
+
+  StateType key;
+  Tensor value;
+
+  for (uint64_t i = 0; i < size; ++i) {
+    if (((*this) >> key) == false || ((*this) >> value) == false) {
+      return false;
+    }
+
+    v.emplace(key, value);
+  }
+
+  return true;
+}
+
+template <>
+inline bool Deserialize::operator>>(std::unordered_map<StateType, int64_t>& v) {
+  v.clear();
+
+  uint64_t size;
+  if (((*this) >> size) == false) {
+    return false;
+  }
+
+  v.reserve(size);
+
+  StateType key;
+  int64_t value;
+
+  for (uint64_t i = 0; i < size; ++i) {
+    if (((*this) >> key) == false || ((*this) >> value) == false) {
+      return false;
+    }
+
+    v.emplace(key, value);
+  }
+
+  return true;
+}
+
+template <>
+inline bool Deserialize::operator>>(
+    std::unordered_map<std::string, uint64_t>& v) {
+  v.clear();
+
+  uint64_t size;
+  if (((*this) >> size) == false) {
+    return false;
+  }
+
+  v.reserve(size);
+
+  std::string key;
+  int64_t value;
+
+  for (uint64_t i = 0; i < size; ++i) {
+    if (((*this) >> key) == false || ((*this) >> value) == false) {
+      return false;
+    }
+
+    v.emplace(std::move(key), value);
   }
 
   return true;

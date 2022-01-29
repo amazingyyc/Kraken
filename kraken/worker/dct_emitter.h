@@ -3,10 +3,11 @@
 #include <atomic>
 #include <cinttypes>
 #include <memory>
+#include <mutex>
+#include <shared_mutex>
 #include <unordered_map>
 #include <vector>
 
-#include "parallel_hashmap/parallel_hashmap/phmap.h"
 #include "t/tensor.h"
 #include "worker/emitter.h"
 
@@ -39,7 +40,7 @@ private:
   float eta_;
 
   std::shared_mutex mu_;
-  phmap::flat_hash_map<uint64_t, std::unique_ptr<DenseBag>> dense_bags_;
+  std::unordered_map<uint64_t, std::unique_ptr<DenseBag>> dense_bags_;
 
 public:
   DCTEmitter(uint64_t life_span, float eta);

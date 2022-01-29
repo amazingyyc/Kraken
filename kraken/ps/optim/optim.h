@@ -4,7 +4,6 @@
 #include <unordered_map>
 
 #include "common/utils.h"
-#include "parallel_hashmap/parallel_hashmap/phmap.h"
 #include "t/tensor.h"
 
 namespace kraken {
@@ -33,10 +32,10 @@ enum class StateType : uint32_t {
  */
 struct Bag {
   // tensor state.
-  phmap::flat_hash_map<StateType, Tensor> state;
+  std::unordered_map<StateType, Tensor> state;
 
   // integer state.
-  phmap::flat_hash_map<StateType, int64_t> state_i;
+  std::unordered_map<StateType, int64_t> state_i;
 };
 
 class Optim {

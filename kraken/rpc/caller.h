@@ -11,15 +11,16 @@
 #include <thread>
 #include <unordered_map>
 
+#include "common/deserialize.h"
 #include "common/error_code.h"
 #include "common/exception.h"
-#include "common/mutable_buffer.h"
+#include "common/mem_buffer.h"
+#include "common/mem_reader.h"
+#include "common/serialize.h"
 #include "common/snappy.h"
 #include "common/thread_barrier.h"
 #include "common/zmq_buffer.h"
-#include "rpc/deserialize.h"
 #include "rpc/protocol.h"
-#include "rpc/serialize.h"
 #include "snappy.h"
 
 namespace kraken {
@@ -78,7 +79,8 @@ private:
 
   template <typename ReplyType>
   int32_t NoUnCompress(const char* body, size_t body_len, ReplyType* reply) {
-    Deserialize deserialize(body, body_len);
+    MemReader reader(body, body_len);
+    Deserialize deserialize(&reader);
     if ((deserialize >> (*reply)) == false) {
       return ErrorCode::kDeserializeReplyError;
     }
@@ -96,7 +98,8 @@ private:
       return ErrorCode::kSnappyUncompressError;
     }
 
-    Deserialize deserialize(sink.ptr(), sink.offset());
+    MemReader reader(sink.ptr(), sink.offset());
+    Deserialize deserialize(&reader);
     if ((deserialize >> (*reply)) == false) {
       return ErrorCode::kDeserializeReplyError;
     }
@@ -142,7 +145,7 @@ public:
     req_header.compress_type = CompressType::kNo;
 
     // Serialize the header and request.
-    MutableBuffer buffer;
+    MemBuffer buffer;
     Serialize serialize(&buffer);
 
     ARGUMENT_CHECK(serialize << req_header, "Serialize request header error!");

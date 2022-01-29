@@ -5,19 +5,35 @@
 #include <unordered_map>
 
 #include "ps/apply_manager.h"
+#include "ps/model_manager.h"
 #include "ps/model.h"
 #include "ps/optim/optim.h"
 
 namespace kraken {
 
+namespace io {
+class Saver;
+}
+
 class Ps {
+  friend class io::Saver;
+
 private:
   ApplyManager apply_mgr_;
+
+  ModelManager model_manager_;
 
   std::shared_mutex mu_;
   std::unordered_map<uint64_t, std::unique_ptr<Model>> models_;
 
+  size_t shard_num_;
+  size_t shard_id_;
+
 public:
+  size_t shard_num() const;
+
+  size_t shard_id() const;
+
   /**
    * \brief Apply a model id. thread-safe.
    *

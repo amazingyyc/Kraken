@@ -5,11 +5,10 @@
 #include <unordered_map>
 #include <vector>
 
-#include "common/zmq_buffer.h"
+#include "common/iwriter.h"
 #include "ps/initializer/initializer.h"
 #include "ps/optim/optim.h"
 #include "ps/table.h"
-#include "rpc/ibuffer.h"
 #include "rpc/protocol.h"
 #include "t/coo_tensor_impl.h"
 #include "t/element_type.h"
@@ -23,17 +22,16 @@ namespace kraken {
 class Serialize {
 private:
   // We donot remove or clear the buffer, just append data.
-  IBuffer* buf_;
+  IWriter* buf_;
 
 public:
-  Serialize(IBuffer* buf) : buf_(buf) {
+  Serialize(IWriter* buf) : buf_(buf) {
   }
 
   ~Serialize() = default;
 
   bool Write(const void* ptr, size_t size) {
-    buf_->Write((const char*)ptr, size);
-    return true;
+    return buf_->Write((const char*)ptr, size);
   }
 
   template <typename T>
@@ -124,6 +122,11 @@ inline bool Serialize::operator<<(const InitializerType& v) {
 template <>
 inline bool Serialize::operator<<(const OptimType& v) {
   return (*this) << (uint8_t)v;
+}
+
+template <>
+inline bool Serialize::operator<<(const StateType& v) {
+  return (*this) << (uint32_t)v;
 }
 
 template <>
@@ -219,6 +222,57 @@ inline bool Serialize::operator<<(const std::vector<Tensor>& v) {
 
   for (auto& i : v) {
     if (((*this) << i) == false) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+template <>
+inline bool Serialize::operator<<(
+    const std::unordered_map<StateType, Tensor>& v) {
+  uint64_t size = v.size();
+  if (((*this) << size) == false) {
+    return false;
+  }
+
+  for (const auto& item : v) {
+    if (((*this) << item.first) == false || ((*this) << item.second) == false) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+template <>
+inline bool Serialize::operator<<(
+    const std::unordered_map<StateType, int64_t>& v) {
+  uint64_t size = v.size();
+  if (((*this) << size) == false) {
+    return false;
+  }
+
+  for (const auto& item : v) {
+    if (((*this) << item.first) == false || ((*this) << item.second) == false) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+template <>
+inline bool Serialize::operator<<(
+    const std::unordered_map<std::string, uint64_t>& v) {
+  uint64_t size = v.size();
+  if (((*this) << size) == false) {
+    return false;
+  }
+
+  for (const auto& item : v) {
+    if (((*this) << item.first) == false || ((*this) << item.second) == false) {
       return false;
     }
   }

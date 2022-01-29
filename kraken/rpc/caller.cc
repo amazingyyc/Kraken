@@ -25,7 +25,8 @@ void Caller::HandleMsg(zmq_msg_t& reply) {
   size_t reply_size = zmq_msg_size(&reply);
   const char* reply_data = (const char*)zmq_msg_data(&reply);
 
-  Deserialize deserializer(reply_data, reply_size);
+  MemReader reader(reply_data, reply_size);
+  Deserialize deserializer(&reader);
 
   ReplyHeader reply_header;
   ARGUMENT_CHECK(deserializer >> reply_header,

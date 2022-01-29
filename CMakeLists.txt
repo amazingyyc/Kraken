@@ -7,9 +7,10 @@ endif(APPLE)
 
 project(Kraken LANGUAGES C CXX)
 
-# c use c11 c++ use 14 avoid zmq build error.
+# c use c11 c++ use 17 avoid zmq build error.
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # try to find openmp
 find_package(OpenMP)
@@ -54,6 +55,7 @@ include_directories(kraken)
 
 # use SYSTEM avoid warning
 include_directories(SYSTEM third_party)
+include_directories(SYSTEM third_party/configor/include)
 
 # source file
 file(GLOB_RECURSE KRAKEN_HEAD_FILES "kraken/*.h")
@@ -84,11 +86,12 @@ list(FILTER KRAKEN_TEST_SRC_FILES EXCLUDE REGEX ".*_main.cc")
 # include third_party cmake
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
 
-# include(googletest)
 include(eigen)
 include(pybind11)
 include(gflags)
 include(googletest)
+include(configor)
+include(libcuckoo)
 
 set(SNAPPY_BUILD_TESTS OFF CACHE BOOL "Close snappy test build" FORCE)
 set(SNAPPY_BUILD_BENCHMARKS OFF CACHE BOOL "Close snappy benchmark build" FORCE)
@@ -97,8 +100,6 @@ include(snappy)
 
 set(BUILD_TESTS OFF CACHE BOOL "set libzmq BUILD_TESTS to be OFF")
 include(libzmq)
-
-include(parallel_hashmap)
 
 # ########################################################################################
 # dynamic library
@@ -124,8 +125,10 @@ set_source_files_properties(kraken/common/snappy.cc
 set_target_properties(kraken_native PROPERTIES PREFIX "")
 target_include_directories(kraken_native PUBLIC ${PYTHON_INCLUDE_DIRS})
 target_link_libraries(kraken_native
+  stdc++fs
   libzmq-static
   snappy
+  libcuckoo
   pybind11_headers
   ${PYTHON_LIBRARIES}
   ${TORCH_LIBRARIES}
@@ -137,7 +140,7 @@ add_executable(kraken_server
   kraken/executable/kraken_server_main.cc
   ${KRAKEN_HEAD_FILES}
   ${KRAKEN_SRC_FILES})
-target_link_libraries(kraken_server libzmq-static snappy gflags)
+target_link_libraries(kraken_server stdc++fs libzmq-static snappy libcuckoo gflags)
 
 # ########################################################################################
 # kraken_test executable
@@ -147,7 +150,7 @@ add_executable(kraken_test
   ${KRAKEN_SRC_FILES}
   ${KRAKEN_TEST_HEAD_FILES}
   ${KRAKEN_TEST_SRC_FILES})
-target_link_libraries(kraken_test libzmq-static snappy gtest)
+target_link_libraries(kraken_test stdc++fs libzmq-static snappy libcuckoo gtest)
 
 # ########################################################################################
 # run test

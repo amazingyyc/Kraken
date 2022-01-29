@@ -3,9 +3,9 @@
 #include <cinttypes>
 #include <vector>
 
+#include "common/deserialize.h"
+#include "common/serialize.h"
 #include "protocol/pull_sparse_table_prot.h"
-#include "rpc/deserialize.h"
-#include "rpc/serialize.h"
 #include "t/tensor.h"
 
 namespace kraken {

@@ -10,14 +10,16 @@
 #include <unordered_map>
 #include <vector>
 
+#include "common/deserialize.h"
 #include "common/error_code.h"
 #include "common/exception.h"
 #include "common/log.h"
+#include "common/mem_buffer.h"
+#include "common/mem_reader.h"
+#include "common/serialize.h"
 #include "common/snappy.h"
 #include "common/zmq_buffer.h"
-#include "rpc/deserialize.h"
 #include "rpc/protocol.h"
-#include "rpc/serialize.h"
 #include "snappy.h"
 
 namespace kraken {
@@ -66,7 +68,8 @@ private:
 
   template <typename RequestType>
   int32_t NoUnCompress(const char* body, size_t body_len, RequestType* req) {
-    Deserialize deserialize(body, body_len);
+    MemReader reader(body, body_len);
+    Deserialize deserialize(&reader);
     if ((deserialize >> (*req)) == false) {
       return ErrorCode::kDeserializeRequestError;
     }
@@ -84,7 +87,8 @@ private:
       return ErrorCode::kSnappyUncompressError;
     }
 
-    Deserialize deserialize(sink.ptr(), sink.offset());
+    MemReader reader(sink.ptr(), sink.offset());
+    Deserialize deserialize(&reader);
     if ((deserialize >> (*req)) == false) {
       return ErrorCode::kDeserializeRequestError;
     }
@@ -95,7 +99,7 @@ private:
   template <typename ReplyType>
   int32_t NoCompress(const ReplyHeader& reply_header, const ReplyType& reply,
                      ZMQBuffer* z_buf) {
-    MutableBuffer buffer;
+    MemBuffer buffer;
     Serialize serialize(&buffer);
 
     ARGUMENT_CHECK(serialize << reply_header, "Serialize reply header error!");
@@ -122,7 +126,7 @@ private:
     }
 
     // step2 serialize body to tmp buffer.
-    MutableBuffer body_buf;
+    MemBuffer body_buf;
     {
       Serialize serialize(&body_buf);
       if ((serialize << reply) == false) {

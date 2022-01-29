@@ -10,7 +10,13 @@
 
 namespace kraken {
 
+namespace io {
+class Saver;
+}
+
 class DenseTable : public Table {
+  friend class io::Saver;
+
 private:
   std::shared_mutex mu_;
 
