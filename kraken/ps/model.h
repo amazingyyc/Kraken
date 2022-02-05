@@ -10,14 +10,14 @@
 namespace kraken {
 
 namespace io {
-class Saver;
+class CheckPoint;
 }
 
 /**
  * \brief The model represent a DeepLearning model will contain the tarinable Dense/Sparse table.
  */
 class Model {
-  friend class io::Saver;
+  friend class io::CheckPoint;
 
 private:
   std::shared_mutex mu_;

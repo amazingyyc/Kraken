@@ -8,7 +8,7 @@
 namespace kraken {
 
 namespace io {
-class Saver;
+class CheckPoint;
 }
 
 /**
@@ -20,7 +20,7 @@ enum class TableType : uint8_t {
 };
 
 class Table {
-  friend class io::Saver;
+  friend class io::CheckPoint;
 
 protected:
   struct Value {

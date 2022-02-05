@@ -12,11 +12,11 @@
 namespace kraken {
 
 namespace io {
-class Saver;
+class CheckPoint;
 }
 
 class Ps {
-  friend class io::Saver;
+  friend class io::CheckPoint;
 
 private:
   ApplyManager apply_mgr_;

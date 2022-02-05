@@ -13,11 +13,11 @@
 namespace kraken {
 
 namespace io {
-class Saver;
+class CheckPoint;
 }
 
 class ModelManager {
-  friend class io::Saver;
+  friend class io::CheckPoint;
 
 private:
   struct Table {
