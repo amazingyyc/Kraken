@@ -9,7 +9,6 @@ from kraken_native import register_model
 from kraken_native import update_lr
 from kraken_native import register_dense_table
 from kraken_native import register_sparse_table
-from kraken_native import register_sparse_table_v2
 from kraken_native import pull_dense_table
 from kraken_native import combine_pull_dense_table
 from kraken_native import push_dense_table

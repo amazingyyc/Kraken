@@ -58,14 +58,6 @@ int32_t Model::RegisterDenseTable(uint64_t id, const std::string& name,
 }
 
 int32_t Model::RegisterSparseTable(uint64_t id, const std::string& name,
-                                   int64_t dimension, ElementType etype) {
-  std::unique_ptr<Initializer> initializer(new NormalInitializer(0, 1.0));
-
-  return RegisterSparseTable(id, name, dimension, etype,
-                             std::move(initializer));
-}
-
-int32_t Model::RegisterSparseTable(uint64_t id, const std::string& name,
                                    int64_t dimension, ElementType etype,
                                    std::unique_ptr<Initializer>&& initializer) {
   std::unique_lock<std::shared_mutex> lock(mu_);

@@ -3,8 +3,9 @@
 #include <tuple>
 
 #include "common/log.h"
+#include "protocol/apply_dense_table_prot.h"
 #include "protocol/apply_model_prot.h"
-#include "protocol/apply_table_prot.h"
+#include "protocol/apply_sparse_table_prot.h"
 #include "protocol/combine_pull_dense_table_prot.h"
 #include "protocol/combine_pull_sparse_table_prot.h"
 #include "protocol/pull_dense_table_prot.h"
@@ -81,6 +82,8 @@ uint64_t Emitter::RegisterModel(
   // Step1: Apply a model in master server.
   ApplyModelRequest req;
   req.name = model_name_;
+  req.optim_type = optim_type;
+  req.optim_conf = optim_conf;
 
   ApplyModelResponse rsp;
   RPC_CALL(clients_[0]->Call(RPCFuncType::kApplyModelType, req, &rsp));
@@ -122,14 +125,15 @@ uint64_t Emitter::RegisterDenseTable(const std::string& name,
 
   {
     // Apply table id.
-    ApplyTableRequest req;
-    ApplyTableResponse rsp;
+    ApplyDenseTableRequest req;
+    ApplyDenseTableResponse rsp;
 
     req.model_id = model_id_;
     req.table_name = name;
-    req.table_type = TableType::kDense;
+    req.shape = val.shape();
+    req.element_type = val.element_type();
 
-    RPC_CALL(clients_[0]->Call(RPCFuncType::kApplyTableType, req, &rsp));
+    RPC_CALL(clients_[0]->Call(RPCFuncType::kApplyDenseTableType, req, &rsp));
 
     table_id = rsp.table_id;
 
@@ -160,25 +164,27 @@ uint64_t Emitter::RegisterDenseTable(const std::string& name,
   return table_id;
 }
 
-uint64_t Emitter::RegisterSparseTable(const std::string& name,
-                                      int64_t dimension, ElementType etype) {
+uint64_t Emitter::RegisterSparseTable(
+    const std::string& name, int64_t dimension, ElementType etype,
+    InitializerType init_type,
+    const std::unordered_map<std::string, std::string>& init_conf) {
   ARGUMENT_CHECK(initialized_.load(), "Emitter not initialize.");
 
-  // Register a SparseTable step:
-  // 1: Apply a table id from master.
-  // 2: Register the SparseTable in all server.
   uint64_t table_id;
 
   {
     // Apply table id.
-    ApplyTableRequest req;
-    ApplyTableResponse rsp;
+    ApplySparseTableRequest req;
+    ApplySparseTableResponse rsp;
 
     req.model_id = model_id_;
     req.table_name = name;
-    req.table_type = TableType::kSparse;
+    req.dimension = dimension;
+    req.element_type = etype;
+    req.init_type = init_type;
+    req.init_conf = init_conf;
 
-    RPC_CALL(clients_[0]->Call(RPCFuncType::kApplyTableType, req, &rsp));
+    RPC_CALL(clients_[0]->Call(RPCFuncType::kApplySparseTableType, req, &rsp));
 
     table_id = rsp.table_id;
 
@@ -196,57 +202,11 @@ uint64_t Emitter::RegisterSparseTable(const std::string& name,
     req.name = name;
     req.dimension = dimension;
     req.etype = etype;
-
-    RPC_CALL(
-        ParallelCallAll(RPCFuncType::kRegisterSparseTableType, req, &rsps));
-
-    LOG_INFO("Register SparseTable: " << name << ", id: " << table_id
-                                      << ", in all server.");
-  }
-
-  return table_id;
-}
-
-uint64_t Emitter::RegisterSparseTableV2(
-    const std::string& name, int64_t dimension, ElementType etype,
-    InitializerType init_type,
-    const std::unordered_map<std::string, std::string>& init_conf) {
-  ARGUMENT_CHECK(initialized_.load(), "Emitter not initialize.");
-
-  uint64_t table_id;
-
-  {
-    // Apply table id.
-    ApplyTableRequest req;
-    ApplyTableResponse rsp;
-
-    req.model_id = model_id_;
-    req.table_name = name;
-    req.table_type = TableType::kSparse;
-
-    RPC_CALL(clients_[0]->Call(RPCFuncType::kApplyTableType, req, &rsp));
-
-    table_id = rsp.table_id;
-
-    LOG_INFO("Apply SparseTable: " << name << ", id: " << table_id
-                                   << ", from server 0.");
-  }
-
-  {
-    // Register sparse table in all server.
-    RegisterSparseTableV2Request req;
-    std::vector<RegisterSparseTableV2Response> rsps;
-
-    req.model_id = model_id_;
-    req.id = table_id;
-    req.name = name;
-    req.dimension = dimension;
-    req.etype = etype;
     req.init_type = init_type;
     req.init_conf = init_conf;
 
     RPC_CALL(
-        ParallelCallAll(RPCFuncType::kRegisterSparseTableV2Type, req, &rsps));
+        ParallelCallAll(RPCFuncType::kRegisterSparseTableType, req, &rsps));
 
     LOG_INFO("Register SparseTable: " << name << ", id: " << table_id
                                       << ", in all server.");

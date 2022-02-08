@@ -15,8 +15,6 @@ private:
   float stddev_;
 
 public:
-  NormalInitializer(float mean, float stddev);
-
   NormalInitializer(const std::unordered_map<std::string, std::string>& conf);
 
   void Initialize(Tensor* val) const override;

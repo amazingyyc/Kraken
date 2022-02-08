@@ -59,12 +59,12 @@ public:
       const std::unordered_map<std::string, std::string>& optim_conf,
       uint64_t* model_id);
 
-  int32_t ApplyDenseTable(uint64_t model_id, const std::string& name,
+  int32_t ApplyDenseTable(uint64_t model_id, const std::string& table_name,
                           const Shape& shape, ElementType element_type,
                           uint64_t* table_id);
 
   int32_t ApplySparseTable(
-      uint64_t model_id, const std::string& name, int64_t dimension,
+      uint64_t model_id, const std::string& table_name, int64_t dimension,
       ElementType element_type, InitializerType init_type,
       const std::unordered_map<std::string, std::string>& init_conf,
       uint64_t* table_id);

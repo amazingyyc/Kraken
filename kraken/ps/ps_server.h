@@ -1,7 +1,8 @@
 #pragma once
 
+#include "protocol/apply_dense_table_prot.h"
 #include "protocol/apply_model_prot.h"
-#include "protocol/apply_table_prot.h"
+#include "protocol/apply_sparse_table_prot.h"
 #include "protocol/combine_pull_dense_table_prot.h"
 #include "protocol/combine_pull_sparse_table_prot.h"
 #include "protocol/pull_dense_table_prot.h"
@@ -19,16 +20,21 @@ namespace kraken {
 
 class PsServer {
 private:
-  Ps ps_;
   Server server_;
+  Ps ps_;
 
 public:
-  PsServer(uint32_t port, uint32_t thread_nums);
+  PsServer(uint32_t port, uint32_t thread_nums, size_t shard_num,
+           size_t shard_id);
 
 private:
   int32_t ApplyModel(const ApplyModelRequest&, ApplyModelResponse*);
 
-  int32_t ApplyTable(const ApplyTableRequest&, ApplyTableResponse*);
+  int32_t ApplyDenseTable(const ApplyDenseTableRequest&,
+                          ApplyDenseTableResponse*);
+
+  int32_t ApplySparseTable(const ApplySparseTableRequest&,
+                           ApplySparseTableResponse*);
 
   int32_t RegisterModel(const RegisterModelRequest&, RegisterModelResponse*);
 
@@ -37,9 +43,6 @@ private:
 
   int32_t RegisterSparseTable(const RegisterSparseTableRequest&,
                               RegisterSparseTableResponse*);
-
-  int32_t RegisterSparseTableV2(const RegisterSparseTableV2Request&,
-                                RegisterSparseTableV2Response*);
 
   int32_t PullDenseTable(const PullDenseTableRequest&, PullDenseTableResponse*);
 

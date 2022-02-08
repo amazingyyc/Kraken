@@ -44,17 +44,12 @@ uint64_t Worker::RegisterDenseTable(const std::string& name,
   return emitter_->RegisterDenseTable(name, val);
 }
 
-uint64_t Worker::RegisterSparseTable(const std::string& name, int64_t dimension,
-                                     ElementType etype) {
-  return emitter_->RegisterSparseTable(name, dimension, etype);
-}
-
-uint64_t Worker::RegisterSparseTableV2(
+uint64_t Worker::RegisterSparseTable(
     const std::string& name, int64_t dimension, ElementType etype,
     InitializerType init_type,
     const std::unordered_map<std::string, std::string>& init_conf) {
-  return emitter_->RegisterSparseTableV2(name, dimension, etype, init_type,
-                                         init_conf);
+  return emitter_->RegisterSparseTable(name, dimension, etype, init_type,
+                                       init_conf);
 }
 
 Tensor Worker::PullDenseTable(uint64_t table_id) {

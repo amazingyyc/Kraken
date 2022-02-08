@@ -23,10 +23,7 @@ void UpdateLR(float lr);
 
 uint64_t RegisterDenseTable(const std::string& name, torch::Tensor val);
 
-uint64_t RegisterSparseTable(const std::string& name, int64_t dimension,
-                             pybind11::object dtype);
-
-uint64_t RegisterSparseTableV2(
+uint64_t RegisterSparseTable(
     const std::string& name, int64_t dimension, pybind11::object dtype,
     InitializerType init_type,
     const std::unordered_map<std::string, std::string>& init_conf);

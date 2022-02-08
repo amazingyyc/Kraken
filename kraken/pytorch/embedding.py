@@ -2,7 +2,7 @@
 
 from typing import List
 import torch
-from sparse_table import SparseTable
+from kraken.pytorch.sparse_table import SparseTable
 from kraken.pytorch.initializer import Initializer, NormalInitializer
 import kraken_native
 

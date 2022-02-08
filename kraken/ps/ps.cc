@@ -15,6 +15,10 @@
 
 namespace kraken {
 
+Ps::Ps(size_t shard_num, size_t shard_id)
+    : shard_num_(shard_num), shard_id_(shard_id) {
+}
+
 size_t Ps::shard_num() const {
   return shard_num_;
 }
@@ -23,13 +27,28 @@ size_t Ps::shard_id() const {
   return shard_id_;
 }
 
-int32_t Ps::ApplyModel(const std::string& name, uint64_t* model_id) {
-  return apply_mgr_.ApplyModel(name, model_id);
+int32_t Ps::ApplyModel(
+    const std::string& name, OptimType optim_type,
+    const std::unordered_map<std::string, std::string>& optim_conf,
+    uint64_t* model_id) {
+  return model_manager_.ApplyModel(name, optim_type, optim_conf, model_id);
 }
 
-int32_t Ps::ApplyTable(uint64_t model_id, const std::string& name,
-                       TableType type, uint64_t* table_id) {
-  return apply_mgr_.ApplyTable(model_id, name, type, table_id);
+int32_t Ps::ApplyDenseTable(uint64_t model_id, const std::string& table_name,
+                            const Shape& shape, ElementType element_type,
+                            uint64_t* table_id) {
+  return model_manager_.ApplyDenseTable(model_id, table_name, shape,
+                                        element_type, table_id);
+}
+
+int32_t Ps::ApplySparseTable(
+    uint64_t model_id, const std::string& table_name, int64_t dimension,
+    ElementType element_type, InitializerType init_type,
+    const std::unordered_map<std::string, std::string>& init_conf,
+    uint64_t* table_id) {
+  return model_manager_.ApplySparseTable(model_id, table_name, dimension,
+                                         element_type, init_type, init_conf,
+                                         table_id);
 }
 
 int32_t Ps::RegisterModel(
@@ -80,20 +99,7 @@ int32_t Ps::RegisterDenseTable(uint64_t model_id, uint64_t id,
   return it->second->RegisterDenseTable(id, name, var);
 }
 
-int32_t Ps::RegisterSparseTable(uint64_t model_id, uint64_t id,
-                                const std::string& name, int64_t dimension,
-                                ElementType etype) {
-  std::shared_lock<std::shared_mutex> lock(mu_);
-
-  auto it = models_.find(model_id);
-  if (it == models_.end()) {
-    return ErrorCode::kUnRegisterModelError;
-  }
-
-  return it->second->RegisterSparseTable(id, name, dimension, etype);
-}
-
-int32_t Ps::RegisterSparseTableV2(
+int32_t Ps::RegisterSparseTable(
     uint64_t model_id, uint64_t id, const std::string& name, int64_t dimension,
     ElementType etype, InitializerType init_type,
     const std::unordered_map<std::string, std::string>& init_conf) {

@@ -4,10 +4,6 @@
 
 namespace kraken {
 
-NormalInitializer::NormalInitializer(float mean, float stddev)
-    : Initializer(InitializerType::kNormal), mean_(mean), stddev_(stddev) {
-}
-
 NormalInitializer::NormalInitializer(
     const std::unordered_map<std::string, std::string>& conf)
     : Initializer(InitializerType::kNormal, conf), mean_(0.0), stddev_(1.0) {

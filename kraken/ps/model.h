@@ -42,9 +42,6 @@ public:
                              const Tensor& var);
 
   int32_t RegisterSparseTable(uint64_t id, const std::string& name,
-                              int64_t dimension, ElementType etype);
-
-  int32_t RegisterSparseTable(uint64_t id, const std::string& name,
                               int64_t dimension, ElementType etype,
                               std::unique_ptr<Initializer>&& initializer);
 

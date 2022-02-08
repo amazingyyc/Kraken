@@ -16,7 +16,8 @@ int32_t ModelManager::ApplyModel(
     *model_id = it->second;
 
     // (TODO) Whether need check the optimizer or replace it?
-    // This maybe some potential error. If the different worker use different Optimizer.
+    // This maybe some potential error. If the different worker use different
+    // Optimizer.
     LOG_INFO("Applied mode:" << name << ", id:" << *model_id
                              << ", already exist.");
 
@@ -41,7 +42,7 @@ int32_t ModelManager::ApplyModel(
 }
 
 int32_t ModelManager::ApplyDenseTable(uint64_t model_id,
-                                      const std::string& name,
+                                      const std::string& table_name,
                                       const Shape& shape,
                                       ElementType element_type,
                                       uint64_t* table_id) {
@@ -53,7 +54,7 @@ int32_t ModelManager::ApplyDenseTable(uint64_t model_id,
   }
 
   auto& model = it->second;
-  auto tit = model.table_id_map_.find(name);
+  auto tit = model.table_id_map_.find(table_name);
   if (tit != model.table_id_map_.end()) {
     // Already register.
     uint64_t tid = tit->second;
@@ -66,7 +67,7 @@ int32_t ModelManager::ApplyDenseTable(uint64_t model_id,
 
     *table_id = tid;
 
-    LOG_INFO("Applied DenseTable: " << name << ", id: " << *table_id
+    LOG_INFO("Applied DenseTable: " << table_name << ", id: " << *table_id
                                     << " already exist.");
 
     return ErrorCode::kSuccess;
@@ -76,23 +77,23 @@ int32_t ModelManager::ApplyDenseTable(uint64_t model_id,
 
   ModelManager::Table table;
   table.id = *table_id;
-  table.name = name;
+  table.name = table_name;
   table.table_type = TableType::kDense;
   table.element_type = element_type;
   table.shape = shape;
 
-  model.table_id_map_.emplace(name, *table_id);
+  model.table_id_map_.emplace(table_name, *table_id);
   model.tables_.emplace(*table_id, table);
 
   LOG_INFO("Apply a DenseTable name:"
-           << name << ", id:" << *table_id << ", shape:" << shape.Str()
+           << table_name << ", id:" << *table_id << ", shape:" << shape.Str()
            << ", ElementTypeL:" << element_type.Name());
 
   return ErrorCode::kSuccess;
 }
 
 int32_t ModelManager::ApplySparseTable(
-    uint64_t model_id, const std::string& name, int64_t dimension,
+    uint64_t model_id, const std::string& table_name, int64_t dimension,
     ElementType element_type, InitializerType init_type,
     const std::unordered_map<std::string, std::string>& init_conf,
     uint64_t* table_id) {
@@ -104,7 +105,7 @@ int32_t ModelManager::ApplySparseTable(
   }
 
   auto& model = it->second;
-  auto tit = model.table_id_map_.find(name);
+  auto tit = model.table_id_map_.find(table_name);
   if (tit != model.table_id_map_.end()) {
     // Already register.
     uint64_t tid = tit->second;
@@ -118,7 +119,7 @@ int32_t ModelManager::ApplySparseTable(
 
     *table_id = tid;
 
-    LOG_INFO("Applied SparseTable: " << name << ", id: " << *table_id
+    LOG_INFO("Applied SparseTable: " << table_name << ", id: " << *table_id
                                      << " already exist.");
 
     return ErrorCode::kSuccess;
@@ -128,18 +129,18 @@ int32_t ModelManager::ApplySparseTable(
 
   ModelManager::Table table;
   table.id = *table_id;
-  table.name = name;
+  table.name = table_name;
   table.table_type = TableType::kSparse;
   table.element_type = element_type;
   table.dimension = dimension;
   table.init_type = init_type;
   table.init_conf = init_conf;
 
-  model.table_id_map_.emplace(name, *table_id);
+  model.table_id_map_.emplace(table_name, *table_id);
   model.tables_.emplace(*table_id, table);
 
   LOG_INFO("Apply a SparseTable name:"
-           << name << ", id:" << *table_id << ", dimension:" << dimension
+           << table_name << ", id:" << *table_id << ", dimension:" << dimension
            << ", ElementType:" << element_type.Name()
            << ", init type:" << (int32_t)init_type);
 

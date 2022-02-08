@@ -127,23 +127,15 @@ uint64_t RegisterDenseTable(const std::string& name, torch::Tensor val) {
   return worker.RegisterDenseTable(name, kval);
 }
 
-uint64_t RegisterSparseTable(const std::string& name, int64_t dimension,
-                             pybind11::object dtype) {
-  torch::Dtype ttype = torch::python::detail::py_object_to_dtype(dtype);
-  ElementType etype = TorchDTypeToElementType(ttype);
-
-  return worker.RegisterSparseTable(name, dimension, etype);
-}
-
-uint64_t RegisterSparseTableV2(
+uint64_t RegisterSparseTable(
     const std::string& name, int64_t dimension, pybind11::object dtype,
     InitializerType init_type,
     const std::unordered_map<std::string, std::string>& init_conf) {
   torch::Dtype ttype = torch::python::detail::py_object_to_dtype(dtype);
   ElementType etype = TorchDTypeToElementType(ttype);
 
-  return worker.RegisterSparseTableV2(name, dimension, etype, init_type,
-                                      init_conf);
+  return worker.RegisterSparseTable(name, dimension, etype, init_type,
+                                    init_conf);
 }
 
 torch::Tensor PullDenseTable(uint64_t table_id) {

@@ -5,7 +5,7 @@
 namespace kraken {
 
 MemReader::MemReader(const char* ptr, size_t length, void (*free)(void*))
-    : ptr_(ptr), length_(length), free_(free), offset_(0) {
+    : ptr_(ptr), length_(length), offset_(0), free_(free) {
 }
 
 bool MemReader::Read(void* target, size_t size) {

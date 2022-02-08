@@ -47,11 +47,11 @@ class Optimizer:
           dtype = param.dtype()
           initializer = param.initializer()
 
-          table_id = kraken_native.register_sparse_table_v2(name=real_name,
-                                                            dimension=dimension,
-                                                            dtype=dtype,
-                                                            init_type=initializer.type(),
-                                                            init_conf=initializer.conf())
+          table_id = kraken_native.register_sparse_table(name=real_name,
+                                                         dimension=dimension,
+                                                         dtype=dtype,
+                                                         init_type=initializer.type(),
+                                                         init_conf=initializer.conf())
 
           param.set_table_id(table_id)
           param.set_name(real_name)

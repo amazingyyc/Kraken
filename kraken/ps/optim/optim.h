@@ -70,7 +70,11 @@ inline bool Optim::GetConf<float>(const std::string& k, float* v) {
     return false;
   }
 
-  *v = std::stof(it->second);
+  try {
+    *v = std::stof(it->second);
+  } catch (...) {
+    return false;
+  }
 
   return true;
 }

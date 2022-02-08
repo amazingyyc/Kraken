@@ -50,12 +50,8 @@ PYBIND11_MODULE(kraken_native, m) {
         pybind11::arg("val"));
 
   m.def("register_sparse_table", &RegisterSparseTable, pybind11::arg("name"),
-        pybind11::arg("dimension"), pybind11::arg("dtype"));
-
-  m.def("register_sparse_table_v2", &RegisterSparseTableV2,
-        pybind11::arg("name"), pybind11::arg("dimension"),
-        pybind11::arg("dtype"), pybind11::arg("init_type"),
-        pybind11::arg("init_conf"));
+        pybind11::arg("dimension"), pybind11::arg("dtype"),
+        pybind11::arg("init_type"), pybind11::arg("init_conf"));
 
   m.def("pull_dense_table", &PullDenseTable, pybind11::arg("table_id"));
 

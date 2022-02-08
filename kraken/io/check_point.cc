@@ -1,5 +1,7 @@
 #include "io/check_point.h"
 
+#include <chrono>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 
@@ -29,11 +31,25 @@ const std::string CheckPoint::kDenseTableSuffix = ".dense";
 const std::string CheckPoint::kSparseTableSuffix = ".sparse";
 const std::string CheckPoint::kPartitionFolderPrefix = "partition_";
 
+CheckPoint::CheckPoint(Ps* ps, const std::string& save_dir,
+                       size_t max_save_count)
+    : ps_(ps),
+      save_dir_(save_dir),
+      max_save_count_(max_save_count),
+      stop_(false) {
+  // Start sub-thread.
+  woker_ = std::thread(&CheckPoint::Run, this);
+}
+
 bool CheckPoint::IsDirExist(const std::string& dir) const {
   std::filesystem::path path(dir);
 
+  return IsDirExist(path);
+}
+
+bool CheckPoint::IsDirExist(const std::filesystem::path& path) const {
   std::error_code error_code;
-  auto status = std::filesystem::status(dir, error_code);
+  auto status = std::filesystem::status(path, error_code);
 
   if (error_code) {
     return false;
@@ -49,18 +65,7 @@ bool CheckPoint::IsDirExist(const std::string& dir) const {
 bool CheckPoint::IsFileExist(const std::string& p) const {
   std::filesystem::path path(p);
 
-  std::error_code error_code;
-  auto status = std::filesystem::status(path, error_code);
-
-  if (error_code) {
-    return false;
-  }
-
-  if (std::filesystem::exists(status) == false) {
-    return false;
-  }
-
-  return std::filesystem::is_directory(status) == false;
+  return IsFileExist(path);
 }
 
 bool CheckPoint::IsFileExist(const std::filesystem::path& path) const {
@@ -78,10 +83,30 @@ bool CheckPoint::IsFileExist(const std::filesystem::path& path) const {
   return std::filesystem::is_directory(status) == false;
 }
 
+bool CheckPoint::DeleteDir(const std::string& dir) const {
+  std::filesystem::path path(dir);
+
+  if (IsDirExist(path)) {
+    std::error_code error_code;
+    std::filesystem::remove_all(path, error_code);
+
+    if (error_code) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 bool CheckPoint::CreateDir(const std::string& dir, bool exist_delete) const {
   std::filesystem::path path(dir);
 
-  if (IsDirExist(dir)) {
+  return CreateDir(path, exist_delete);
+}
+
+bool CheckPoint::CreateDir(const std::filesystem::path& path,
+                           bool exist_delete) const {
+  if (IsDirExist(path)) {
     if (exist_delete) {
       std::error_code error_code;
       std::filesystem::remove_all(path, error_code);
@@ -181,6 +206,19 @@ bool CheckPoint::GetSparseTablePaths(
   return true;
 }
 
+std::string CheckPoint::GenModelDirByTime() const {
+  auto now = std::chrono::system_clock::now();
+  time_t tt = std::chrono::system_clock::to_time_t(now);
+  tm utc_tm = *gmtime(&tt);
+
+  // Name format: year-month-day-hour-min-sec.
+  return std::to_string(utc_tm.tm_year + 1900) + "-" +
+         std::to_string(utc_tm.tm_mon + 1) + "-" +
+         std::to_string(utc_tm.tm_mday) + "-" + std::to_string(utc_tm.tm_hour) +
+         "-" + std::to_string(utc_tm.tm_min) + "-" +
+         std::to_string(utc_tm.tm_sec);
+}
+
 std::string CheckPoint::GenModelInfoPath(const std::string& dir) const {
   std::filesystem::path path(dir);
   path /= kModelInfoName;
@@ -232,8 +270,9 @@ bool CheckPoint::Save(const std::string& model_info_path,
     std::string pretty_str = j.dump(4, ' ');
 
     // Dump json string to file.
-    std::ofstream out_f(model_info_path.c_str());
+    std::ofstream out_f(model_info_path);
     if (!out_f.is_open()) {
+      LOG_ERROR("Open file:" << model_info_path << " error!");
       return false;
     }
 
@@ -246,6 +285,7 @@ bool CheckPoint::Save(const std::string& model_info_path,
     // Binary.
     FileWriter writer(model_binary_path);
     if (writer.IsOpen() == false) {
+      LOG_ERROR("Open file:" << model_binary_path << " error!");
       return false;
     }
 
@@ -296,6 +336,7 @@ bool CheckPoint::Save(const std::string& dir, DenseTable* table) const {
   // Open a file to serialize the DenseTable.
   FileWriter writer(path.string());
   if (writer.IsOpen() == false) {
+    LOG_ERROR("Open file:" << path.string() << " error!");
     return false;
   }
 
@@ -324,6 +365,7 @@ bool CheckPoint::Save(const std::string& dir, SparseTable* table) const {
 
   FileWriter writer(path.string());
   if (writer.IsOpen() == false) {
+    LOG_ERROR("Open file:" << path.string() << " error!");
     return false;
   }
 
@@ -384,6 +426,7 @@ bool CheckPoint::Load(const std::string& model_binary_path,
   // Binary.
   FileReader reader(model_binary_path);
   if (reader.IsOpen() == false) {
+    LOG_ERROR("Open file:" << model_binary_path << " error!");
     return false;
   }
 
@@ -435,6 +478,7 @@ bool CheckPoint::Load(const std::string& model_binary_path,
 bool CheckPoint::Load(const std::string& path, DenseTable* table) const {
   FileReader reader(path);
   if (reader.IsOpen() == false) {
+    LOG_ERROR("Open file:" << path << " error!");
     return false;
   }
 
@@ -481,6 +525,7 @@ bool CheckPoint::Load(const std::vector<std::string>& paths, size_t shard_id,
     do {
       FileReader reader(paths[i]);
       if (reader.IsOpen() == false) {
+        LOG_ERROR("Open file:" << paths[i] << " error!");
         has_error[i] = true;
         break;
       }
@@ -557,6 +602,7 @@ bool CheckPoint::Load(const std::string& path, size_t shard_id,
                       SparseTable* table) {
   FileReader reader(path);
   if (reader.IsOpen() == false) {
+    LOG_ERROR("Open file:" << path << " error!");
     return false;
   }
 
@@ -612,19 +658,50 @@ bool CheckPoint::Load(const std::string& path, size_t shard_id,
   return true;
 }
 
-bool CheckPoint::Save(Ps* ps, const std::string& dir, uint64_t model_id) {
+bool CheckPoint::Save(Ps* ps, const std::string& save_dir, uint64_t model_id) {
+  // Check whether delete old saved model.
+  if (model_check_points_[model_id].size() >= max_save_count_) {
+    const auto& delete_path = model_check_points_[model_id].front();
+
+    if (DeleteDir(delete_path) == false) {
+      LOG_ERROR("Delete dir:" << delete_path << " error!");
+      return false;
+    }
+
+    model_check_points_[model_id].pop_front();
+  }
+
+  // try to get model name.
+  std::shared_lock<std::shared_mutex> lock_ps(ps->mu_);
+
   // Shard 0 is leader.
   size_t shard_id = ps->shard_id();
   bool is_leader = (shard_id == 0);
 
+  auto it = ps->models_.find(model_id);
+  if (it == ps->models_.end()) {
+    LOG_ERROR("Model id:" << model_id << " not exist.");
+    return false;
+  }
+
+  Model* model = it->second.get();
+
+  // Create model dump dir.
+  std::filesystem::path real_path(save_dir);
+
+  // (TODO) the model name maybe error when as a folder name.
+  real_path /= model->name();
+  real_path /= GenModelDirByTime();
+
   // Try to create folder.
-  if (CreateDir(dir, false) == false) {
-    LOG_ERROR("Create dir:" << dir << " error.");
+  if (CreateDir(real_path, false) == false) {
+    LOG_ERROR("Create dir:" << real_path << " error.");
     return false;
   }
 
   if (is_leader) {
-    std::shared_lock<std::shared_mutex> _(ps->model_manager_.mu_);
+    std::shared_lock<std::shared_mutex> lock_model_manager(
+        ps->model_manager_.mu_);
 
     // If this is a leader we need dump model info.
     auto it = ps->model_manager_.models_.find(model_id);
@@ -634,8 +711,8 @@ bool CheckPoint::Save(Ps* ps, const std::string& dir, uint64_t model_id) {
     }
 
     // Generate path.
-    auto model_info_path = GenModelInfoPath(dir);
-    auto model_binary_path = GenModelBinaryPath(dir);
+    auto model_info_path = GenModelInfoPath(real_path.string());
+    auto model_binary_path = GenModelBinaryPath(real_path.string());
 
     if (Save(model_info_path, model_binary_path,
              ps->model_manager_.models_[model_id]) == false) {
@@ -644,24 +721,13 @@ bool CheckPoint::Save(Ps* ps, const std::string& dir, uint64_t model_id) {
   }
 
   // We need create a partition folder.
-  std::filesystem::path partition_dir(dir);
+  std::filesystem::path partition_dir(real_path);
   partition_dir /= (kPartitionFolderPrefix + std::to_string(shard_id));
 
-  auto partition_dir_s = partition_dir.string();
-  if (CreateDir(partition_dir_s, true) == false) {
-    LOG_ERROR("Create dir:" << partition_dir_s << " error.");
+  if (CreateDir(partition_dir, true) == false) {
+    LOG_ERROR("Create dir:" << partition_dir << " error.");
     return false;
   }
-
-  // Dump model's table.
-  std::shared_lock<std::shared_mutex> lock_ps(ps->mu_);
-  auto it = ps->models_.find(model_id);
-  if (it == ps->models_.end()) {
-    LOG_ERROR("Model id:" << model_id << " not exist.");
-    return false;
-  }
-
-  Model* model = it->second.get();
 
   std::shared_lock<std::shared_mutex> lock_model(model->mu_);
   for (auto it = model->tables_.begin(); it != model->tables_.end(); ++it) {
@@ -669,17 +735,20 @@ bool CheckPoint::Save(Ps* ps, const std::string& dir, uint64_t model_id) {
     if (table->type_ == TableType::kDense) {
       DenseTable* dense_table = (DenseTable*)table;
       std::shared_lock<std::shared_mutex> lock_table(dense_table->mu_);
-      if (Save(partition_dir_s, dense_table) == false) {
+      if (Save(partition_dir.string(), dense_table) == false) {
         LOG_ERROR("Dump DenseTable:" << table->name_ << " error.");
         return false;
       }
     } else if (table->type_ == TableType::kSparse) {
-      if (Save(partition_dir_s, (SparseTable*)table) == false) {
+      if (Save(partition_dir.string(), (SparseTable*)table) == false) {
         LOG_ERROR("Dump SparseTable:" << table->name_ << " error.");
         return false;
       }
     }
   }
+
+  // Store the path.
+  model_check_points_[model_id].emplace_back(real_path.string());
 
   return true;
 }
@@ -755,6 +824,12 @@ bool CheckPoint::Load(Ps* ps, const std::string& dir) {
   for (auto& [k, v] : mm_model.tables_) {
     if (v.table_type != TableType::kSparse) {
       continue;
+    }
+
+    if (model->tables_.find(v.id) != model->tables_.end()) {
+      LOG_ERROR("SparseTable name:" << v.name << ", id:" << v.id
+                                    << " already exist.");
+      return false;
     }
 
     std::unique_ptr<Initializer> initializer;
@@ -874,15 +949,63 @@ bool CheckPoint::Load(Ps* ps, const std::string& dir) {
 
   // When finish initialize, will insert into PS.
   if (shard_id == 0) {
-    std::shared_lock<std::shared_mutex> lock(ps->model_manager_.mu_);
+    std::unique_lock<std::shared_mutex> lock(ps->model_manager_.mu_);
     ps->model_manager_.model_id_map_[mm_model.name] = mm_model.id;
     ps->model_manager_.models_.emplace(mm_model.id, std::move(mm_model));
   }
 
-  std::shared_lock<std::shared_mutex> lock(ps->mu_);
+  std::unique_lock<std::shared_mutex> lock(ps->mu_);
   ps->models_.emplace(model->id_, std::move(model));
 
   return true;
+}
+
+void CheckPoint::Run() {
+  while (true) {
+    std::unique_lock<std::mutex> lock(mu_);
+
+    if (task_que_.empty() == false) {
+      Task task = std::move(task_que_.front());
+      task_que_.pop();
+
+      bool success = Save(ps_, save_dir_, task.model_id);
+
+      if (task.done) {
+        task.done(success);
+      }
+    } else if (stop_.load()) {
+      break;
+    } else {
+      cond_var_.wait(lock, [this] {
+        return this->stop_.load() || false == this->task_que_.empty();
+      });
+    }
+  }
+}
+
+void CheckPoint::Stop() {
+  stop_.store(false);
+
+  if (woker_.joinable()) {
+    woker_.join();
+  }
+}
+
+void CheckPoint::Save(uint64_t model_id, std::function<void(bool)>&& done) {
+  Task task;
+  task.model_id = model_id;
+  task.done = std::move(done);
+
+  {
+    std::unique_lock<std::mutex> lock(mu_);
+    task_que_.emplace(std::move(task));
+  }
+
+  cond_var_.notify_one();
+}
+
+bool CheckPoint::Load(const std::string& model_dir) {
+  return Load(ps_, model_dir);
 }
 
 }  // namespace io

@@ -2,28 +2,34 @@
 
 #include <cinttypes>
 #include <string>
+#include <unordered_map>
 
 #include "common/deserialize.h"
 #include "common/serialize.h"
+#include "ps/optim/optim.h"
 
 namespace kraken {
 
 /**
  * \brief Apply a model in PS. Apply donot means really create a model in server,
- * it just giving a new id, the response server guard the id is unique.
+ * it just giving a new id, the response server guarantee the id is unique.
  */
 struct ApplyModelRequest {
   std::string name;
+  OptimType optim_type;
+  std::unordered_map<std::string, std::string> optim_conf;
 };
 
 template <>
 inline bool Serialize::operator<<(const ApplyModelRequest& v) {
-  return (*this) << v.name;
+  return (*this) << v.name && (*this) << v.optim_type &&
+         (*this) << v.optim_conf;
 }
 
 template <>
 inline bool Deserialize::operator>>(ApplyModelRequest& v) {
-  return (*this) >> v.name;
+  return (*this) >> v.name && (*this) >> v.optim_type &&
+         (*this) >> v.optim_conf;
 }
 
 struct ApplyModelResponse {
