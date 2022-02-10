@@ -17,7 +17,7 @@ struct RegisterSparseTableRequest {
   std::string name;
 
   int64_t dimension;
-  ElementType etype;
+  ElementType element_type;
 
   InitializerType init_type;
   std::unordered_map<std::string, std::string> init_conf;
@@ -26,14 +26,14 @@ struct RegisterSparseTableRequest {
 template <>
 inline bool Serialize::operator<<(const RegisterSparseTableRequest& v) {
   return (*this) << v.model_id && (*this) << v.id && (*this) << v.name &&
-         (*this) << v.dimension && (*this) << v.etype &&
+         (*this) << v.dimension && (*this) << v.element_type &&
          (*this) << v.init_type && (*this) << v.init_conf;
 }
 
 template <>
 inline bool Deserialize::operator>>(RegisterSparseTableRequest& v) {
   return (*this) >> v.model_id && (*this) >> v.id && (*this) >> v.name &&
-         (*this) >> v.dimension && (*this) >> v.etype &&
+         (*this) >> v.dimension && (*this) >> v.element_type &&
          (*this) >> v.init_type && (*this) >> v.init_conf;
 }
 

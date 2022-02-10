@@ -9,23 +9,14 @@ PsServer::PsServer(uint32_t port, uint32_t thread_nums, size_t shard_num,
     : server_(port, thread_nums), ps_(shard_num, shard_id) {
 }
 
-int32_t PsServer::ApplyModel(const ApplyModelRequest& req,
-                             ApplyModelResponse* rsp) {
-  return ps_.ApplyModel(req.name, req.optim_type, req.optim_conf,
-                        &(rsp->model_id));
+int32_t PsServer::ApplyModelId(const ApplyModelIdRequest& req,
+                               ApplyModelIdResponse* rsp) {
+  return ps_.ApplyModelId(req.model_name, &(rsp->model_id));
 }
 
-int32_t PsServer::ApplyDenseTable(const ApplyDenseTableRequest& req,
-                                  ApplyDenseTableResponse* rsp) {
-  return ps_.ApplyDenseTable(req.model_id, req.table_name, req.shape,
-                             req.element_type, &(rsp->table_id));
-}
-
-int32_t PsServer::ApplySparseTable(const ApplySparseTableRequest& req,
-                                   ApplySparseTableResponse* rsp) {
-  return ps_.ApplySparseTable(req.model_id, req.table_name, req.dimension,
-                              req.element_type, req.init_type, req.init_conf,
-                              &(rsp->table_id));
+int32_t PsServer::ApplyTableId(const ApplyTableIdRequest& req,
+                               ApplyTableIdResponse* rsp) {
+  return ps_.ApplyTableId(req.model_name, req.table_name, &(rsp->table_id));
 }
 
 int32_t PsServer::RegisterModel(const RegisterModelRequest& req,
@@ -33,15 +24,31 @@ int32_t PsServer::RegisterModel(const RegisterModelRequest& req,
   return ps_.RegisterModel(req.id, req.name, req.optim_type, req.optim_conf);
 }
 
+int32_t PsServer::RegisterDenseTableInfo(
+    const RegisterDenseTableInfoRequest& req,
+    RegisterDenseTableInfoResponse* rsp) {
+  return ps_.RegisterDenseTableInfo(req.model_id, req.id, req.name, req.shape,
+                                    req.element_type);
+}
+
 int32_t PsServer::RegisterDenseTable(const RegisterDenseTableRequest& req,
                                      RegisterDenseTableResponse* rsp) {
   return ps_.RegisterDenseTable(req.model_id, req.id, req.name, req.val);
 }
 
+int32_t PsServer::RegisterSparseTableInfo(
+    const RegisterSparseTableInfoRequest& req,
+    RegisterSparseTableInfoResponse* rsp) {
+  return ps_.RegisterSparseTableInfo(req.model_id, req.id, req.name,
+                                     req.dimension, req.element_type,
+                                     req.init_type, req.init_conf);
+}
+
 int32_t PsServer::RegisterSparseTable(const RegisterSparseTableRequest& req,
                                       RegisterSparseTableResponse* rsp) {
   return ps_.RegisterSparseTable(req.model_id, req.id, req.name, req.dimension,
-                                 req.etype, req.init_type, req.init_conf);
+                                 req.element_type, req.init_type,
+                                 req.init_conf);
 }
 
 int32_t PsServer::PullDenseTable(const PullDenseTableRequest& req,
@@ -102,11 +109,12 @@ void PsServer::RegisterFuncs() {
   server_.RegisterFunc<TYPE##Request, TYPE##Response>( \
       RPCFuncType::k##TYPE##Type, std::bind(&PsServer::FUNC, this, _1, _2));
 
-  REGISTER_FUNC(ApplyModel, ApplyModel);
-  REGISTER_FUNC(ApplyDenseTable, ApplyDenseTable);
-  REGISTER_FUNC(ApplySparseTable, ApplySparseTable);
+  REGISTER_FUNC(ApplyModelId, ApplyModelId);
+  REGISTER_FUNC(ApplyTableId, ApplyTableId);
   REGISTER_FUNC(RegisterModel, RegisterModel);
+  REGISTER_FUNC(RegisterDenseTableInfo, RegisterDenseTableInfo);
   REGISTER_FUNC(RegisterDenseTable, RegisterDenseTable);
+  REGISTER_FUNC(RegisterSparseTableInfo, RegisterSparseTableInfo);
   REGISTER_FUNC(RegisterSparseTable, RegisterSparseTable);
   REGISTER_FUNC(PullDenseTable, PullDenseTable);
   REGISTER_FUNC(CombinePullDenseTable, CombinePullDenseTable);

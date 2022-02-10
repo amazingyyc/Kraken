@@ -9,11 +9,6 @@
 
 namespace kraken {
 
-/**
- * \brief The worker register a model
- * means the worker has get the model's id.
- *
- */
 struct RegisterModelRequest {
   uint64_t id;
   std::string name;

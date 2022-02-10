@@ -29,7 +29,7 @@ const std::string CheckPoint::kModelInfoName = "model.json";
 const std::string CheckPoint::kModelBinaryName = "model.binary";
 const std::string CheckPoint::kDenseTableSuffix = ".dense";
 const std::string CheckPoint::kSparseTableSuffix = ".sparse";
-const std::string CheckPoint::kPartitionFolderPrefix = "partition_";
+const std::string CheckPoint::kShardFolderPrefix = "shard_";
 
 CheckPoint::CheckPoint(Ps* ps, const std::string& save_dir,
                        size_t max_save_count)
@@ -37,7 +37,6 @@ CheckPoint::CheckPoint(Ps* ps, const std::string& save_dir,
       save_dir_(save_dir),
       max_save_count_(max_save_count),
       stop_(false) {
-  // Start sub-thread.
   woker_ = std::thread(&CheckPoint::Run, this);
 }
 
@@ -86,6 +85,10 @@ bool CheckPoint::IsFileExist(const std::filesystem::path& path) const {
 bool CheckPoint::DeleteDir(const std::string& dir) const {
   std::filesystem::path path(dir);
 
+  return DeleteDir(path);
+}
+
+bool CheckPoint::DeleteDir(const std::filesystem::path& path) const {
   if (IsDirExist(path)) {
     std::error_code error_code;
     std::filesystem::remove_all(path, error_code);
@@ -130,44 +133,77 @@ bool CheckPoint::CreateDir(const std::filesystem::path& path,
   return true;
 }
 
-bool CheckPoint::GetSortedPartitionFolder(
-    const std::string& dir, std::vector<std::string>* partition_folders) const {
-  std::vector<std::pair<std::string, size_t>> partitions;
+bool CheckPoint::GetSortedShardFolders(
+    const std::string& dir, std::vector<std::string>* shard_folders) const {
+  std::vector<std::pair<std::string, size_t>> shards;
 
   std::filesystem::path path(dir);
   for (auto const& entry : std::filesystem::directory_iterator{path}) {
     if (entry.is_directory()) {
       auto filename = entry.path().filename().string();
-      if (filename.rfind(kPartitionFolderPrefix, 0) != 0) {
+      if (filename.rfind(kShardFolderPrefix, 0) != 0) {
         continue;
       }
 
-      auto num_s =
-          filename.substr(kPartitionFolderPrefix.size(),
-                          filename.size() - kPartitionFolderPrefix.size());
+      auto num_s = filename.substr(kShardFolderPrefix.size(),
+                                   filename.size() - kShardFolderPrefix.size());
 
       try {
         size_t num = std::stoull(num_s);
 
-        partitions.emplace_back(std::make_pair(entry.path().string(), num));
+        shards.emplace_back(std::make_pair(entry.path().string(), num));
       } catch (...) {
         return false;
       }
     }
   }
 
-  std::sort(partitions.begin(), partitions.end(),
+  std::sort(shards.begin(), shards.end(),
             [](const std::pair<std::string, size_t>& p1,
                const std::pair<std::string, size_t>& p2) -> bool {
               return p1.second < p2.second;
             });
 
-  partition_folders->clear();
-  partition_folders->reserve(partitions.size());
+  shard_folders->clear();
+  shard_folders->reserve(shards.size());
 
-  for (const auto& i : partitions) {
-    partition_folders->emplace_back(i.first);
+  for (const auto& i : shards) {
+    shard_folders->emplace_back(i.first);
   }
+
+  return true;
+}
+
+bool CheckPoint::GetLatestCheckPointFolderPath(const std::string& shard_dir,
+                                               std::string* path) {
+  std::filesystem::path shard_path(shard_dir);
+
+  std::vector<std::pair<std::string, uint64_t>> folders;
+  for (auto const& entry : std::filesystem::directory_iterator{shard_path}) {
+    if (entry.is_directory()) {
+      auto filename = entry.path().filename().string();
+
+      try {
+        uint64_t num = std::stoull(filename);
+
+        folders.emplace_back(std::make_pair(entry.path().string(), num));
+      } catch (...) {
+        return false;
+      }
+    }
+  }
+
+  if (folders.empty()) {
+    return false;
+  }
+
+  std::sort(folders.begin(), folders.end(),
+            [](const std::pair<std::string, uint64_t>& p1,
+               const std::pair<std::string, uint64_t>& p2) -> bool {
+              return p1.second > p2.second;
+            });
+
+  *path = folders.front().first;
 
   return true;
 }
@@ -235,31 +271,31 @@ std::string CheckPoint::GenModelBinaryPath(const std::string& dir) const {
 
 bool CheckPoint::Save(const std::string& model_info_path,
                       const std::string& model_binary_path,
-                      ModelManager::Model& model) const {
+                      const Ps::ModelInfo& model_info) const {
   // We will dump 2 file. one is readable another is binary serialize.
   {
     // Readable.
     configor::json j;
-    j["id"] = model.id;
-    j["name"] = model.name;
-    j["optim_type"] = (int32_t)model.optim_type;
-    j["optim_conf"] = model.optim_conf;
+    j["id"] = model_info.id;
+    j["name"] = model_info.name;
+    j["optim_type"] = (int32_t)model_info.optim_type;
+    j["optim_conf"] = model_info.optim_conf;
 
     configor::json tables_j = configor::json::array({});
-    for (auto& table : model.tables_) {
+    for (auto& [table_name, table_info] : model_info.table_infos) {
       configor::json t_j;
 
-      t_j["id"] = table.second.id;
-      t_j["name"] = table.second.name;
-      t_j["table_type"] = (int32_t)table.second.table_type;
-      t_j["element_type"] = (int32_t)table.second.element_type.dtype;
+      t_j["id"] = table_info.id;
+      t_j["name"] = table_info.name;
+      t_j["table_type"] = (int32_t)table_info.table_type;
+      t_j["element_type"] = (int32_t)table_info.element_type.dtype;
 
-      if (table.second.table_type == TableType::kDense) {
-        t_j["shape"] = table.second.shape.dims();
-      } else if (table.second.table_type == TableType::kSparse) {
-        t_j["dimension"] = table.second.dimension;
-        t_j["init_type"] = (int32_t)table.second.init_type;
-        t_j["init_conf"] = table.second.init_conf;
+      if (table_info.table_type == TableType::kDense) {
+        t_j["shape"] = table_info.shape.dims();
+      } else if (table_info.table_type == TableType::kSparse) {
+        t_j["dimension"] = table_info.dimension;
+        t_j["init_type"] = (int32_t)table_info.init_type;
+        t_j["init_conf"] = table_info.init_conf;
       }
 
       tables_j.push_back(std::move(t_j));
@@ -291,23 +327,19 @@ bool CheckPoint::Save(const std::string& model_info_path,
 
     Serialize serialize(&writer);
 
-    if ((serialize << model.id) == false ||
-        (serialize << model.name) == false ||
-        (serialize << model.optim_type) == false ||
-        (serialize << model.optim_conf) == false) {
+    if ((serialize << model_info.id) == false ||
+        (serialize << model_info.name) == false ||
+        (serialize << model_info.optim_type) == false ||
+        (serialize << model_info.optim_conf) == false) {
       return false;
     }
 
-    if ((serialize << model.table_id_map_) == false) {
-      return false;
-    }
-
-    uint64_t table_size = model.tables_.size();
+    uint64_t table_size = model_info.table_infos.size();
     if ((serialize << table_size) == false) {
       return false;
     }
 
-    for (auto& t : model.tables_) {
+    for (auto& t : model_info.table_infos) {
       // table id.
       if ((serialize << t.first) == false) {
         return false;
@@ -422,7 +454,7 @@ bool CheckPoint::Save(const std::string& dir, SparseTable* table) const {
 }
 
 bool CheckPoint::Load(const std::string& model_binary_path,
-                      ModelManager::Model* model) const {
+                      Ps::ModelInfo* model_info) const {
   // Binary.
   FileReader reader(model_binary_path);
   if (reader.IsOpen() == false) {
@@ -432,14 +464,10 @@ bool CheckPoint::Load(const std::string& model_binary_path,
 
   Deserialize deserialize(&reader);
 
-  if ((deserialize >> model->id) == false ||
-      (deserialize >> model->name) == false ||
-      (deserialize >> model->optim_type) == false ||
-      (deserialize >> model->optim_conf) == false) {
-    return false;
-  }
-
-  if ((deserialize >> model->table_id_map_) == false) {
+  if ((deserialize >> model_info->id) == false ||
+      (deserialize >> model_info->name) == false ||
+      (deserialize >> model_info->optim_type) == false ||
+      (deserialize >> model_info->optim_conf) == false) {
     return false;
   }
 
@@ -448,28 +476,28 @@ bool CheckPoint::Load(const std::string& model_binary_path,
     return false;
   }
 
-  model->tables_.reserve(table_size);
+  model_info->table_infos.reserve(table_size);
 
   for (uint64_t i = 0; i < table_size; ++i) {
     uint64_t table_id;
-    ModelManager::Table table;
+    Ps::TableInfo table_info;
 
     if ((deserialize >> table_id) == false) {
       return false;
     }
 
-    if ((deserialize >> table.id) == false ||
-        (deserialize >> table.name) == false ||
-        (deserialize >> table.table_type) == false ||
-        (deserialize >> table.element_type) == false ||
-        (deserialize >> table.shape) == false ||
-        (deserialize >> table.dimension) == false ||
-        (deserialize >> table.init_type) == false ||
-        (deserialize >> table.init_conf) == false) {
+    if ((deserialize >> table_info.id) == false ||
+        (deserialize >> table_info.name) == false ||
+        (deserialize >> table_info.table_type) == false ||
+        (deserialize >> table_info.element_type) == false ||
+        (deserialize >> table_info.shape) == false ||
+        (deserialize >> table_info.dimension) == false ||
+        (deserialize >> table_info.init_type) == false ||
+        (deserialize >> table_info.init_conf) == false) {
       return false;
     }
 
-    model->tables_.emplace(table_id, std::move(table));
+    model_info->table_infos.emplace(table_id, std::move(table_info));
   }
 
   return true;
@@ -505,94 +533,6 @@ bool CheckPoint::Load(const std::string& path, DenseTable* table) const {
   }
 
   table->val_ = val;
-
-  return true;
-}
-
-bool CheckPoint::Load(const std::vector<std::string>& paths, size_t shard_id,
-                      uint64_t model_id, const ConsistentHasher& hasher,
-                      SparseTable* table) {
-  // The sparse table maybe store in mulit-files so we need load all of them and
-  // check the hash whehter it belong to this shard.
-  size_t size = paths.size();
-
-  std::vector<bool> has_error(size, false);
-
-  uint64_t table_id = table->id_;
-
-#pragma omp parallel for
-  for (size_t i = 0; i < size; ++i) {
-    do {
-      FileReader reader(paths[i]);
-      if (reader.IsOpen() == false) {
-        LOG_ERROR("Open file:" << paths[i] << " error!");
-        has_error[i] = true;
-        break;
-      }
-
-      Deserialize deserialize(&reader);
-
-      TableType type;
-      uint64_t id;
-      std::string name;
-      int64_t dimension;
-      ElementType etype;
-      InitializerType init_type;
-      std::unordered_map<std::string, std::string> init_conf;
-
-      if ((deserialize >> type) == false || (deserialize >> id) == false ||
-          (deserialize >> name) == false ||
-          (deserialize >> dimension) == false ||
-          (deserialize >> etype) == false ||
-          (deserialize >> init_type) == false ||
-          (deserialize >> init_conf) == false) {
-        has_error[i] = true;
-        break;
-      }
-
-      if (type != TableType::kSparse || id != table->id_ ||
-          name != table->name_ || dimension != table->dimension_ ||
-          etype == table->etype_ || init_type != table->initializer_->type()) {
-        has_error[i] = true;
-        break;
-      }
-
-      // Parse embedding and insert to hash-table it's thread-safe.
-      uint64_t val_size;
-      if ((deserialize >> val_size) == false) {
-        has_error[i] = true;
-        break;
-      }
-
-      for (uint64_t j = 0; j < val_size; ++j) {
-        int64_t sparse_id;
-        Table::Value val;
-
-        if ((deserialize >> sparse_id) == false) {
-          has_error[i] = true;
-          break;
-        }
-
-        if ((deserialize >> val.val) == false ||
-            (deserialize >> val.bag.state) == false ||
-            (deserialize >> val.bag.state_i) == false) {
-          has_error[i] = true;
-          break;
-        }
-
-        // If this val belong this shard insert it.
-        if (shard_id == hasher(model_id, table_id, sparse_id)) {
-          table->vals_.insert(sparse_id, val);
-        }
-      }
-    } while (false);
-  }
-
-  for (size_t i = 0; i < has_error.size(); ++i) {
-    if (has_error[i]) {
-      return false;
-    }
-  }
 
   return true;
 }
@@ -659,16 +599,15 @@ bool CheckPoint::Load(const std::string& path, size_t shard_id,
 }
 
 bool CheckPoint::Save(Ps* ps, const std::string& save_dir, uint64_t model_id) {
-  // Check whether delete old saved model.
-  if (model_check_points_[model_id].size() >= max_save_count_) {
-    const auto& delete_path = model_check_points_[model_id].front();
+  if (model_save_infos_[model_id].save_paths.size() >= max_save_count_) {
+    const auto& delete_path = model_save_infos_[model_id].save_paths.front();
 
     if (DeleteDir(delete_path) == false) {
       LOG_ERROR("Delete dir:" << delete_path << " error!");
       return false;
     }
 
-    model_check_points_[model_id].pop_front();
+    model_save_infos_[model_id].save_paths.pop_front();
   }
 
   // try to get model name.
@@ -676,71 +615,56 @@ bool CheckPoint::Save(Ps* ps, const std::string& save_dir, uint64_t model_id) {
 
   // Shard 0 is leader.
   size_t shard_id = ps->shard_id();
-  bool is_leader = (shard_id == 0);
 
-  auto it = ps->models_.find(model_id);
-  if (it == ps->models_.end()) {
+  if (ps->model_infos_.find(model_id) != ps->model_infos_.end() ||
+      ps->models_.find(model_id) == ps->models_.end()) {
     LOG_ERROR("Model id:" << model_id << " not exist.");
     return false;
   }
 
-  Model* model = it->second.get();
+  const Ps::ModelInfo& model_info = ps->model_infos_[model_id];
+  Model* model = ps->models_[model_id].get();
 
   // Create model dump dir.
-  std::filesystem::path real_path(save_dir);
+  std::filesystem::path shard_path(save_dir);
 
   // (TODO) the model name maybe error when as a folder name.
-  real_path /= model->name();
-  real_path /= GenModelDirByTime();
+  shard_path /= model_info.name;
+  shard_path /= (kShardFolderPrefix + std::to_string(shard_id));
+  shard_path /= std::to_string(model_save_infos_[model_id].index++);
 
   // Try to create folder.
-  if (CreateDir(real_path, false) == false) {
-    LOG_ERROR("Create dir:" << real_path << " error.");
+  if (CreateDir(shard_path, false) == false) {
+    LOG_ERROR("Create dir:" << shard_path << " error.");
     return false;
   }
 
-  if (is_leader) {
-    std::shared_lock<std::shared_mutex> lock_model_manager(
-        ps->model_manager_.mu_);
+  {
+    // For every shard we need dump model info.
+    auto model_info_path = GenModelInfoPath(shard_path.string());
+    auto model_binary_path = GenModelBinaryPath(shard_path.string());
 
-    // If this is a leader we need dump model info.
-    auto it = ps->model_manager_.models_.find(model_id);
-    if (it == ps->model_manager_.models_.end()) {
-      LOG_ERROR("Model id:" << model_id << " not exist in ModelManager.");
-      return false;
-    }
-
-    // Generate path.
-    auto model_info_path = GenModelInfoPath(real_path.string());
-    auto model_binary_path = GenModelBinaryPath(real_path.string());
-
-    if (Save(model_info_path, model_binary_path,
-             ps->model_manager_.models_[model_id]) == false) {
+    if (Save(model_info_path, model_binary_path, model_info) == false) {
       return false;
     }
   }
 
-  // We need create a partition folder.
-  std::filesystem::path partition_dir(real_path);
-  partition_dir /= (kPartitionFolderPrefix + std::to_string(shard_id));
-
-  if (CreateDir(partition_dir, true) == false) {
-    LOG_ERROR("Create dir:" << partition_dir << " error.");
-    return false;
-  }
-
+  // Try to dump tables.
   std::shared_lock<std::shared_mutex> lock_model(model->mu_);
-  for (auto it = model->tables_.begin(); it != model->tables_.end(); ++it) {
-    Table* table = it->second.get();
+
+  for (auto& [k, v] : model->tables_) {
+    Table* table = v.get();
+
     if (table->type_ == TableType::kDense) {
       DenseTable* dense_table = (DenseTable*)table;
       std::shared_lock<std::shared_mutex> lock_table(dense_table->mu_);
-      if (Save(partition_dir.string(), dense_table) == false) {
+
+      if (Save(shard_path.string(), dense_table) == false) {
         LOG_ERROR("Dump DenseTable:" << table->name_ << " error.");
         return false;
       }
     } else if (table->type_ == TableType::kSparse) {
-      if (Save(partition_dir.string(), (SparseTable*)table) == false) {
+      if (Save(shard_path.string(), (SparseTable*)table) == false) {
         LOG_ERROR("Dump SparseTable:" << table->name_ << " error.");
         return false;
       }
@@ -748,21 +672,23 @@ bool CheckPoint::Save(Ps* ps, const std::string& save_dir, uint64_t model_id) {
   }
 
   // Store the path.
-  model_check_points_[model_id].emplace_back(real_path.string());
+  model_save_infos_[model_id].save_paths.emplace_back(shard_path.string());
 
   return true;
 }
 
-bool CheckPoint::Load(Ps* ps, const std::string& dir) {
-  if (IsDirExist(dir) == false) {
-    LOG_ERROR("Dir:" << dir << " not exist.");
+bool CheckPoint::Load(Ps* ps, const std::string& model_dir) {
+  if (IsDirExist(model_dir) == false) {
+    LOG_ERROR("Dir:" << model_dir << " not exist.");
     return false;
   }
 
-  std::vector<std::string> partition_folders;
-  if (GetSortedPartitionFolder(dir, &partition_folders) == false ||
-      partition_folders.empty()) {
-    LOG_ERROR("Get partition folder error, from dir:" << dir);
+  // model_dir contain the shard folder and shard folder may contain
+  // multi-model.
+  std::vector<std::string> shard_folders;
+  if (GetSortedShardFolders(model_dir, &shard_folders) == false ||
+      shard_folders.empty()) {
+    LOG_ERROR("Get shard folder error, from dir:" << model_dir);
     return false;
   }
 
@@ -770,11 +696,10 @@ bool CheckPoint::Load(Ps* ps, const std::string& dir) {
   size_t shard_id = ps->shard_id_;
 
   ConsistentHasher hasher(shard_num);
-  ConsistentHasher old_hasher(partition_folders.size());
+  ConsistentHasher old_hasher(shard_folders.size());
 
-  std::vector<size_t> include_partitions;
+  std::vector<size_t> include_shards;
   {
-    // Get the shared boundary.
     auto boundary = hasher.ShardBoundary(shard_id);
 
     // boundary: [lower, upper)
@@ -785,15 +710,33 @@ bool CheckPoint::Load(Ps* ps, const std::string& dir) {
       auto cur_b = old_hasher.ShardBoundary(i);
 
       if (cur_b.first < upper && cur_b.second > lower) {
-        include_partitions.emplace_back(i);
+        include_shards.emplace_back(i);
       }
     }
   }
 
-  // Try to load ModelManager::Model.
-  auto model_binary_path = GenModelBinaryPath(dir);
-  ModelManager::Model mm_model;
-  if (Load(model_binary_path, &mm_model) == false) {
+  // Every shard may has multi-checkpoint so we need the latest one.
+  std::vector<std::string> checkpoint_paths;
+  for (auto i : include_shards) {
+    std::string path;
+    if (GetLatestCheckPointFolderPath(shard_folders[i], &path) == false) {
+      LOG_ERROR("Get latest checkpoint folder from:" << shard_folders[i]
+                                                     << " error!");
+      return false;
+    }
+
+    checkpoint_paths.emplace_back(std::move(path));
+  }
+
+  if (checkpoint_paths.empty()) {
+    LOG_ERROR("Get latest checkpoints folder error!");
+    return false;
+  }
+
+  // Try to load ModelInfo.
+  auto model_binary_path = GenModelBinaryPath(checkpoint_paths[0]);
+  Ps::ModelInfo model_info;
+  if (Load(model_binary_path, &model_info) == false) {
     LOG_ERROR(
         "Load model binary error, model_binary_path:" << model_binary_path);
     return false;
@@ -803,25 +746,25 @@ bool CheckPoint::Load(Ps* ps, const std::string& dir) {
   std::unique_ptr<Model> model;
   {
     std::unique_ptr<Optim> optim;
-    if (mm_model.optim_type == OptimType::kAdagrad) {
-      optim.reset(new Adagrad(mm_model.optim_conf));
-    } else if (mm_model.optim_type == OptimType::kAdam) {
-      optim.reset(new Adam(mm_model.optim_conf));
-    } else if (mm_model.optim_type == OptimType::kRMSprop) {
-      optim.reset(new RMSprop(mm_model.optim_conf));
-    } else if (mm_model.optim_type == OptimType::kSGD) {
-      optim.reset(new SGD(mm_model.optim_conf));
+    if (model_info.optim_type == OptimType::kAdagrad) {
+      optim.reset(new Adagrad(model_info.optim_conf));
+    } else if (model_info.optim_type == OptimType::kAdam) {
+      optim.reset(new Adam(model_info.optim_conf));
+    } else if (model_info.optim_type == OptimType::kRMSprop) {
+      optim.reset(new RMSprop(model_info.optim_conf));
+    } else if (model_info.optim_type == OptimType::kSGD) {
+      optim.reset(new SGD(model_info.optim_conf));
     } else {
-      LOG_ERROR("Unsupported optim type:" << (int32_t)mm_model.optim_type);
+      LOG_ERROR("Unsupported optim type:" << (int32_t)model_info.optim_type);
       return false;
     }
 
-    model.reset(new Model(mm_model.id, mm_model.name, std::move(optim)));
+    model.reset(new Model(model_info.id, model_info.name, std::move(optim)));
   }
 
   // Because the sparse table will load for every shard.
   // So we firstly initialize the SparseTable.
-  for (auto& [k, v] : mm_model.tables_) {
+  for (auto& [k, v] : model_info.table_infos) {
     if (v.table_type != TableType::kSparse) {
       continue;
     }
@@ -855,20 +798,22 @@ bool CheckPoint::Load(Ps* ps, const std::string& dir) {
     model->tables_.emplace(v.id, std::move(table));
   }
 
-  // Load table.
-  for (auto p_i : include_partitions) {
-    auto p_dir = partition_folders[p_i];
+  std::unordered_map<std::string, uint64_t> table_name_id_map;
+  for (const auto& [k, v] : model_info.table_infos) {
+    table_name_id_map[v.name] = v.id;
+  }
 
+  for (auto& dir : checkpoint_paths) {
     std::vector<std::filesystem::path> dense_paths;
     std::vector<std::filesystem::path> sparse_paths;
 
-    if (GetDenseTablePaths(p_dir, &dense_paths) == false) {
-      LOG_ERROR("Try to get dense table paths error, dir:" << p_dir);
+    if (GetDenseTablePaths(dir, &dense_paths) == false) {
+      LOG_ERROR("Try to get dense table paths error, dir:" << dir);
       return false;
     }
 
-    if (GetSparseTablePaths(p_dir, &sparse_paths) == false) {
-      LOG_ERROR("Try to get sparse table paths error, dir:" << p_dir);
+    if (GetSparseTablePaths(dir, &sparse_paths) == false) {
+      LOG_ERROR("Try to get sparse table paths error, dir:" << dir);
       return false;
     }
 
@@ -876,27 +821,23 @@ bool CheckPoint::Load(Ps* ps, const std::string& dir) {
     for (const auto& d_path : dense_paths) {
       // Get dense table name and check whether it belong to this shard.
       auto table_name = d_path.stem().string();
-      if (mm_model.table_id_map_.find(table_name) ==
-          mm_model.table_id_map_.end()) {
+
+      if (table_name_id_map.find(table_name) == table_name_id_map.end()) {
         LOG_ERROR("Dense table:" << table_name << " not recognized.");
         return false;
       }
 
-      auto table_id = mm_model.table_id_map_[table_name];
-      if (mm_model.tables_.find(table_id) == mm_model.tables_.end()) {
-        LOG_ERROR("Dense table:" << table_name << " not recognized.");
-        return false;
-      }
+      uint64_t table_id = table_name_id_map[table_name];
 
-      if (hasher(mm_model.id, table_id) != shard_id) {
+      if (hasher(model_info.id, table_id) != shard_id) {
         // Not belong this shard.
         continue;
       }
 
-      const auto& table_conf = mm_model.tables_[table_id];
+      const auto& table_info = model_info.table_infos[table_id];
 
       // this val is dummy, will replaced when deserialize.
-      auto val = Tensor::Dense(table_conf.shape, table_conf.element_type);
+      auto val = Tensor::Dense(table_info.shape, table_info.element_type);
 
       std::unique_ptr<DenseTable> table(
           new DenseTable(model->optim_.get(), table_id, table_name, val));
@@ -910,20 +851,16 @@ bool CheckPoint::Load(Ps* ps, const std::string& dir) {
       model->tables_.emplace(table_id, std::move(table));
     }
 
-    // Sparse table.
+    // SparseTable
     for (const auto& s_path : sparse_paths) {
       auto table_name = s_path.stem().string();
-      if (mm_model.table_id_map_.find(table_name) ==
-          mm_model.table_id_map_.end()) {
+
+      if (table_name_id_map.find(table_name) == table_name_id_map.end()) {
         LOG_ERROR("Sparse table:" << table_name << " not recognized.");
         return false;
       }
 
-      auto table_id = mm_model.table_id_map_[table_name];
-      if (mm_model.tables_.find(table_id) == mm_model.tables_.end()) {
-        LOG_ERROR("Sparse table:" << table_name << " not recognized.");
-        return false;
-      }
+      uint64_t table_id = table_name_id_map[table_name];
 
       if (model->tables_.find(table_id) == model->tables_.end()) {
         LOG_ERROR("Sparse table:" << table_name << " id:" << table_id
@@ -939,7 +876,7 @@ bool CheckPoint::Load(Ps* ps, const std::string& dir) {
 
       SparseTable* table = (SparseTable*)(model->tables_[table_id].get());
 
-      if (Load(s_path.string(), shard_id, mm_model.id, hasher, table) ==
+      if (Load(s_path.string(), shard_id, model_info.id, hasher, table) ==
           false) {
         LOG_ERROR("Load SparseTable:" << table_name << " error!");
         return false;
@@ -947,14 +884,26 @@ bool CheckPoint::Load(Ps* ps, const std::string& dir) {
     }
   }
 
-  // When finish initialize, will insert into PS.
   if (shard_id == 0) {
-    std::unique_lock<std::shared_mutex> lock(ps->model_manager_.mu_);
-    ps->model_manager_.model_id_map_[mm_model.name] = mm_model.id;
-    ps->model_manager_.models_.emplace(mm_model.id, std::move(mm_model));
+    // If this is a leader shard. we need insert into model_id_manager_.
+    ModelIdManager::ModelInfo m_info;
+    m_info.id = model_info.id;
+    m_info.name = model_info.name;
+
+    for (const auto& table_info : model_info.table_infos) {
+      ModelIdManager::TableInfo t_info;
+      t_info.id = table_info.second.id;
+      t_info.name = table_info.second.name;
+
+      m_info.table_infos.emplace(t_info.name, t_info);
+    }
+
+    std::unique_lock<std::mutex> lock(ps->model_id_manager_.mu_);
+    ps->model_id_manager_.model_infos_.emplace(m_info.name, m_info);
   }
 
   std::unique_lock<std::shared_mutex> lock(ps->mu_);
+  ps->model_infos_.emplace(model_info.id, std::move(model_info));
   ps->models_.emplace(model->id_, std::move(model));
 
   return true;

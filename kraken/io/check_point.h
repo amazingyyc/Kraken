@@ -11,7 +11,6 @@
 
 #include "common/consistent_hasher.h"
 #include "ps/dense_table.h"
-#include "ps/model_manager.h"
 #include "ps/ps.h"
 #include "ps/sparse_table.h"
 #include "ps/table.h"
@@ -25,7 +24,7 @@ private:
   static const std::string kModelBinaryName;
   static const std::string kDenseTableSuffix;
   static const std::string kSparseTableSuffix;
-  static const std::string kPartitionFolderPrefix;
+  static const std::string kShardFolderPrefix;
 
   struct Task {
     uint64_t model_id;
@@ -34,6 +33,14 @@ private:
   };
 
 private:
+  struct SaveInfo {
+    uint64_t index;
+    std::list<std::string> save_paths;
+
+    SaveInfo() : index(0) {
+    }
+  };
+
   Ps* ps_;
 
   // The directory to store the model file.
@@ -43,9 +50,9 @@ private:
   // How many checkpoint will be saved.
   size_t max_save_count_;
 
-  // Store the saved model path will delelte the oldest if the count >
+  // Store the saved model path will delete the oldest if the count >
   // max_save_count_.
-  std::unordered_map<uint64_t, std::list<std::string>> model_check_points_;
+  std::unordered_map<uint64_t, SaveInfo> model_save_infos_;
 
   // Will use a separate thread to dump model.
   std::thread woker_;
@@ -61,23 +68,23 @@ public:
 
 private:
   bool IsDirExist(const std::string& dir) const;
-
   bool IsDirExist(const std::filesystem::path& path) const;
 
   bool IsFileExist(const std::string& p) const;
-
   bool IsFileExist(const std::filesystem::path& path) const;
 
   bool DeleteDir(const std::string& dir) const;
+  bool DeleteDir(const std::filesystem::path& path) const;
 
   // Create a dir. exist_delete whether delete it if exist.
   bool CreateDir(const std::string& dir, bool exist_delete) const;
-
   bool CreateDir(const std::filesystem::path& path, bool exist_delete) const;
 
-  bool GetSortedPartitionFolder(
-      const std::string& dir,
-      std::vector<std::string>* partition_folders) const;
+  bool GetSortedShardFolders(const std::string& dir,
+                             std::vector<std::string>* partition_folders) const;
+
+  bool GetLatestCheckPointFolderPath(const std::string& shard_dir,
+                                     std::string* path);
 
   // Get dense table file path from dir.
   bool GetDenseTablePaths(const std::string& dir,
@@ -98,27 +105,23 @@ private:
 
   bool Save(const std::string& model_info_path,
             const std::string& model_binary_path,
-            ModelManager::Model& model) const;
+            const Ps::ModelInfo& model_info) const;
 
   bool Save(const std::string& dir, DenseTable* table) const;
 
   bool Save(const std::string& dir, SparseTable* table) const;
 
   bool Load(const std::string& model_binary_path,
-            ModelManager::Model* model) const;
+            Ps::ModelInfo* model_info) const;
 
   bool Load(const std::string& path, DenseTable* table) const;
-
-  bool Load(const std::vector<std::string>& paths, size_t shard_id,
-            uint64_t model_id, const ConsistentHasher& hasher,
-            SparseTable* table);
 
   bool Load(const std::string& path, size_t shard_id, uint64_t model_id,
             const ConsistentHasher& hasher, SparseTable* table);
 
   bool Save(Ps* ps, const std::string& save_dir, uint64_t model_id);
 
-  bool Load(Ps* ps, const std::string& dir);
+  bool Load(Ps* ps, const std::string& model_dir);
 
   void Run();
 

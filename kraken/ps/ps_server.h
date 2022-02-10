@@ -1,8 +1,7 @@
 #pragma once
 
-#include "protocol/apply_dense_table_prot.h"
-#include "protocol/apply_model_prot.h"
-#include "protocol/apply_sparse_table_prot.h"
+#include "protocol/apply_model_id_prot.h"
+#include "protocol/apply_table_id_prot.h"
 #include "protocol/combine_pull_dense_table_prot.h"
 #include "protocol/combine_pull_sparse_table_prot.h"
 #include "protocol/pull_dense_table_prot.h"
@@ -10,8 +9,10 @@
 #include "protocol/push_dense_table_prot.h"
 #include "protocol/push_pull_dense_table_prot.h"
 #include "protocol/push_sparse_table_prot.h"
+#include "protocol/register_dense_table_info_prot.h"
 #include "protocol/register_dense_table_prot.h"
 #include "protocol/register_model_prot.h"
+#include "protocol/register_sparse_table_info_prot.h"
 #include "protocol/register_sparse_table_prot.h"
 #include "ps/ps.h"
 #include "rpc/server.h"
@@ -28,18 +29,20 @@ public:
            size_t shard_id);
 
 private:
-  int32_t ApplyModel(const ApplyModelRequest&, ApplyModelResponse*);
+  int32_t ApplyModelId(const ApplyModelIdRequest&, ApplyModelIdResponse*);
 
-  int32_t ApplyDenseTable(const ApplyDenseTableRequest&,
-                          ApplyDenseTableResponse*);
-
-  int32_t ApplySparseTable(const ApplySparseTableRequest&,
-                           ApplySparseTableResponse*);
+  int32_t ApplyTableId(const ApplyTableIdRequest&, ApplyTableIdResponse*);
 
   int32_t RegisterModel(const RegisterModelRequest&, RegisterModelResponse*);
 
+  int32_t RegisterDenseTableInfo(const RegisterDenseTableInfoRequest&,
+                                 RegisterDenseTableInfoResponse*);
+
   int32_t RegisterDenseTable(const RegisterDenseTableRequest&,
                              RegisterDenseTableResponse*);
+
+  int32_t RegisterSparseTableInfo(const RegisterSparseTableInfoRequest&,
+                                  RegisterSparseTableInfoResponse*);
 
   int32_t RegisterSparseTable(const RegisterSparseTableRequest&,
                               RegisterSparseTableResponse*);
