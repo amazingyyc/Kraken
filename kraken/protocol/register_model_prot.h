@@ -3,17 +3,12 @@
 #include <string>
 #include <unordered_map>
 
+#include "common/deserialize.h"
+#include "common/serialize.h"
 #include "ps/optim/optim.h"
-#include "rpc/deserialize.h"
-#include "rpc/serialize.h"
 
 namespace kraken {
 
-/**
- * \brief The worker register a model
- * means the worker has get the model's id.
- *
- */
 struct RegisterModelRequest {
   uint64_t id;
   std::string name;

@@ -18,7 +18,7 @@ struct RequestHeader {
   // which func will be call in server.
   uint32_t type;
 
-  // compress type.
+  // body request compress type.
   CompressType compress_type;
 };
 
@@ -33,11 +33,11 @@ struct ReplyHeader {
   // 0 means success or will be error code.
   int32_t error_code;
 
-  // compress type.
+  // body compress type.
   CompressType compress_type;
 };
 
-static_assert(sizeof(RequestHeader) == 13);
+static_assert(sizeof(ReplyHeader) == 13);
 #pragma pack()
 
 }  // namespace kraken

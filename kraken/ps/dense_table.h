@@ -2,15 +2,18 @@
 
 #include <shared_mutex>
 
-#include "common/element_type.h"
-#include "common/shape.h"
-#include "common/tensor.h"
+#include "io/check_point.h"
 #include "ps/optim/optim.h"
 #include "ps/table.h"
+#include "t/element_type.h"
+#include "t/shape.h"
+#include "t/tensor.h"
 
 namespace kraken {
 
 class DenseTable : public Table {
+  friend class io::CheckPoint;
+
 private:
   std::shared_mutex mu_;
 

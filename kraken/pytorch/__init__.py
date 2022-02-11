@@ -1,17 +1,22 @@
 # coding=utf-8
 
+from kraken_native import OptimType
+from kraken_native import InitializerType
+from kraken_native import EmitterType
 from kraken_native import initialize
 from kraken_native import stop
-from kraken_native import OptimType
 from kraken_native import register_model
 from kraken_native import update_lr
 from kraken_native import register_dense_table
 from kraken_native import register_sparse_table
-from kraken_native import push_dense_table
 from kraken_native import pull_dense_table
+from kraken_native import combine_pull_dense_table
+from kraken_native import push_dense_table
 from kraken_native import push_pull_dense_table
-from kraken_native import push_sparse_table
 from kraken_native import pull_sparse_table
+from kraken_native import combine_pull_sparse_table
+from kraken_native import push_sparse_table
+from kraken_native import save_check_point
 
 from .embedding import Embedding
 from .lr import ConstantLR

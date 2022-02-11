@@ -2,7 +2,9 @@
 
 #include <string>
 
+#include "io/check_point.h"
 #include "ps/optim/optim.h"
+#include "t/tensor.h"
 
 namespace kraken {
 
@@ -15,6 +17,8 @@ enum class TableType : uint8_t {
 };
 
 class Table {
+  friend class io::CheckPoint;
+
 protected:
   struct Value {
     Tensor val;

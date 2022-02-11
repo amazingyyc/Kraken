@@ -78,8 +78,10 @@ size_t SnappySink::offset() const {
   return offset_;
 }
 
-void SnappySink::Write(const char* bytes, size_t n) {
+bool SnappySink::Write(const char* bytes, size_t n) {
   Append(bytes, n);
+
+  return true;
 }
 
 void SnappySink::Append(const char* bytes, size_t n) {
@@ -133,6 +135,18 @@ char* SnappySink::GetAppendBufferVariable(size_t min_size,
   *allocated_size = capacity_ - offset_;
 
   return ptr_ + offset_;
+}
+
+void SnappySink::TransferForZMQ(void** ptr, size_t* capacity, size_t* offset,
+                                void (**zmq_free)(void*, void*)) {
+  *ptr = ptr_;
+  *capacity = capacity_;
+  *offset = offset_;
+  *zmq_free = SnappySink::ZMQFree;
+
+  ptr_ = nullptr;
+  capacity_ = 0;
+  offset_ = 0;
 }
 
 void SnappySink::TransferForZMQ(ZMQBuffer* z_buf) {

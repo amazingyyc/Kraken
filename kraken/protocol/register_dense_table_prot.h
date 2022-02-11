@@ -3,10 +3,9 @@
 #include <cinttypes>
 #include <string>
 
-#include "common/element_type.h"
-#include "common/shape.h"
-#include "rpc/deserialize.h"
-#include "rpc/serialize.h"
+#include "common/deserialize.h"
+#include "common/serialize.h"
+#include "t/tensor.h"
 
 namespace kraken {
 

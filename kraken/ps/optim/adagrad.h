@@ -3,12 +3,13 @@
 #include <string>
 #include <unordered_map>
 
-#include "common/tensor.h"
 #include "ps/optim/optim.h"
+#include "t/tensor.h"
 
 namespace kraken {
 
-// ref: https://pytorch.org/docs/stable/generated/torch.optim.Adagrad.html#torch.optim.Adagrad
+// ref:
+// https://pytorch.org/docs/stable/generated/torch.optim.Adagrad.html#torch.optim.Adagrad
 class Adagrad : public Optim {
 private:
   bool has_weight_decay_;

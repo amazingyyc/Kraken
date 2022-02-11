@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "common/tensor.h"
 #include "ps/optim/optim.h"
+#include "t/tensor.h"
 
 namespace kraken {
 

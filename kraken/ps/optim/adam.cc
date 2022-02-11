@@ -48,22 +48,31 @@ Adam::Adam(const std::unordered_map<std::string, std::string>& conf)
 
 int32_t Adam::Update(const Tensor& grad, float lr, Tensor* val,
                      Bag* bag) const {
-  if (grad.Size() != val->Size() ||
-      grad.element_type() != val->element_type()) {
+  // Grad maybe Coo tensor.
+  Tensor grad_t = grad;
+  if (grad_t.IsCoo()) {
+     if (grad_t.indices().IsEmpty()) {
+      return ErrorCode::kSuccess;
+    }
+
+    grad_t = grad_t.ToDense();
+  }
+
+  if (grad_t.Size() != val->Size() ||
+      grad_t.element_type() != val->element_type()) {
     return ErrorCode::kGradientUnCompatibleError;
   }
 
   // First moment and second moment.
   if (bag->state.find(StateType::kFirstMoment) == bag->state.end()) {
-    bag->state.emplace(StateType::kFirstMoment, grad.Like().Zero());
+    bag->state.emplace(StateType::kFirstMoment, grad_t.Like().Zero());
   }
 
   if (bag->state.find(StateType::kSecondMoment) == bag->state.end()) {
-    bag->state.emplace(StateType::kSecondMoment, grad.Like().Zero());
+    bag->state.emplace(StateType::kSecondMoment, grad_t.Like().Zero());
   }
 
-  // Use = operator grad_t will share memory with grad.
-  Tensor grad_t = grad;
+  // Weight decay.
   if (has_weight_decay_) {
     grad_t += weight_decay_ * (*val);
   }
@@ -83,7 +92,7 @@ int32_t Adam::Update(const Tensor& grad, float lr, Tensor* val,
   if (amsgrad_) {
     // Get max SecondMomentMax.
     if (bag->state.find(StateType::kSecondMomentMax) == bag->state.end()) {
-      bag->state.emplace(StateType::kSecondMomentMax, grad.Like().Zero());
+      bag->state.emplace(StateType::kSecondMomentMax, grad_t.Like().Zero());
     }
 
     Tensor& v_max = bag->state[StateType::kSecondMomentMax];

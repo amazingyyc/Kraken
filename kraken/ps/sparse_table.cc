@@ -8,7 +8,8 @@ SparseTable::SparseTable(Optim* optim, uint64_t id, const std::string& name,
     : Table(TableType::kSparse, optim, id, name),
       dimension_(dimension),
       etype_(etype),
-      initializer_(std::move(initializer)) {
+      initializer_(std::move(initializer)),
+      vals_() {
 }
 
 int64_t SparseTable::dimension() const {
@@ -30,7 +31,6 @@ int32_t SparseTable::Push(const std::vector<int64_t>& indices,
   }
 
   Optim* l_optim = optim_;
-
   for (size_t i = 0; i < indices.size(); ++i) {
     int64_t sparse_id = indices[i];
     if (sparse_id < 0) {
@@ -39,7 +39,7 @@ int32_t SparseTable::Push(const std::vector<int64_t>& indices,
 
     int32_t ecode;
     bool exist =
-        vals_.modify_if(sparse_id, [l_optim, &grads, i, lr, &ecode](Value& v) {
+        vals_.update_fn(sparse_id, [l_optim, &grads, i, lr, &ecode](Value& v) {
           ecode = l_optim->Update(grads[i], lr, &v.val, &v.bag);
         });
 
@@ -67,12 +67,12 @@ int32_t SparseTable::Pull(const std::vector<int64_t>& indices,
       return ErrorCode::kSparseTableIdError;
     }
 
-    bool exist = vals_.if_contains(
+    bool exist = vals_.find_fn(
         sparse_id, [vals, i](const Value& v) { (*vals)[i] = v.val.Clone(); });
 
     if (exist == false) {
       // can not find, insert a new one.
-      Tensor t = Tensor::Create({dimension_}, etype_);
+      Tensor t = Tensor::Dense({dimension_}, etype_);
       initializer_->Initialize(&t);
 
       // for result.
@@ -82,7 +82,7 @@ int32_t SparseTable::Pull(const std::vector<int64_t>& indices,
       v.val = t;
       v.bag = Bag();
 
-      vals_.emplace(sparse_id, v);
+      vals_.insert(sparse_id, v);
     }
   }
 

@@ -21,7 +21,7 @@ void Server::HandleError(uint64_t timestamp, int32_t error_code,
   reply_header.error_code = error_code;
   reply_header.compress_type = CompressType::kNo;
 
-  MutableBuffer buf;
+  MemBuffer buf;
   Serialize serializer(&buf);
 
   ARGUMENT_CHECK(serializer << reply_header, "serialize reply header error!");
@@ -56,7 +56,8 @@ void Server::HandleMsg(zmq_msg_t& identity, zmq_msg_t& msg, void* socket) {
   size_t req_size = zmq_msg_size(&msg);
   const char* req_data = (const char*)zmq_msg_data(&msg);
 
-  Deserialize header_d(req_data, req_size);
+  MemReader reader(req_data, req_size);
+  Deserialize header_d(&reader);
 
   RequestHeader req_header;
   ARGUMENT_CHECK(header_d >> req_header, "Deserialize request header error!");

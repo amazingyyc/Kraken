@@ -11,7 +11,7 @@ from model import WideDeep, WideDeepLoader
 import kraken.pytorch as kk
 
 # initialize Kraken
-kk.initialize('localhost:50000')
+kk.initialize(addrs='localhost:50000')
 
 path = 'data/adult_data.csv'
 
@@ -58,12 +58,15 @@ criterion = F.binary_cross_entropy
 
 train_dataset = wd_dataset['train_dataset']
 
-n_epochs = 100
+n_epochs = 1
 batch_size = 64
 
 widedeep_dataset = WideDeepLoader(train_dataset)
 train_loader = torch.utils.data.DataLoader(dataset=widedeep_dataset, batch_size=batch_size, shuffle=True)
 model.train()
+
+total_duration = 0
+count = 0
 
 for epoch in range(n_epochs):
   total = 0
@@ -97,6 +100,8 @@ for epoch in range(n_epochs):
     print('Cost {:0,.2f} Epoch {} of {}, Loss: {}, accuracy: {}'.format((end_t - start_t) * 1000, epoch + 1, n_epochs,
                                                                         round(loss.item(), 3),
                                                                         round(correct / total, 4)))
+
+kk.save_check_point()
 
 # Stop it
 kk.stop()

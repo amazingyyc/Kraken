@@ -10,6 +10,7 @@
 #include "ps/initializer/initializer.h"
 #include "ps/optim/optim.h"
 #include "pybind11/pytorch.h"
+#include "worker/emitter.h"
 
 namespace kraken {
 namespace py {
@@ -28,7 +29,13 @@ PYBIND11_MODULE(kraken_native, m) {
       .value("kXavierUniform", InitializerType::kXavierUniform)
       .value("kXavierNormal", InitializerType::kXavierNormal);
 
-  m.def("initialize", &Initialize, pybind11::arg("addrs"));
+  pybind11::enum_<EmitterType>(m, "EmitterType")
+      .value("kDefault", EmitterType::kDefault)
+      .value("kDCT", EmitterType::kDCT);
+
+  m.def("initialize", &Initialize, pybind11::arg("addrs"),
+        pybind11::arg("emitter_type") = EmitterType::kDefault,
+        pybind11::arg("life_span") = 1000, pybind11::arg("eta") = 0.75);
 
   m.def("stop", &Stop);
 
@@ -43,29 +50,30 @@ PYBIND11_MODULE(kraken_native, m) {
         pybind11::arg("val"));
 
   m.def("register_sparse_table", &RegisterSparseTable, pybind11::arg("name"),
-        pybind11::arg("dimension"), pybind11::arg("dtype"));
+        pybind11::arg("dimension"), pybind11::arg("dtype"),
+        pybind11::arg("init_type"), pybind11::arg("init_conf"));
 
-  m.def("register_sparse_table_v2", &RegisterSparseTableV2,
-        pybind11::arg("name"), pybind11::arg("dimension"),
-        pybind11::arg("dtype"), pybind11::arg("init_type"),
-        pybind11::arg("init_conf"));
+  m.def("pull_dense_table", &PullDenseTable, pybind11::arg("table_id"));
+
+  m.def("combine_pull_dense_table", &CombinePullDenseTable,
+        pybind11::arg("table_ids"));
 
   m.def("push_dense_table", &PushDenseTable, pybind11::arg("table_id"),
         pybind11::arg("grad"));
 
-  m.def("pull_dense_table", &PullDenseTable, pybind11::arg("table_id"));
-
-  m.def("pull_list_dense_table", &PullListDenseTable,
-        pybind11::arg("table_ids"));
-
   m.def("push_pull_dense_table", &PushPullDenseTable, pybind11::arg("table_id"),
         pybind11::arg("grad"));
+
+  m.def("pull_sparse_table", &PullSparseTable, pybind11::arg("table_id"),
+        pybind11::arg("indices"));
+
+  m.def("combine_pull_sparse_table", &CombinePullSparseTable,
+        pybind11::arg("table_ids"), pybind11::arg("indices"));
 
   m.def("push_sparse_table", &PushSparseTable, pybind11::arg("table_id"),
         pybind11::arg("indices"), pybind11::arg("grads"));
 
-  m.def("pull_sparse_table", &PullSparseTable, pybind11::arg("table_id"),
-        pybind11::arg("indices"));
+  m.def("save_check_point", &SaveCheckPoint);
 }
 
 }  // namespace py

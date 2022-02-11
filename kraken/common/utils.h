@@ -13,5 +13,7 @@ void Split(const std::string& str, const std::string& delim,
 
 std::string ToLower(const std::string& v);
 
+bool EndWith(const std::string& value, const std::string& ending);
+
 }  // namespace utils
 }  // namespace kraken

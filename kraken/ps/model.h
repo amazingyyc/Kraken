@@ -2,8 +2,8 @@
 
 #include <memory>
 #include <shared_mutex>
-#include <unordered_map>
 
+#include "io/check_point.h"
 #include "ps/initializer/initializer.h"
 #include "ps/optim/optim.h"
 #include "ps/table.h"
@@ -14,14 +14,16 @@ namespace kraken {
  * \brief The model represent a DeepLearning model will contain the tarinable Dense/Sparse table.
  */
 class Model {
+  friend class io::CheckPoint;
+
 private:
+  std::shared_mutex mu_;
+
   uint64_t id_;
   std::string name_;
 
-  std::shared_mutex mu_;
-
   std::unique_ptr<Optim> optim_;
-  phmap::flat_hash_map<uint64_t, std::unique_ptr<Table>> tables_;
+  std::unordered_map<uint64_t, std::unique_ptr<Table>> tables_;
 
 public:
   Model(uint64_t id, const std::string& name, std::unique_ptr<Optim>&& optim);
@@ -37,9 +39,6 @@ public:
                              const Tensor& var);
 
   int32_t RegisterSparseTable(uint64_t id, const std::string& name,
-                              int64_t dimension, ElementType etype);
-
-  int32_t RegisterSparseTable(uint64_t id, const std::string& name,
                               int64_t dimension, ElementType etype,
                               std::unique_ptr<Initializer>&& initializer);
 
@@ -47,8 +46,8 @@ public:
 
   int32_t PullDenseTable(uint64_t table_id, Tensor* val);
 
-  int32_t PullListDenseTable(const std::vector<uint64_t>& table_ids,
-                             std::vector<Tensor>* vals);
+  int32_t CombinePullDenseTable(const std::vector<uint64_t>& table_ids,
+                                std::vector<Tensor>* vals);
 
   int32_t PushPullDenseTable(uint64_t table_id, const Tensor& grad, float lr,
                              Tensor* val);

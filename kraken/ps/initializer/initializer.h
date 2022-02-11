@@ -3,8 +3,8 @@
 #include <cinttypes>
 #include <unordered_map>
 
-#include "common/tensor.h"
 #include "common/utils.h"
+#include "t/tensor.h"
 
 namespace kraken {
 
@@ -41,6 +41,10 @@ public:
 
   InitializerType type() const {
     return type_;
+  }
+
+  const std::unordered_map<std::string, std::string>& conf() const {
+    return conf_;
   }
 
   virtual void Initialize(Tensor* val) const = 0;

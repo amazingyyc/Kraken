@@ -1,6 +1,7 @@
 #pragma once
 
-#include "rpc/serialize.h"
+#include "common/iwriter.h"
+#include "common/zmq_buffer.h"
 #include "snappy-sinksource.h"
 
 namespace kraken {
@@ -24,7 +25,7 @@ public:
   void Skip(size_t n) override;
 };
 
-class SnappySink : public snappy::Sink, public IBuffer {
+class SnappySink : public snappy::Sink, public IWriter {
 private:
   char* ptr_;
   size_t capacity_;
@@ -46,9 +47,12 @@ public:
   size_t offset() const;
 
   // Fo IBuffer.
-  void Write(const char* bytes, size_t n) override;
+  bool Write(const char* bytes, size_t n) override;
 
-  void TransferForZMQ(ZMQBuffer* z_buf) override;
+  void TransferForZMQ(void** ptr, size_t* capacity, size_t* offset,
+                      void (**zmq_free)(void*, void*));
+
+  void TransferForZMQ(ZMQBuffer* z_buf);
 
   // For snappy sink.
   void Append(const char* bytes, size_t n) override;
