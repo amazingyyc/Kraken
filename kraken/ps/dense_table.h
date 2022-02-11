@@ -2,6 +2,7 @@
 
 #include <shared_mutex>
 
+#include "io/check_point.h"
 #include "ps/optim/optim.h"
 #include "ps/table.h"
 #include "t/element_type.h"
@@ -9,10 +10,6 @@
 #include "t/tensor.h"
 
 namespace kraken {
-
-namespace io {
-class CheckPoint;
-}
 
 class DenseTable : public Table {
   friend class io::CheckPoint;

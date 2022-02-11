@@ -43,7 +43,8 @@ namespace kraken {
   { \
     auto _code = (func); \
     if (_code != ErrorCode::kSuccess) { \
-      RUNTIME_ERROR("RPC call error:" << ErrorCode::Msg(_code)); \
+      RUNTIME_ERROR("RPC call error code:" << _code << ", msg:" \
+                                           << ErrorCode::Msg(_code)); \
     } \
   }
 

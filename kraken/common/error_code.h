@@ -32,43 +32,53 @@ struct ErrorCode {
   static const char* Msg(int32_t code) {
     switch (code) {
       case ErrorCode::kUnknowError:
-        return "Unknow error.";
+        return "Unknow error";
       case ErrorCode::kSuccess:
-        return "Success.";
+        return "Success";
       case ErrorCode::kUnRegisterFuncError:
-        return "UnRegister RPC function.";
+        return "UnRegister RPC function";
       case ErrorCode::kSerializeRequestError:
-        return "Serialize request error.";
+        return "Serialize request error";
       case ErrorCode::kSerializeReplyError:
-        return "Serialize reply error.";
+        return "Serialize reply error";
       case ErrorCode::kDeserializeRequestError:
-        return "Deserialize request error.";
+        return "Deserialize request error";
       case ErrorCode::kDeserializeReplyError:
-        return "Deserialize reply error.";
+        return "Deserialize reply error";
       case ErrorCode::kUnSupportOptimTypeError:
-        return "UnSupport optim type.";
+        return "UnSupport optim type";
       case ErrorCode::kTableTypeUnCompatibleError:
-        return "Uncompatible table type.";
+        return "Uncompatible table type";
       case ErrorCode::kDenseTableUnCompatibleError:
         return "Uncompatible Dense table";
+      case ErrorCode::kSparseDimensionError:
+        return "Sparse Dimension error";
+      case ErrorCode::kSparseTableUnCompatibleError:
+        return "SparseTable Uncompatible Error";
       case ErrorCode::kUnRegisterModelError:
-        return "Unregister model.";
+        return "Unregister model";
       case ErrorCode::kUnRegisterTableError:
-        return "Unregister table.";
+        return "Unregister table";
       case ErrorCode::kInterfaceUnImplementError:
-        return "Unimplement interface.";
+        return "Unimplement interface";
       case ErrorCode::kGradientUnCompatibleError:
-        return "Uncompatible gradient.";
+        return "Uncompatible gradient";
       case ErrorCode::kSparseTableIdError:
-        return "Sparse id error.";
+        return "Sparse id error";
       case ErrorCode::kSparseTableIdNotExistError:
-        return "Sparse table id not exist.";
+        return "Sparse table id not exist";
       case ErrorCode::kPushSparseTableParameterError:
-        return "Push sparse table parameter error.";
+        return "Push sparse table parameter error";
       case ErrorCode::kUnSupportInitializerTypeError:
-        return "UnSupport initializer type.";
+        return "UnSupport initializer type";
+      case ErrorCode::kUnSupportCompressTypeError:
+        return "UnSupportCompress type";
+      case ErrorCode::kSnappyUncompressError:
+        return "Snappy Uncompress error";
+      case ErrorCode::kSnappyCompressError:
+        return "Snappy Compress Error";
       default:
-        return "Unknow error.";
+        return "Unrecognized error";
     }
   }
 };

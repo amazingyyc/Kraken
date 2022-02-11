@@ -288,5 +288,9 @@ void PushSparseTable(uint64_t table_id, torch::Tensor indices,
   worker.PushSparseTable(table_id, kindices, kgrads);
 }
 
+void SaveCheckPoint() {
+  worker.SaveCheckPoint();
+}
+
 }  // namespace py
 }  // namespace kraken

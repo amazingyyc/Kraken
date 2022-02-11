@@ -84,4 +84,8 @@ void Worker::PushSparseTable(uint64_t table_id, const Tensor& indices,
   emitter_->PushSparseTable(table_id, indices, grads);
 }
 
+void Worker::SaveCheckPoint() {
+  emitter_->SaveCheckPoint();
+}
+
 }  // namespace kraken

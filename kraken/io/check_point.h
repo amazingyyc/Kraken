@@ -1,21 +1,30 @@
 #pragma once
 
+#include <atomic>
 #include <filesystem>
 #include <functional>
 #include <list>
 #include <memory>
 #include <queue>
+#include <shared_mutex>
 #include <string>
 #include <thread>
 #include <unordered_map>
 
 #include "common/consistent_hasher.h"
-#include "ps/dense_table.h"
-#include "ps/ps.h"
-#include "ps/sparse_table.h"
-#include "ps/table.h"
+#include "ps/initializer/initializer.h"
+#include "ps/optim/optim.h"
 
 namespace kraken {
+
+class TableInfo;
+class ModelInfo;
+class Ps;
+class Model;
+class Table;
+class DenseTable;
+class SparseTable;
+
 namespace io {
 
 class CheckPoint {
@@ -26,10 +35,10 @@ private:
   static const std::string kSparseTableSuffix;
   static const std::string kShardFolderPrefix;
 
-  struct Task {
+  struct CheckPointTask {
     uint64_t model_id;
 
-    std::function<void(bool)> done;
+    std::function<void(uint64_t, bool)> done;
   };
 
 private:
@@ -61,12 +70,16 @@ private:
 
   std::mutex mu_;
   std::condition_variable cond_var_;
-  std::queue<Task> task_que_;
+  std::queue<CheckPointTask> task_que_;
 
 public:
   CheckPoint(Ps* ps, const std::string& save_dir, size_t max_save_count = 3);
 
 private:
+  const char* OptimTypeName(OptimType type) const;
+
+  const char* InitializerTypeName(InitializerType type) const;
+
   bool IsDirExist(const std::string& dir) const;
   bool IsDirExist(const std::filesystem::path& path) const;
 
@@ -105,14 +118,13 @@ private:
 
   bool Save(const std::string& model_info_path,
             const std::string& model_binary_path,
-            const Ps::ModelInfo& model_info) const;
+            const ModelInfo& model_info) const;
 
   bool Save(const std::string& dir, DenseTable* table) const;
 
   bool Save(const std::string& dir, SparseTable* table) const;
 
-  bool Load(const std::string& model_binary_path,
-            Ps::ModelInfo* model_info) const;
+  bool Load(const std::string& model_binary_path, ModelInfo* model_info) const;
 
   bool Load(const std::string& path, DenseTable* table) const;
 
@@ -128,7 +140,7 @@ private:
 public:
   void Stop();
 
-  void Save(uint64_t model_id, std::function<void(bool)>&& done);
+  void Save(uint64_t model_id, std::function<void(uint64_t, bool)>&& done);
 
   bool Load(const std::string& model_dir);
 };

@@ -3,8 +3,9 @@
 #include <tuple>
 
 #include "common/log.h"
-#include "protocol/apply_model_id_prot.h"
-#include "protocol/apply_table_id_prot.h"
+#include "protocol/apply_dense_table_prot.h"
+#include "protocol/apply_model_prot.h"
+#include "protocol/apply_sparse_table_prot.h"
 #include "protocol/combine_pull_dense_table_prot.h"
 #include "protocol/combine_pull_sparse_table_prot.h"
 #include "protocol/pull_dense_table_prot.h"
@@ -18,6 +19,7 @@
 #include "protocol/register_sparse_table_info_prot.h"
 #include "protocol/register_sparse_table_prot.h"
 #include "protocol/rpc_func_type.h"
+#include "protocol/save_check_point_prot.h"
 
 namespace kraken {
 
@@ -84,12 +86,14 @@ uint64_t Emitter::RegisterModel(
 
   {
     // Step1: Apply a model id in leader server.
-    ApplyModelIdRequest req;
+    ApplyModelRequest req;
     req.model_name = model_name;
+    req.optim_type = optim_type;
+    req.optim_conf = optim_conf;
 
-    ApplyModelIdResponse rsp;
+    ApplyModelResponse rsp;
 
-    RPC_CALL(clients_[0]->Call(RPCFuncType::kApplyModelIdType, req, &rsp));
+    RPC_CALL(clients_[0]->Call(RPCFuncType::kApplyModelType, req, &rsp));
 
     // Store model id.
     model_id_ = rsp.model_id;
@@ -129,13 +133,15 @@ uint64_t Emitter::RegisterDenseTable(const std::string& name,
   uint64_t table_id;
   {
     // Apply table id.
-    ApplyTableIdRequest req;
-    ApplyTableIdResponse rsp;
+    ApplyDenseTableRequest req;
+    ApplyDenseTableResponse rsp;
 
-    req.model_name = model_id_;
-    req.table_name = name;
+    req.model_id = model_id_;
+    req.name = name;
+    req.shape = val.shape();
+    req.element_type = val.element_type();
 
-    RPC_CALL(clients_[0]->Call(RPCFuncType::kApplyTableIdType, req, &rsp));
+    RPC_CALL(clients_[0]->Call(RPCFuncType::kApplyDenseTableType, req, &rsp));
 
     table_id = rsp.table_id;
 
@@ -193,38 +199,22 @@ uint64_t Emitter::RegisterSparseTable(
   uint64_t table_id;
   {
     // Apply table id.
-    ApplyTableIdRequest req;
-    ApplyTableIdResponse rsp;
-
-    req.model_name = model_id_;
-    req.table_name = name;
-
-    RPC_CALL(clients_[0]->Call(RPCFuncType::kApplyTableIdType, req, &rsp));
-
-    table_id = rsp.table_id;
-
-    LOG_INFO("Apply SparseTable: " << name << ", id: " << table_id
-                                   << ", from server 0.");
-  }
-
-  {
-    // Register SparseTableInfo in all server.
-    RegisterSparseTableInfoRequest req;
-    std::vector<RegisterSparseTableInfoResponse> rsps;
+    ApplySparseTableRequest req;
+    ApplySparseTableResponse rsp;
 
     req.model_id = model_id_;
-    req.id = table_id;
     req.name = name;
     req.dimension = dimension;
     req.element_type = element_type;
     req.init_type = init_type;
     req.init_conf = init_conf;
 
-    RPC_CALL(
-        ParallelCallAll(RPCFuncType::kRegisterSparseTableInfoType, req, &rsps));
+    RPC_CALL(clients_[0]->Call(RPCFuncType::kApplySparseTableType, req, &rsp));
 
-    LOG_INFO("Register SparseTableInfo: " << name << ", id: " << table_id
-                                          << ", in all server.");
+    table_id = rsp.table_id;
+
+    LOG_INFO("Apply SparseTable: " << name << ", id: " << table_id
+                                   << ", from server 0.");
   }
 
   {
@@ -582,6 +572,15 @@ void Emitter::PushSparseTable(uint64_t table_id, const Tensor& indices,
 
   ParallelCallAsync<PushSparseTableRequest, PushSparseTableResponse>(
       RPCFuncType::kPushSparseTableType, mask, reqs);
+}
+
+void Emitter::SaveCheckPoint() {
+  SaveCheckPointRequest req;
+  std::vector<SaveCheckPointResponse> rsps;
+
+  req.model_id = model_id_;
+
+  RPC_CALL(ParallelCallAll(RPCFuncType::kSaveCheckPointType, req, &rsps));
 }
 
 }  // namespace kraken

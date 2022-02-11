@@ -46,5 +46,7 @@ std::vector<torch::Tensor> CombinePullSparseTable(
 void PushSparseTable(uint64_t table_id, torch::Tensor indices,
                      torch::Tensor grads);
 
+void SaveCheckPoint();
+
 }  // namespace py
 }  // namespace kraken

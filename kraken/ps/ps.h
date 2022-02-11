@@ -4,50 +4,19 @@
 #include <shared_mutex>
 #include <unordered_map>
 
+#include "io/check_point.h"
+#include "ps/info.h"
 #include "ps/model.h"
-#include "ps/model_id_manager.h"
 #include "ps/optim/optim.h"
 
 namespace kraken {
-
-namespace io {
-class CheckPoint;
-}
 
 class Ps {
   friend class io::CheckPoint;
 
 private:
-  struct TableInfo {
-    uint64_t id;
-    std::string name;
-    TableType table_type;
-
-    ElementType element_type;
-
-    // For dense.
-    Shape shape;
-
-    // For sparse.
-    int64_t dimension;
-    InitializerType init_type;
-    std::unordered_map<std::string, std::string> init_conf;
-  };
-
-  struct ModelInfo {
-    uint64_t id;
-    std::string name;
-
-    OptimType optim_type;
-    std::unordered_map<std::string, std::string> optim_conf;
-
-    std::unordered_map<uint64_t, TableInfo> table_infos;
-  };
-
   size_t shard_num_;
   size_t shard_id_;
-
-  ModelIdManager model_id_manager_;
 
   // protect model_infos_/models_.
   std::shared_mutex mu_;
@@ -58,33 +27,68 @@ private:
   // models_ include the whole SparseTable and part of DenseTable.
   std::unordered_map<uint64_t, std::unique_ptr<Model>> models_;
 
+  // save Checkpoint.
+  io::CheckPoint check_point_;
+
 public:
-  Ps(size_t shard_num, size_t shard_id);
+  Ps(size_t shard_num, size_t shard_id, const std::string& save_dir,
+     size_t max_save_count);
 
 public:
   size_t shard_num() const;
 
   size_t shard_id() const;
 
-  /**
-   * \brief Apply a model id from this server.
-   *
-   * \param model_name Model name.
-   * \param model_id returned model id.
-   * \return int32_t ErrorCode.
-   */
-  int32_t ApplyModelId(const std::string& model_name, uint64_t* model_id);
+  void Load(const std::string& load_dir);
+
+  void Stop();
 
   /**
-   * \brief Apply a table id from this server.
+   * \brief Apply a model will return a unique model id.
+   * Will insert modelinfo to model_infos_.
    *
-   * \param model_name Model name.
-   * \param table_name Table name.
-   * \param table_id Retured table id.
+   * \param name Model name.
+   * \param optim_type Optim type.
+   * \param optim_conf Optim config.
+   * \param model_id Returned model id.
    * \return int32_t ErrorCode.
    */
-  int32_t ApplyTableId(const std::string& model_name,
-                       const std::string& table_name, uint64_t* table_id);
+  int32_t ApplyModel(
+      const std::string& name, OptimType optim_type,
+      const std::unordered_map<std::string, std::string>& optim_conf,
+      uint64_t* model_id);
+
+  /**
+   * \brief Apply DenseTable
+   *
+   * \param model_id Model id.
+   * \param name Table name.
+   * \param shape Table shape.
+   * \param element_type ElementType.
+   * \param table_id Returned table id.
+   * \return int32_t ErrorCode.
+   */
+  int32_t ApplyDenseTable(uint64_t model_id, const std::string& name,
+                          const Shape& shape, ElementType element_type,
+                          uint64_t* table_id);
+
+  /**
+   * \brief Apply SparseTable.
+   *
+   * \param model_id Model id.
+   * \param name Table name.
+   * \param dimension Dimension.
+   * \param element_type ElementType.
+   * \param init_type Initialzie type.
+   * \param init_conf Initialize config.
+   * \param table_id Table id.
+   * \return int32_t ErrorCode.
+   */
+  int32_t ApplySparseTable(
+      uint64_t model_id, const std::string& name, int64_t dimension,
+      ElementType element_type, InitializerType init_type,
+      const std::unordered_map<std::string, std::string>& init_conf,
+      uint64_t* table_id);
 
   /**
    * \brief Register a model.
@@ -124,23 +128,6 @@ public:
    */
   int32_t RegisterDenseTable(uint64_t model_id, uint64_t id,
                              const std::string& name, const Tensor& var);
-
-  /**
-   * \brief Register the SparseTable Info. every server will store all SparseTable info.
-   *
-   * \param model_id Model id.
-   * \param id SpareTable id.
-   * \param name SparseTable name.
-   * \param dimension SparseTable dimension.
-   * \param element_type ElementType.
-   * \param init_type Initialize type.
-   * \param init_conf Initialize config.
-   * \return int32_t ErrorCode.
-   */
-  int32_t RegisterSparseTableInfo(
-      uint64_t model_id, uint64_t id, const std::string& name,
-      int64_t dimension, ElementType element_type, InitializerType init_type,
-      const std::unordered_map<std::string, std::string>& init_conf);
 
   /**
    * \brief Register a sparse table.
@@ -232,6 +219,14 @@ public:
   int32_t PushSparseTable(uint64_t model_id, uint64_t table_id,
                           const std::vector<int64_t>& indices,
                           const std::vector<Tensor>& grads, float lr);
+
+  /**
+   * \brief Save CheckPoint.
+   *
+   * \param model_id Model id.
+   * \return int32_t ErrorCode.
+   */
+  int32_t SaveCheckPoint(uint64_t model_id);
 };
 
 }  // namespace kraken

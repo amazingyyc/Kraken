@@ -3,15 +3,12 @@
 #include <memory>
 #include <shared_mutex>
 
+#include "io/check_point.h"
 #include "ps/initializer/initializer.h"
 #include "ps/optim/optim.h"
 #include "ps/table.h"
 
 namespace kraken {
-
-namespace io {
-class CheckPoint;
-}
 
 /**
  * \brief The model represent a DeepLearning model will contain the tarinable Dense/Sparse table.

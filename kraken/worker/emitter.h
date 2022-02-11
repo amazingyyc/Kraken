@@ -27,7 +27,7 @@ protected:
 
   std::vector<std::unique_ptr<Client>> clients_;
 
-  // use concsisten hash to route.
+  // use concsistent hash to route.
   ConsistentHasher router_;
 
   std::string model_name_;
@@ -381,6 +381,11 @@ public:
    */
   virtual void PushSparseTable(uint64_t table_id, const Tensor& indices,
                                const Tensor& grads);
+
+  /**
+   * \brief Request server to save check point.
+   */
+  virtual void SaveCheckPoint();
 };
 
 }  // namespace kraken

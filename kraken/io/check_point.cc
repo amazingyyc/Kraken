@@ -12,6 +12,8 @@
 #include "configor/json.hpp"
 #include "io/file_reader.h"
 #include "io/file_writer.h"
+#include "ps/dense_table.h"
+#include "ps/info.h"
 #include "ps/initializer/constant_initializer.h"
 #include "ps/initializer/normal_initializer.h"
 #include "ps/initializer/uniform_initializer.h"
@@ -21,6 +23,9 @@
 #include "ps/optim/adam.h"
 #include "ps/optim/rmsprop.h"
 #include "ps/optim/sgd.h"
+#include "ps/ps.h"
+#include "ps/sparse_table.h"
+#include "ps/table.h"
 
 namespace kraken {
 namespace io {
@@ -38,6 +43,38 @@ CheckPoint::CheckPoint(Ps* ps, const std::string& save_dir,
       max_save_count_(max_save_count),
       stop_(false) {
   woker_ = std::thread(&CheckPoint::Run, this);
+
+  LOG_INFO("Save dir:" << save_dir_ << ", max_save_count:" << max_save_count_);
+}
+
+const char* CheckPoint::OptimTypeName(OptimType type) const {
+  if (type == OptimType::kAdagrad) {
+    return "Adagrad";
+  } else if (type == OptimType::kAdam) {
+    return "Adam";
+  } else if (type == OptimType::kRMSprop) {
+    return "RMSprop";
+  } else if (type == OptimType::kSGD) {
+    return "SGD";
+  } else {
+    return "UnKnow";
+  }
+}
+
+const char* CheckPoint::InitializerTypeName(InitializerType type) const {
+  if (type == InitializerType::kConstant) {
+    return "Constant";
+  } else if (type == InitializerType::kUniform) {
+    return "Uniform";
+  } else if (type == InitializerType::kNormal) {
+    return "Normal";
+  } else if (type == InitializerType::kXavierUniform) {
+    return "XavierUniform";
+  } else if (type == InitializerType::kXavierNormal) {
+    return "XavierNormal";
+  } else {
+    return "UnKnow";
+  }
 }
 
 bool CheckPoint::IsDirExist(const std::string& dir) const {
@@ -271,14 +308,14 @@ std::string CheckPoint::GenModelBinaryPath(const std::string& dir) const {
 
 bool CheckPoint::Save(const std::string& model_info_path,
                       const std::string& model_binary_path,
-                      const Ps::ModelInfo& model_info) const {
+                      const ModelInfo& model_info) const {
   // We will dump 2 file. one is readable another is binary serialize.
   {
     // Readable.
     configor::json j;
     j["id"] = model_info.id;
     j["name"] = model_info.name;
-    j["optim_type"] = (int32_t)model_info.optim_type;
+    j["optim_type"] = OptimTypeName(model_info.optim_type);
     j["optim_conf"] = model_info.optim_conf;
 
     configor::json tables_j = configor::json::array({});
@@ -287,14 +324,15 @@ bool CheckPoint::Save(const std::string& model_info_path,
 
       t_j["id"] = table_info.id;
       t_j["name"] = table_info.name;
-      t_j["table_type"] = (int32_t)table_info.table_type;
-      t_j["element_type"] = (int32_t)table_info.element_type.dtype;
+      t_j["table_type"] =
+          (table_info.table_type == TableType::kDense ? "Dense" : "Sparse");
+      t_j["element_type"] = table_info.element_type.Name();
 
       if (table_info.table_type == TableType::kDense) {
         t_j["shape"] = table_info.shape.dims();
       } else if (table_info.table_type == TableType::kSparse) {
         t_j["dimension"] = table_info.dimension;
-        t_j["init_type"] = (int32_t)table_info.init_type;
+        t_j["init_type"] = InitializerTypeName(table_info.init_type);
         t_j["init_conf"] = table_info.init_conf;
       }
 
@@ -454,7 +492,7 @@ bool CheckPoint::Save(const std::string& dir, SparseTable* table) const {
 }
 
 bool CheckPoint::Load(const std::string& model_binary_path,
-                      Ps::ModelInfo* model_info) const {
+                      ModelInfo* model_info) const {
   // Binary.
   FileReader reader(model_binary_path);
   if (reader.IsOpen() == false) {
@@ -480,7 +518,7 @@ bool CheckPoint::Load(const std::string& model_binary_path,
 
   for (uint64_t i = 0; i < table_size; ++i) {
     uint64_t table_id;
-    Ps::TableInfo table_info;
+    TableInfo table_info;
 
     if ((deserialize >> table_id) == false) {
       return false;
@@ -528,7 +566,7 @@ bool CheckPoint::Load(const std::string& path, DenseTable* table) const {
     return false;
   }
 
-  if (type != TableType::kDense || id != table->id_ || name == table->name_) {
+  if (type != TableType::kDense || id != table->id_ || name != table->name_) {
     return false;
   }
 
@@ -564,7 +602,7 @@ bool CheckPoint::Load(const std::string& path, size_t shard_id,
   }
 
   if (type != TableType::kSparse || id != table->id_ || name != table->name_ ||
-      dimension != table->dimension_ || etype == table->etype_ ||
+      dimension != table->dimension_ || etype != table->etype_ ||
       init_type != table->initializer_->type()) {
     return false;
   }
@@ -599,6 +637,8 @@ bool CheckPoint::Load(const std::string& path, size_t shard_id,
 }
 
 bool CheckPoint::Save(Ps* ps, const std::string& save_dir, uint64_t model_id) {
+  LOG_INFO("Try to save model:" << model_id << " to dir:" << save_dir);
+
   if (model_save_infos_[model_id].save_paths.size() >= max_save_count_) {
     const auto& delete_path = model_save_infos_[model_id].save_paths.front();
 
@@ -616,13 +656,13 @@ bool CheckPoint::Save(Ps* ps, const std::string& save_dir, uint64_t model_id) {
   // Shard 0 is leader.
   size_t shard_id = ps->shard_id();
 
-  if (ps->model_infos_.find(model_id) != ps->model_infos_.end() ||
+  if (ps->model_infos_.find(model_id) == ps->model_infos_.end() ||
       ps->models_.find(model_id) == ps->models_.end()) {
     LOG_ERROR("Model id:" << model_id << " not exist.");
     return false;
   }
 
-  const Ps::ModelInfo& model_info = ps->model_infos_[model_id];
+  const auto& model_info = ps->model_infos_[model_id];
   Model* model = ps->models_[model_id].get();
 
   // Create model dump dir.
@@ -674,10 +714,14 @@ bool CheckPoint::Save(Ps* ps, const std::string& save_dir, uint64_t model_id) {
   // Store the path.
   model_save_infos_[model_id].save_paths.emplace_back(shard_path.string());
 
+  LOG_INFO("Finish save model:" << model_info.name << " to dir:" << shard_path);
+
   return true;
 }
 
 bool CheckPoint::Load(Ps* ps, const std::string& model_dir) {
+  LOG_INFO("Try to load model from:" << model_dir);
+
   if (IsDirExist(model_dir) == false) {
     LOG_ERROR("Dir:" << model_dir << " not exist.");
     return false;
@@ -725,6 +769,8 @@ bool CheckPoint::Load(Ps* ps, const std::string& model_dir) {
       return false;
     }
 
+    LOG_INFO("Get latest checkpoint dir:" << path);
+
     checkpoint_paths.emplace_back(std::move(path));
   }
 
@@ -735,7 +781,9 @@ bool CheckPoint::Load(Ps* ps, const std::string& model_dir) {
 
   // Try to load ModelInfo.
   auto model_binary_path = GenModelBinaryPath(checkpoint_paths[0]);
-  Ps::ModelInfo model_info;
+  ModelInfo model_info;
+
+  LOG_INFO("Try to load ModelInfo from:" << model_binary_path);
   if (Load(model_binary_path, &model_info) == false) {
     LOG_ERROR(
         "Load model binary error, model_binary_path:" << model_binary_path);
@@ -819,6 +867,8 @@ bool CheckPoint::Load(Ps* ps, const std::string& model_dir) {
 
     // DenseTable.
     for (const auto& d_path : dense_paths) {
+      LOG_INFO("Try to load DenseTable from:" << d_path);
+
       // Get dense table name and check whether it belong to this shard.
       auto table_name = d_path.stem().string();
 
@@ -853,6 +903,8 @@ bool CheckPoint::Load(Ps* ps, const std::string& model_dir) {
 
     // SparseTable
     for (const auto& s_path : sparse_paths) {
+      LOG_INFO("Try to load SparseTable from:" << s_path);
+
       auto table_name = s_path.stem().string();
 
       if (table_name_id_map.find(table_name) == table_name_id_map.end()) {
@@ -884,23 +936,7 @@ bool CheckPoint::Load(Ps* ps, const std::string& model_dir) {
     }
   }
 
-  if (shard_id == 0) {
-    // If this is a leader shard. we need insert into model_id_manager_.
-    ModelIdManager::ModelInfo m_info;
-    m_info.id = model_info.id;
-    m_info.name = model_info.name;
-
-    for (const auto& table_info : model_info.table_infos) {
-      ModelIdManager::TableInfo t_info;
-      t_info.id = table_info.second.id;
-      t_info.name = table_info.second.name;
-
-      m_info.table_infos.emplace(t_info.name, t_info);
-    }
-
-    std::unique_lock<std::mutex> lock(ps->model_id_manager_.mu_);
-    ps->model_id_manager_.model_infos_.emplace(m_info.name, m_info);
-  }
+  LOG_INFO("Load Model:" << model_info.name << " finish.");
 
   std::unique_lock<std::shared_mutex> lock(ps->mu_);
   ps->model_infos_.emplace(model_info.id, std::move(model_info));
@@ -914,13 +950,13 @@ void CheckPoint::Run() {
     std::unique_lock<std::mutex> lock(mu_);
 
     if (task_que_.empty() == false) {
-      Task task = std::move(task_que_.front());
+      CheckPointTask task = std::move(task_que_.front());
       task_que_.pop();
 
       bool success = Save(ps_, save_dir_, task.model_id);
 
       if (task.done) {
-        task.done(success);
+        task.done(task.model_id, success);
       }
     } else if (stop_.load()) {
       break;
@@ -940,8 +976,19 @@ void CheckPoint::Stop() {
   }
 }
 
-void CheckPoint::Save(uint64_t model_id, std::function<void(bool)>&& done) {
-  Task task;
+void CheckPoint::Save(uint64_t model_id,
+                      std::function<void(uint64_t, bool)>&& done) {
+  if (save_dir_.empty()) {
+    LOG_ERROR("Save dir is empty, save checkpoint error!");
+
+    if (done) {
+      done(model_id, false);
+    }
+
+    return;
+  }
+
+  CheckPointTask task;
   task.model_id = model_id;
   task.done = std::move(done);
 

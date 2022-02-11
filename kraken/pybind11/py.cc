@@ -72,6 +72,8 @@ PYBIND11_MODULE(kraken_native, m) {
 
   m.def("push_sparse_table", &PushSparseTable, pybind11::arg("table_id"),
         pybind11::arg("indices"), pybind11::arg("grads"));
+
+  m.def("save_check_point", &SaveCheckPoint);
 }
 
 }  // namespace py

@@ -144,6 +144,11 @@ public:
    */
   void PushSparseTable(uint64_t table_id, const Tensor& indices,
                        const Tensor& grads);
+  
+  /**
+   * \brief Request Ps to save check point.
+   */
+  void SaveCheckPoint();
 };
 
 }  // namespace kraken

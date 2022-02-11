@@ -5,6 +5,7 @@
 
 #include "common/error_code.h"
 #include "common/spin_locker.h"
+#include "io/check_point.h"
 #include "libcuckoo/libcuckoo/cuckoohash_map.hh"
 #include "ps/initializer/initializer.h"
 #include "ps/optim/optim.h"
@@ -13,10 +14,6 @@
 #include "t/tensor.h"
 
 namespace kraken {
-
-namespace io {
-class CheckPoint;
-}
 
 class SparseTable : public Table {
   friend class io::CheckPoint;

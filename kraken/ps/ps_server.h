@@ -1,6 +1,8 @@
 #pragma once
 
-#include "protocol/apply_model_id_prot.h"
+#include "protocol/apply_dense_table_prot.h"
+#include "protocol/apply_model_prot.h"
+#include "protocol/apply_sparse_table_prot.h"
 #include "protocol/apply_table_id_prot.h"
 #include "protocol/combine_pull_dense_table_prot.h"
 #include "protocol/combine_pull_sparse_table_prot.h"
@@ -14,6 +16,7 @@
 #include "protocol/register_model_prot.h"
 #include "protocol/register_sparse_table_info_prot.h"
 #include "protocol/register_sparse_table_prot.h"
+#include "protocol/save_check_point_prot.h"
 #include "ps/ps.h"
 #include "rpc/server.h"
 
@@ -26,12 +29,16 @@ private:
 
 public:
   PsServer(uint32_t port, uint32_t thread_nums, size_t shard_num,
-           size_t shard_id);
+           size_t shard_id, const std::string& save_dir, size_t max_save_count);
 
 private:
-  int32_t ApplyModelId(const ApplyModelIdRequest&, ApplyModelIdResponse*);
+  int32_t ApplyModel(const ApplyModelRequest&, ApplyModelResponse*);
 
-  int32_t ApplyTableId(const ApplyTableIdRequest&, ApplyTableIdResponse*);
+  int32_t ApplyDenseTable(const ApplyDenseTableRequest&,
+                          ApplyDenseTableResponse*);
+
+  int32_t ApplySparseTable(const ApplySparseTableRequest&,
+                           ApplySparseTableResponse*);
 
   int32_t RegisterModel(const RegisterModelRequest&, RegisterModelResponse*);
 
@@ -40,9 +47,6 @@ private:
 
   int32_t RegisterDenseTable(const RegisterDenseTableRequest&,
                              RegisterDenseTableResponse*);
-
-  int32_t RegisterSparseTableInfo(const RegisterSparseTableInfoRequest&,
-                                  RegisterSparseTableInfoResponse*);
 
   int32_t RegisterSparseTable(const RegisterSparseTableRequest&,
                               RegisterSparseTableResponse*);
@@ -66,9 +70,13 @@ private:
   int32_t PushSparseTable(const PushSparseTableRequest&,
                           PushSparseTableResponse*);
 
+  int32_t SaveCheckPoint(const SaveCheckPointRequest&, SaveCheckPointResponse*);
+
   void RegisterFuncs();
 
 public:
+  void Load(const std::string& load_dir);
+
   void Start();
 
   void Stop();

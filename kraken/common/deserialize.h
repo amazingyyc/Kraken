@@ -379,7 +379,7 @@ inline bool Deserialize::operator>>(
   v.reserve(size);
 
   std::string key;
-  int64_t value;
+  uint64_t value;
 
   for (uint64_t i = 0; i < size; ++i) {
     if (((*this) >> key) == false || ((*this) >> value) == false) {

@@ -2,14 +2,11 @@
 
 #include <string>
 
+#include "io/check_point.h"
 #include "ps/optim/optim.h"
 #include "t/tensor.h"
 
 namespace kraken {
-
-namespace io {
-class CheckPoint;
-}
 
 /**
  * \brief The table type.
