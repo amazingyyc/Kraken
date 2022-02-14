@@ -26,6 +26,7 @@ public:
    */
   void Initialize(const std::string& addrs,
                   EmitterType emitter_type = EmitterType::kDefault,
+                  CompressType compress_type = CompressType::kNo,
                   uint64_t life_span = 1000, float eta = 0.75);
 
   /**
@@ -144,7 +145,7 @@ public:
    */
   void PushSparseTable(uint64_t table_id, const Tensor& indices,
                        const Tensor& grads);
-  
+
   /**
    * \brief Request Ps to save check point.
    */

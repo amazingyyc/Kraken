@@ -6,6 +6,7 @@
 
 #include "common/error_code.h"
 #include "common/log.h"
+#include "ps/table.h"
 
 namespace kraken {
 

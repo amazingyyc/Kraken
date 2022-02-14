@@ -160,32 +160,6 @@ inline bool Deserialize::operator>>(StateType& v) {
 }
 
 template <>
-inline bool Deserialize::operator>>(
-    std::unordered_map<std::string, std::string>& v) {
-  v.clear();
-
-  uint64_t size;
-  if (((*this) >> size) == false) {
-    return false;
-  }
-
-  v.reserve(size);
-
-  std::string key;
-  std::string value;
-
-  for (uint64_t i = 0; i < size; ++i) {
-    if (((*this) >> key) == false || ((*this) >> value) == false) {
-      return false;
-    }
-
-    v.emplace(std::move(key), std::move(value));
-  }
-
-  return true;
-}
-
-template <>
 inline bool Deserialize::operator>>(TableType& v) {
   uint8_t uv;
 
@@ -317,6 +291,32 @@ inline bool Deserialize::operator>>(std::vector<Tensor>& v) {
 }
 
 template <>
+inline bool Deserialize::operator>>(
+    std::unordered_map<std::string, std::string>& v) {
+  v.clear();
+
+  uint64_t size;
+  if (((*this) >> size) == false) {
+    return false;
+  }
+
+  v.reserve(size);
+
+  std::string key;
+  std::string value;
+
+  for (uint64_t i = 0; i < size; ++i) {
+    if (((*this) >> key) == false || ((*this) >> value) == false) {
+      return false;
+    }
+
+    v.emplace(std::move(key), std::move(value));
+  }
+
+  return true;
+}
+
+template <>
 inline bool Deserialize::operator>>(std::unordered_map<StateType, Tensor>& v) {
   v.clear();
 
@@ -327,10 +327,10 @@ inline bool Deserialize::operator>>(std::unordered_map<StateType, Tensor>& v) {
 
   v.reserve(size);
 
-  StateType key;
-  Tensor value;
-
   for (uint64_t i = 0; i < size; ++i) {
+    StateType key;
+    Tensor value;
+
     if (((*this) >> key) == false || ((*this) >> value) == false) {
       return false;
     }
@@ -352,10 +352,10 @@ inline bool Deserialize::operator>>(std::unordered_map<StateType, int64_t>& v) {
 
   v.reserve(size);
 
-  StateType key;
-  int64_t value;
-
   for (uint64_t i = 0; i < size; ++i) {
+    StateType key;
+    int64_t value;
+
     if (((*this) >> key) == false || ((*this) >> value) == false) {
       return false;
     }
@@ -378,10 +378,10 @@ inline bool Deserialize::operator>>(
 
   v.reserve(size);
 
-  std::string key;
-  uint64_t value;
-
   for (uint64_t i = 0; i < size; ++i) {
+    std::string key;
+    uint64_t value;
+
     if (((*this) >> key) == false || ((*this) >> value) == false) {
       return false;
     }
@@ -390,6 +390,16 @@ inline bool Deserialize::operator>>(
   }
 
   return true;
+}
+
+template <>
+inline bool Deserialize::operator>>(Bag& v) {
+  return (*this) >> v.state && (*this) >> v.state_i;
+}
+
+template <>
+inline bool Deserialize::operator>>(Table::Value& v) {
+  return (*this) >> v.val && (*this) >> v.bag;
 }
 
 }  // namespace kraken

@@ -27,7 +27,10 @@ public:
 
   const std::vector<uint64_t>& buckets() const;
 
-  std::pair<uint64_t, uint64_t> ShardBoundary(size_t shard_id) const;
+  // the boundary is: [lower, upper] both are closed interval.
+  std::pair<uint64_t, uint64_t> Boundary(size_t shard_id) const;
+
+  size_t Hit(uint64_t h) const;
 
   size_t operator()(uint64_t v1, uint64_t v2) const;
 

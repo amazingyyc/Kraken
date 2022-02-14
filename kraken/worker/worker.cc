@@ -13,7 +13,8 @@ Worker::Worker() {
 }
 
 void Worker::Initialize(const std::string& addrs, EmitterType emitter_type,
-                        uint64_t life_span, float eta) {
+                        CompressType compress_type, uint64_t life_span,
+                        float eta) {
   if (emitter_type == EmitterType::kDefault) {
     emitter_.reset(new Emitter());
   } else if (emitter_type == EmitterType::kDCT) {
@@ -22,7 +23,7 @@ void Worker::Initialize(const std::string& addrs, EmitterType emitter_type,
     RUNTIME_ERROR("Unsupport EmitterType:" << (uint32_t)emitter_type);
   }
 
-  emitter_->Initialize(addrs);
+  emitter_->Initialize(addrs, compress_type);
 }
 
 void Worker::Stop() {

@@ -259,10 +259,11 @@ public:
   /**
    * \brief Initialize Emitter.
    *
-   * \param addrs_
-   * \param model_name
+   * \param addrs_ Server address.
+   * \param model_name Model Name.
+   * \param compress_type The compress type.
    */
-  void Initialize(const std::string& addrs);
+  void Initialize(const std::string& addrs, CompressType compress_type);
 
   /**
    * \brief Stop worker.

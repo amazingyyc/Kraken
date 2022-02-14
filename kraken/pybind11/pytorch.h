@@ -11,7 +11,7 @@ namespace kraken {
 namespace py {
 
 void Initialize(const std::string& addrs, EmitterType emitter_type,
-                uint64_t life_span, float eta);
+                CompressType compress_type, uint64_t life_span, float eta);
 
 void Stop();
 

@@ -16,10 +16,33 @@ enum class TableType : uint8_t {
   kSparse = 1,
 };
 
+enum class StateType : uint32_t {
+  kSteps = 0,
+  kMomentumBuffer = 1,
+  kStateSum = 2,
+  kFirstMoment = 3,
+  kSecondMoment = 4,
+  kSecondMomentMax = 5,
+  kSquareAverage = 6,
+  kGAve = 7,
+};
+
+/**
+ * \brief This is a simple struct that store some useful resource.
+ * Like in SGD optim we may need store some temporary tensor.
+ */
+struct Bag {
+  // tensor state.
+  std::unordered_map<StateType, Tensor> state;
+
+  // integer state.
+  std::unordered_map<StateType, int64_t> state_i;
+};
+
 class Table {
   friend class io::CheckPoint;
 
-protected:
+public:
   struct Value {
     Tensor val;
     Bag bag;

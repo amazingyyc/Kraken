@@ -4,6 +4,7 @@
 #include <string>
 
 #include "rpc/caller.h"
+#include "rpc/protocol.h"
 
 namespace kraken {
 
@@ -16,7 +17,8 @@ private:
   Caller caller_;
 
 public:
-  Client(uint32_t server_id, const std::string& addr);
+  Client(uint32_t server_id, const std::string& addr,
+         CompressType compress_type);
 
 public:
   uint32_t server_id() const;

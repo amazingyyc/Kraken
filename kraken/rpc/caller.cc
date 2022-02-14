@@ -140,7 +140,7 @@ void Caller::Run(void* zmp_context, const std::string& addr, zmq_fd_t efd) {
             SnappySource source((char*)msg.z_buf.ptr() + sizeof(req_header),
                                 msg.z_buf.offset() - sizeof(req_header));
 
-            ARGUMENT_CHECK(snappy::Compress(&source, &sink),
+            ARGUMENT_CHECK(snappy::Compress(&source, &sink) > 0,
                            "snappy::Compress error.");
           }
 
