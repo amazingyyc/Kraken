@@ -2,6 +2,7 @@
 
 from kraken_native import OptimType
 from kraken_native import InitializerType
+from kraken_native import CompressType
 from kraken_native import EmitterType
 from kraken_native import initialize
 from kraken_native import stop

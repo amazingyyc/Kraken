@@ -20,8 +20,6 @@ private:
   // Every DenseTable has a Bag to store the e_grad, step etc.
   class DenseBag {
   private:
-    std::shared_mutex mu_;
-
     Tensor e_grad_;
 
     // topk value.

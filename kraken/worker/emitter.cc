@@ -39,7 +39,7 @@ size_t Emitter::SparseTableRouter(uint64_t model_id, uint64_t table_id,
   return router_(model_id, table_id, sparse_id);
 }
 
-void Emitter::Initialize(const std::string& addrs) {
+void Emitter::Initialize(const std::string& addrs, CompressType compress_type) {
   if (initialized_.load()) {
     return;
   }
@@ -49,7 +49,7 @@ void Emitter::Initialize(const std::string& addrs) {
   utils::Split(addrs, ",", &tokens);
 
   for (uint32_t i = 0; i < tokens.size(); ++i) {
-    std::unique_ptr<Client> client(new Client(i, tokens[i]));
+    std::unique_ptr<Client> client(new Client(i, tokens[i], compress_type));
     clients_.emplace_back(std::move(client));
   }
 

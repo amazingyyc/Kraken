@@ -65,8 +65,7 @@ private:
   std::atomic_bool stop_;
 
 public:
-  Caller(const std::string& addr,
-         CompressType compress_type = CompressType::kNo);
+  Caller(const std::string& addr, CompressType compress_type);
 
   ~Caller();
 

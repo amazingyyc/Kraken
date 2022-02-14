@@ -58,7 +58,7 @@ criterion = F.binary_cross_entropy
 
 train_dataset = wd_dataset['train_dataset']
 
-n_epochs = 1
+n_epochs = 100
 batch_size = 64
 
 widedeep_dataset = WideDeepLoader(train_dataset)
@@ -100,8 +100,6 @@ for epoch in range(n_epochs):
     print('Cost {:0,.2f} Epoch {} of {}, Loss: {}, accuracy: {}'.format((end_t - start_t) * 1000, epoch + 1, n_epochs,
                                                                         round(loss.item(), 3),
                                                                         round(correct / total, 4)))
-
-kk.save_check_point()
 
 # Stop it
 kk.stop()

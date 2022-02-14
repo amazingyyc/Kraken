@@ -3,10 +3,322 @@
 #include <cinttypes>
 #include <vector>
 
+#include "common/utils.h"
 #include "test/utils_test.h"
 
 namespace kraken {
 namespace test {
+
+TEST(Math, Add) {
+  {
+    int64_t c = utils::ThreadLocalRandom<int64_t>(1, 1000);
+
+    std::vector<float> v0;
+    std::vector<float> v1;
+    std::vector<float> expect;
+
+    for (int64_t i = 0; i < c; ++i) {
+      v0.emplace_back(utils::ThreadLocalRandom<float>(-1000, 1000));
+      v1.emplace_back(utils::ThreadLocalRandom<float>(-1000, 1000));
+
+      expect.emplace_back(v0.back() + v1.back());
+    }
+
+    Tensor t0 = VectorToTensor(v0);
+    Tensor t1 = VectorToTensor(v1);
+    Tensor t2 = t0 + t1;
+
+    std::vector<float> real = TensorToVector<float>(t2);
+
+    AssertVectorF32(expect, real);
+  }
+
+  {
+    int64_t c = utils::ThreadLocalRandom<int64_t>(1, 1000);
+
+    float a = utils::ThreadLocalRandom<float>(-1000, 1000);
+
+    std::vector<float> v0;
+    std::vector<float> expect;
+
+    for (int64_t i = 0; i < c; ++i) {
+      v0.emplace_back(utils::ThreadLocalRandom<float>(-1000, 1000));
+
+      expect.emplace_back(v0.back() + a);
+    }
+
+    Tensor t0 = VectorToTensor(v0);
+
+    std::vector<float> real = TensorToVector<float>(t0 + a);
+
+    AssertVectorF32(expect, real);
+  }
+}
+
+TEST(Math, Sub) {
+  {
+    int64_t c = utils::ThreadLocalRandom<int64_t>(1, 1000);
+
+    std::vector<float> v0;
+    std::vector<float> v1;
+    std::vector<float> expect;
+
+    for (int64_t i = 0; i < c; ++i) {
+      v0.emplace_back(utils::ThreadLocalRandom<float>(-1000, 1000));
+      v1.emplace_back(utils::ThreadLocalRandom<float>(-1000, 1000));
+
+      expect.emplace_back(v0.back() - v1.back());
+    }
+
+    Tensor t0 = VectorToTensor(v0);
+    Tensor t1 = VectorToTensor(v1);
+    Tensor t2 = t0 - t1;
+
+    std::vector<float> real = TensorToVector<float>(t2);
+
+    AssertVectorF32(expect, real);
+  }
+
+  {
+    int64_t c = utils::ThreadLocalRandom<int64_t>(1, 1000);
+
+    float a = utils::ThreadLocalRandom<float>(-1000, 1000);
+
+    std::vector<float> v0;
+    std::vector<float> expect;
+
+    for (int64_t i = 0; i < c; ++i) {
+      v0.emplace_back(utils::ThreadLocalRandom<float>(-1000, 1000));
+
+      expect.emplace_back(v0.back() - a);
+    }
+
+    Tensor t0 = VectorToTensor(v0);
+
+    std::vector<float> real = TensorToVector<float>(t0 - a);
+
+    AssertVectorF32(expect, real);
+  }
+
+  {
+    int64_t c = utils::ThreadLocalRandom<int64_t>(1, 1000);
+
+    float a = utils::ThreadLocalRandom<float>(-1000, 1000);
+
+    std::vector<float> v0;
+    std::vector<float> expect;
+
+    for (int64_t i = 0; i < c; ++i) {
+      v0.emplace_back(utils::ThreadLocalRandom<float>(-1000, 1000));
+
+      expect.emplace_back(a - v0.back());
+    }
+
+    Tensor t0 = VectorToTensor(v0);
+
+    std::vector<float> real = TensorToVector<float>(a - t0);
+
+    AssertVectorF32(expect, real);
+  }
+}
+
+TEST(Math, Mul) {
+  {
+    int64_t c = utils::ThreadLocalRandom<int64_t>(1, 1000);
+
+    std::vector<float> v0;
+    std::vector<float> v1;
+    std::vector<float> expect;
+
+    for (int64_t i = 0; i < c; ++i) {
+      v0.emplace_back(utils::ThreadLocalRandom<float>(-1000, 1000));
+      v1.emplace_back(utils::ThreadLocalRandom<float>(-1000, 1000));
+
+      expect.emplace_back(v0.back() * v1.back());
+    }
+
+    Tensor t0 = VectorToTensor(v0);
+    Tensor t1 = VectorToTensor(v1);
+    Tensor t2 = t0 * t1;
+
+    std::vector<float> real = TensorToVector<float>(t2);
+
+    AssertVectorF32(expect, real);
+  }
+
+  {
+    int64_t c = utils::ThreadLocalRandom<int64_t>(1, 1000);
+
+    float a = utils::ThreadLocalRandom<float>(-1000, 1000);
+
+    std::vector<float> v0;
+    std::vector<float> expect;
+
+    for (int64_t i = 0; i < c; ++i) {
+      v0.emplace_back(utils::ThreadLocalRandom<float>(-1000, 1000));
+
+      expect.emplace_back(v0.back() * a);
+    }
+
+    Tensor t0 = VectorToTensor(v0);
+
+    std::vector<float> real = TensorToVector<float>(t0 * a);
+
+    AssertVectorF32(expect, real);
+  }
+}
+
+TEST(Math, Div) {
+  {
+    int64_t c = utils::ThreadLocalRandom<int64_t>(1, 1000);
+
+    std::vector<float> v0;
+    std::vector<float> v1;
+    std::vector<float> expect;
+
+    for (int64_t i = 0; i < c; ++i) {
+      v0.emplace_back(utils::ThreadLocalRandom<float>(1, 1000));
+      v1.emplace_back(utils::ThreadLocalRandom<float>(1, 1000));
+
+      expect.emplace_back(v0.back() / v1.back());
+    }
+
+    Tensor t0 = VectorToTensor(v0);
+    Tensor t1 = VectorToTensor(v1);
+    Tensor t2 = t0 / t1;
+
+    std::vector<float> real = TensorToVector<float>(t2);
+
+    AssertVectorF32(expect, real);
+  }
+
+  {
+    int64_t c = utils::ThreadLocalRandom<int64_t>(1, 1000);
+
+    float a = utils::ThreadLocalRandom<float>(1, 1000);
+
+    std::vector<float> v0;
+    std::vector<float> expect;
+
+    for (int64_t i = 0; i < c; ++i) {
+      v0.emplace_back(utils::ThreadLocalRandom<float>(1, 1000));
+
+      expect.emplace_back(v0.back() / a);
+    }
+
+    Tensor t0 = VectorToTensor(v0);
+
+    std::vector<float> real = TensorToVector<float>(t0 / a);
+
+    AssertVectorF32(expect, real);
+  }
+
+  {
+    int64_t c = utils::ThreadLocalRandom<int64_t>(1, 1000);
+
+    float a = utils::ThreadLocalRandom<float>(1, 1000);
+
+    std::vector<float> v0;
+    std::vector<float> expect;
+
+    for (int64_t i = 0; i < c; ++i) {
+      v0.emplace_back(utils::ThreadLocalRandom<float>(1, 1000));
+
+      expect.emplace_back(a / v0.back());
+    }
+
+    Tensor t0 = VectorToTensor(v0);
+
+    std::vector<float> real = TensorToVector<float>(a / t0);
+
+    AssertVectorF32(expect, real);
+  }
+}
+
+TEST(Math, Constant) {
+  int64_t c = utils::ThreadLocalRandom<int64_t>(1, 1000);
+
+  std::vector<float> v0(c, 0);
+  Tensor t0 = VectorToTensor(v0);
+
+  float v = utils::ThreadLocalRandom<float>(-1000, 1000);
+
+  t0.Constant(v);
+
+  std::vector<float> real = TensorToVector<float>(t0);
+
+  for (auto i : real) {
+    EXPECT_FLOAT_EQ(v, i);
+  }
+}
+
+TEST(Math, Sqrt) {
+  int64_t c = utils::ThreadLocalRandom<int64_t>(1, 1000);
+
+  std::vector<float> v0;
+  std::vector<float> expect;
+
+  for (int64_t i = 0; i < c; ++i) {
+    v0.emplace_back(utils::ThreadLocalRandom<float>(0, 1000));
+
+    expect.emplace_back(std::sqrt(v0.back()));
+  }
+
+  Tensor t0 = VectorToTensor(v0);
+
+  std::vector<float> real = TensorToVector<float>(t0.Sqrt());
+
+  AssertVectorF32(expect, real);
+}
+
+TEST(Math, Max) {
+  int64_t c = utils::ThreadLocalRandom<int64_t>(1, 1000);
+
+  std::vector<float> v0;
+  std::vector<float> v1;
+  std::vector<float> expect;
+
+  for (int64_t i = 0; i < c; ++i) {
+    v0.emplace_back(utils::ThreadLocalRandom<float>(-1000, 1000));
+    v1.emplace_back(utils::ThreadLocalRandom<float>(-1000, 1000));
+
+    expect.emplace_back(std::max(v0.back(), v1.back()));
+  }
+
+  Tensor t0 = VectorToTensor(v0);
+  Tensor t1 = VectorToTensor(v1);
+  Tensor t2 = t0.Max(t1);
+
+  std::vector<float> real = TensorToVector<float>(t2);
+
+  AssertVectorF32(expect, real);
+}
+
+TEST(Math, ConcatVector) {
+  int64_t row = utils::ThreadLocalRandom<int64_t>(1, 1000);
+  int64_t col = utils::ThreadLocalRandom<int64_t>(1, 1000);
+
+  std::vector<Tensor> vecs;
+  std::vector<float> expect;
+
+  for (int64_t r = 0; r < row; ++r) {
+    std::vector<float> vals;
+
+    for (int64_t c = 0; c < col; ++c) {
+      vals.emplace_back(utils::ThreadLocalRandom<float>(-1000, 1000));
+
+      expect.emplace_back(vals.back());
+    }
+
+    vecs.emplace_back(VectorToTensor(vals));
+  }
+
+  Tensor t = vecs[0].ConcatVector(vecs);
+
+  std::vector<float> real = TensorToVector<float>(t);
+
+  AssertVectorF32(expect, real);
+}
 
 TEST(Math, Abs) {
   std::vector<float> vec{-1.0, 1.0, 2.0, 3.0, -4.0, -0.1};

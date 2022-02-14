@@ -412,17 +412,11 @@ bool CheckPoint::Save(const std::string& dir, DenseTable* table) const {
 
   Serialize serialize(&writer);
 
-  // table type | id | name | value (val | bag (state|state_i))
-  if ((serialize << table->type()) == false ||
-      (serialize << table->id()) == false ||
-      (serialize << table->name()) == false) {
-    return false;
-  }
-
-  // Value.
-  if ((serialize << table->val_.val) == false ||
-      (serialize << table->val_.bag.state) == false ||
-      (serialize << table->val_.bag.state_i) == false) {
+  // table type | id | name | value
+  if ((serialize << table->type_) == false ||
+      (serialize << table->id_) == false ||
+      (serialize << table->name_) == false ||
+      (serialize << table->val_) == false) {
     return false;
   }
 
@@ -443,15 +437,15 @@ bool CheckPoint::Save(const std::string& dir, SparseTable* table) const {
 
   // At here we just read the variable of this table.
   // The table's variable never change. So it safe.
-  if ((serialize << table->type()) == false ||
-      (serialize << table->id()) == false ||
-      (serialize << table->name()) == false) {
+  if ((serialize << table->type_) == false ||
+      (serialize << table->id_) == false ||
+      (serialize << table->name_) == false) {
     return false;
   }
 
   // dimension | element type.
-  if ((serialize << table->dimension()) == false ||
-      (serialize << table->etype()) == false) {
+  if ((serialize << table->dimension_) == false ||
+      (serialize << table->element_type_) == false) {
     return false;
   }
 
@@ -472,15 +466,9 @@ bool CheckPoint::Save(const std::string& dir, SparseTable* table) const {
 
     // At here it's thread-safe to read the vals.
     for (auto it = lt.begin(); it != lt.end(); ++it) {
-      // key
-      if ((serialize << it->first) == false) {
-        return false;
-      }
-
-      // Value.
-      if ((serialize << it->second.val) == false ||
-          (serialize << it->second.bag.state) == false ||
-          (serialize << it->second.bag.state_i) == false) {
+      // key-value
+      if ((serialize << it->first) == false ||
+          (serialize << it->second) == false) {
         return false;
       }
     }
@@ -556,13 +544,7 @@ bool CheckPoint::Load(const std::string& path, DenseTable* table) const {
   Table::Value val;
 
   if ((deserialize >> type) == false || (deserialize >> id) == false ||
-      (deserialize >> name) == false) {
-    return false;
-  }
-
-  if ((deserialize >> val.val) == false ||
-      (deserialize >> val.bag.state) == false ||
-      (deserialize >> val.bag.state_i) == false) {
+      (deserialize >> name) == false || (deserialize >> val) == false) {
     return false;
   }
 
@@ -602,7 +584,7 @@ bool CheckPoint::Load(const std::string& path, size_t shard_id,
   }
 
   if (type != TableType::kSparse || id != table->id_ || name != table->name_ ||
-      dimension != table->dimension_ || etype != table->etype_ ||
+      dimension != table->dimension_ || etype != table->element_type_ ||
       init_type != table->initializer_->type()) {
     return false;
   }
@@ -617,13 +599,7 @@ bool CheckPoint::Load(const std::string& path, size_t shard_id,
     int64_t sparse_id;
     Table::Value val;
 
-    if ((deserialize >> sparse_id) == false) {
-      return false;
-    }
-
-    if ((deserialize >> val.val) == false ||
-        (deserialize >> val.bag.state) == false ||
-        (deserialize >> val.bag.state_i) == false) {
+    if ((deserialize >> sparse_id) == false || (deserialize >> val) == false) {
       return false;
     }
 
@@ -744,16 +720,16 @@ bool CheckPoint::Load(Ps* ps, const std::string& model_dir) {
 
   std::vector<size_t> include_shards;
   {
-    auto boundary = hasher.ShardBoundary(shard_id);
+    auto boundary = hasher.Boundary(shard_id);
 
-    // boundary: [lower, upper)
+    // boundary: [lower, upper]
     uint64_t lower = boundary.first;
     uint64_t upper = boundary.second;
 
     for (size_t i = 0; i < old_hasher.bucket_count(); ++i) {
-      auto cur_b = old_hasher.ShardBoundary(i);
+      auto cur_b = old_hasher.Boundary(i);
 
-      if (cur_b.first < upper && cur_b.second > lower) {
+      if (cur_b.first <= upper && cur_b.second >= lower) {
         include_shards.emplace_back(i);
       }
     }

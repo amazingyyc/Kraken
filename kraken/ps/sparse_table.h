@@ -23,7 +23,7 @@ private:
   // We donnot assign the N, so it means the matrix's row canbe increase
   // automatically.
   int64_t dimension_;
-  ElementType etype_;
+  ElementType element_type_;
 
   std::unique_ptr<Initializer> initializer_;
 
@@ -31,13 +31,13 @@ private:
 
 public:
   SparseTable(Optim* optim, uint64_t id, const std::string& name,
-              int64_t dimension, ElementType etype,
+              int64_t dimension, ElementType element_type,
               std::unique_ptr<Initializer>&& initializer);
 
 public:
   int64_t dimension() const;
 
-  ElementType etype() const;
+  ElementType element_type() const;
 
   Initializer* initializer() const;
 

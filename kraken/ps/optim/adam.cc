@@ -5,6 +5,7 @@
 
 #include "common/error_code.h"
 #include "common/log.h"
+#include "ps/table.h"
 
 namespace kraken {
 
@@ -51,7 +52,7 @@ int32_t Adam::Update(const Tensor& grad, float lr, Tensor* val,
   // Grad maybe Coo tensor.
   Tensor grad_t = grad;
   if (grad_t.IsCoo()) {
-     if (grad_t.indices().IsEmpty()) {
+    if (grad_t.indices().IsEmpty()) {
       return ErrorCode::kSuccess;
     }
 

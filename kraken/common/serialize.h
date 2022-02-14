@@ -130,23 +130,6 @@ inline bool Serialize::operator<<(const StateType& v) {
 }
 
 template <>
-inline bool Serialize::operator<<(
-    const std::unordered_map<std::string, std::string>& v) {
-  uint64_t size = v.size();
-  if (((*this) << size) == false) {
-    return false;
-  }
-
-  for (const auto& item : v) {
-    if (((*this) << item.first) == false || ((*this) << item.second) == false) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-template <>
 inline bool Serialize::operator<<(const TableType& v) {
   return (*this) << ((uint8_t)v);
 }
@@ -231,14 +214,31 @@ inline bool Serialize::operator<<(const std::vector<Tensor>& v) {
 
 template <>
 inline bool Serialize::operator<<(
+    const std::unordered_map<std::string, std::string>& v) {
+  uint64_t size = v.size();
+  if (((*this) << size) == false) {
+    return false;
+  }
+
+  for (const auto& [key, val] : v) {
+    if (((*this) << key) == false || ((*this) << val) == false) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+template <>
+inline bool Serialize::operator<<(
     const std::unordered_map<StateType, Tensor>& v) {
   uint64_t size = v.size();
   if (((*this) << size) == false) {
     return false;
   }
 
-  for (const auto& item : v) {
-    if (((*this) << item.first) == false || ((*this) << item.second) == false) {
+  for (const auto& [key, val] : v) {
+    if (((*this) << key) == false || ((*this) << val) == false) {
       return false;
     }
   }
@@ -254,8 +254,8 @@ inline bool Serialize::operator<<(
     return false;
   }
 
-  for (const auto& item : v) {
-    if (((*this) << item.first) == false || ((*this) << item.second) == false) {
+  for (const auto& [key, val] : v) {
+    if (((*this) << key) == false || ((*this) << val) == false) {
       return false;
     }
   }
@@ -271,13 +271,23 @@ inline bool Serialize::operator<<(
     return false;
   }
 
-  for (const auto& item : v) {
-    if (((*this) << item.first) == false || ((*this) << item.second) == false) {
+  for (const auto& [key, val] : v) {
+    if (((*this) << key) == false || ((*this) << val) == false) {
       return false;
     }
   }
 
   return true;
+}
+
+template <>
+inline bool Serialize::operator<<(const Bag& v) {
+  return ((*this) << v.state) && ((*this) << v.state_i);
+}
+
+template <>
+inline bool Serialize::operator<<(const Table::Value& v) {
+  return ((*this) << v.val) && ((*this) << v.bag);
 }
 
 }  // namespace kraken

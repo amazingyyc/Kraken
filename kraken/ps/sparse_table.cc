@@ -3,11 +3,11 @@
 namespace kraken {
 
 SparseTable::SparseTable(Optim* optim, uint64_t id, const std::string& name,
-                         int64_t dimension, ElementType etype,
+                         int64_t dimension, ElementType element_type,
                          std::unique_ptr<Initializer>&& initializer)
     : Table(TableType::kSparse, optim, id, name),
       dimension_(dimension),
-      etype_(etype),
+      element_type_(element_type),
       initializer_(std::move(initializer)),
       vals_() {
 }
@@ -16,8 +16,8 @@ int64_t SparseTable::dimension() const {
   return dimension_;
 }
 
-ElementType SparseTable::etype() const {
-  return etype_;
+ElementType SparseTable::element_type() const {
+  return element_type_;
 }
 
 Initializer* SparseTable::initializer() const {
@@ -72,7 +72,7 @@ int32_t SparseTable::Pull(const std::vector<int64_t>& indices,
 
     if (exist == false) {
       // can not find, insert a new one.
-      Tensor t = Tensor::Dense({dimension_}, etype_);
+      Tensor t = Tensor::Dense({dimension_}, element_type_);
       initializer_->Initialize(&t);
 
       // for result.

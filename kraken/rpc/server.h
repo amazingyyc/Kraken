@@ -137,7 +137,7 @@ private:
     // Step3 compress body data to sink.
     {
       SnappySource source(body_buf.ptr(), body_buf.offset());
-      if (snappy::Compress(&source, &sink) == false) {
+      if (snappy::Compress(&source, &sink) <= 0) {
         return ErrorCode::kSnappyCompressError;
       }
     }

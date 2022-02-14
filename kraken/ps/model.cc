@@ -74,7 +74,7 @@ int32_t Model::RegisterSparseTable(uint64_t id, const std::string& name,
     }
 
     SparseTable* table = (SparseTable*)(it->second.get());
-    if (table->dimension() != dimension || table->etype() != etype) {
+    if (table->dimension() != dimension || table->element_type() != etype) {
       return ErrorCode::kSparseTableUnCompatibleError;
     }
 

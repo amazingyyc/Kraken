@@ -8,34 +8,13 @@
 
 namespace kraken {
 
+struct Bag;
+
 enum class OptimType : uint8_t {
   kAdagrad = 0,
   kAdam = 1,
   kRMSprop = 2,
   kSGD = 3,
-};
-
-enum class StateType : uint32_t {
-  kSteps = 0,
-  kMomentumBuffer = 1,
-  kStateSum = 2,
-  kFirstMoment = 3,
-  kSecondMoment = 4,
-  kSecondMomentMax = 5,
-  kSquareAverage = 6,
-  kGAve = 7,
-};
-
-/**
- * \brief This is a simple struct that store some useful resource.
- * Like in SGD optim we may need store some temporary tensor.
- */
-struct Bag {
-  // tensor state.
-  std::unordered_map<StateType, Tensor> state;
-
-  // integer state.
-  std::unordered_map<StateType, int64_t> state_i;
 };
 
 class Optim {
@@ -60,7 +39,7 @@ public:
   }
 
   virtual int32_t Update(const Tensor& grad, float lr, Tensor* val,
-                         Bag* package) const = 0;
+                         Bag* bag) const = 0;
 };
 
 template <>

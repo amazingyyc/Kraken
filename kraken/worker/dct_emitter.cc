@@ -16,8 +16,6 @@ Tensor DCTEmitter::DenseBag::MaybeToCoo(uint64_t life_span, float eta,
     return grad;
   }
 
-  std::unique_lock<std::shared_mutex> lock(mu_);
-
   // Fix gradient.
   Tensor f_grad = grad + e_grad_;
 
