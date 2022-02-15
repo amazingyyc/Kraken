@@ -189,7 +189,7 @@ int32_t Model::PushSparseTable(uint64_t table_id,
 
 int32_t Model::PullSparseTable(uint64_t table_id,
                                const std::vector<int64_t>& indices,
-                               std::vector<Tensor>* vars) {
+                               std::vector<Tensor>* vals) {
   std::shared_lock<std::shared_mutex> lock(mu_);
 
   auto it = tables_.find(table_id);
@@ -201,7 +201,38 @@ int32_t Model::PullSparseTable(uint64_t table_id,
     return ErrorCode::kSparseTableUnCompatibleError;
   }
 
-  return it->second->Pull(indices, vars);
+  return it->second->Pull(indices, vals);
+}
+
+int32_t Model::CombinePullSparseTable(
+    const std::unordered_map<uint64_t, std::vector<int64_t>>& indices,
+    std::unordered_map<uint64_t, std::vector<Tensor>>* vals) {
+  std::shared_lock<std::shared_mutex> lock(mu_);
+
+  vals->clear();
+  vals->reserve(indices.size());
+
+  for (const auto& [table_id, indice] : indices) {
+    auto it = tables_.find(table_id);
+    if (it == tables_.end()) {
+      return ErrorCode::kUnRegisterTableError;
+    }
+
+    if (it->second->type() != TableType::kSparse) {
+      return ErrorCode::kSparseTableUnCompatibleError;
+    }
+
+    std::vector<Tensor> val;
+
+    int32_t ecode = it->second->Pull(indice, &val);
+    if (ecode != ErrorCode::kSuccess) {
+      return ecode;
+    }
+
+    vals->emplace(table_id, std::move(val));
+  }
+
+  return ErrorCode::kSuccess;
 }
 
 }  // namespace kraken

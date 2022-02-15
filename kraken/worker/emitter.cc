@@ -348,28 +348,27 @@ Tensor Emitter::PullSparseTable(uint64_t table_id, const Tensor& indices) {
   Tensor indices_i64 = indices.Cast(ElementType::From<int64_t>());
 
   int64_t row = indices_i64.Size();
-  int64_t* idp = indices_i64.Data<int64_t>();
+  int64_t* ptr = indices_i64.Data<int64_t>();
 
-  // The val index in req/rsp
-  std::vector<std::unordered_map<int64_t, size_t>> val_indices;
-  val_indices.resize(clients_.size());
+  // The index in Req/Rsp for every sparse_id.
+  std::unordered_map<int64_t, size_t> val_indices;
+  val_indices.reserve(row);
 
   std::vector<PullSparseTableRequest> reqs;
-  reqs.resize(clients_.size());
-
   std::vector<PullSparseTableResponse> rsps;
+  reqs.resize(clients_.size());
 
   std::vector<bool> mask(clients_.size(), false);
 
   for (int64_t i = 0; i < row; ++i) {
-    int64_t sparse_id = idp[i];
-    size_t server_id = SparseTableRouter(model_id_, table_id, sparse_id);
+    int64_t sparse_id = ptr[i];
 
-    mask[server_id] = true;
+    if (val_indices.find(sparse_id) == val_indices.end()) {
+      size_t server_id = SparseTableRouter(model_id_, table_id, sparse_id);
 
-    if (val_indices[server_id].find(sparse_id) ==
-        val_indices[server_id].end()) {
-      val_indices[server_id][sparse_id] = reqs[server_id].indices.size();
+      mask[server_id] = true;
+
+      val_indices[sparse_id] = reqs[server_id].indices.size();
       reqs[server_id].indices.emplace_back(sparse_id);
     }
   }
@@ -388,12 +387,12 @@ Tensor Emitter::PullSparseTable(uint64_t table_id, const Tensor& indices) {
   vals.reserve(row);
 
   for (int64_t i = 0; i < row; ++i) {
-    int64_t sparse_id = idp[i];
+    int64_t sparse_id = ptr[i];
     size_t server_id = SparseTableRouter(model_id_, table_id, sparse_id);
 
-    size_t val_idx = val_indices[server_id][sparse_id];
+    size_t val_i = val_indices[sparse_id];
 
-    vals.emplace_back(rsps.at(server_id).vals.at(val_idx));
+    vals.emplace_back(rsps.at(server_id).vals.at(val_i));
   }
 
   Tensor val = indices_i64.ConcatVector(vals);
@@ -422,62 +421,48 @@ std::vector<Tensor> Emitter::CombinePullSparseTable(
   }
 
   std::vector<CombinePullSparseTableRequest> reqs;
-  reqs.resize(clients_.size());
   std::vector<CombinePullSparseTableResponse> rsps;
+  reqs.resize(clients_.size());
 
   std::vector<bool> mask(clients_.size(), false);
 
-  // <model_id, table_id>
-  using KeyT = std::tuple<uint64_t, uint64_t>;
+  // <talbe_id, sparse_id>
+  using KeyT = std::pair<uint64_t, int64_t>;
   struct KeyHash : public std::unary_function<KeyT, std::size_t> {
     std::size_t operator()(const KeyT& k) const {
-      return std::get<0>(k) ^ std::get<1>(k);
+      return k.first ^ k.second;
     }
   };
 
-  std::vector<std::unordered_map<KeyT, size_t, KeyHash>> req_table_idx_map;
-  req_table_idx_map.resize(clients_.size());
-
-  std::vector<std::unordered_map<int64_t, size_t>> req_sparse_val_map;
-  req_sparse_val_map.resize(clients_.size());
+  std::unordered_map<KeyT, size_t, KeyHash> sparse_indices;
 
   for (size_t i = 0; i < table_ids.size(); ++i) {
     uint64_t table_id = table_ids[i];
 
     int64_t row = indice_i64s[i].Size();
-    int64_t* idp = indice_i64s[i].Data<int64_t>();
+    int64_t* ptr = indice_i64s[i].Data<int64_t>();
 
     for (int64_t j = 0; j < row; ++j) {
-      int64_t sparse_id = (int64_t)idp[i];
+      int64_t sparse_id = ptr[j];
       size_t server_id = SparseTableRouter(model_id_, table_id, sparse_id);
-
-      KeyT key = std::make_tuple(model_id_, table_id);
 
       mask[server_id] = true;
 
-      if (req_table_idx_map[server_id].find(key) ==
-          req_table_idx_map[server_id].end()) {
-        req_table_idx_map[server_id][key] = reqs[server_id].indices.size();
+      auto key = std::make_pair(table_id, sparse_id);
 
-        PullSparseTableRequest c_req;
-        c_req.model_id = model_id_;
-        c_req.table_id = table_id;
-
-        reqs[server_id].indices.emplace_back(c_req);
-      }
-
-      size_t table_idx = req_table_idx_map[server_id][key];
-
-      if (req_sparse_val_map[server_id].find(sparse_id) ==
-          req_sparse_val_map[server_id].end()) {
-        req_sparse_val_map[server_id][sparse_id] =
-            reqs[server_id].indices[table_idx].indices.size();
-        reqs[server_id].indices[table_idx].indices.emplace_back(sparse_id);
+      if (sparse_indices.find(key) == sparse_indices.end()) {
+        sparse_indices[key] = reqs[server_id].indices[table_id].size();
+        reqs[server_id].indices[table_id].emplace_back(sparse_id);
       }
     }
   }
 
-  // Send to server.
+  for (size_t i = 0; i < reqs.size(); ++i) {
+    if (mask[i]) {
+      reqs[i].model_id = model_id_;
+    }
+  }
+
   RPC_CALL(ParallelCall(RPCFuncType::kCombinePullSparseTableType, mask, reqs,
                         &rsps));
 
@@ -488,21 +473,19 @@ std::vector<Tensor> Emitter::CombinePullSparseTable(
     uint64_t table_id = table_ids[i];
 
     int64_t row = indice_i64s[i].Size();
-    int64_t* idp = indice_i64s[i].Data<int64_t>();
+    int64_t* ptr = indice_i64s[i].Data<int64_t>();
 
     std::vector<Tensor> vecs;
     vecs.reserve(row);
 
     for (int64_t j = 0; j < row; ++j) {
-      int64_t sparse_id = (int64_t)idp[i];
+      int64_t sparse_id = ptr[j];
       size_t server_id = SparseTableRouter(model_id_, table_id, sparse_id);
 
-      KeyT key = std::make_tuple(model_id_, table_id);
+      KeyT key = std::make_pair(table_id, sparse_id);
+      size_t val_i = sparse_indices[key];
 
-      size_t table_idx = req_table_idx_map[server_id][key];
-      size_t val_idx = req_sparse_val_map[server_id][sparse_id];
-
-      vecs.emplace_back(rsps[server_id].vals.at(table_idx).vals.at(val_idx));
+      vecs.emplace_back(rsps[server_id].vals[table_id].at(val_i));
     }
 
     Tensor val = indice_i64s[i].ConcatVector(vecs);
@@ -533,12 +516,12 @@ void Emitter::PushSparseTable(uint64_t table_id, const Tensor& indices,
 
   Tensor indices_i64 = indices.Cast(ElementType::From<int64_t>());
   int64_t row = indices_i64.Size();
-  int64_t* idp = indices_i64.Data<int64_t>();
+  int64_t* ptr = indices_i64.Data<int64_t>();
 
   Tensor m_grads = grads.Reshape({row, dimension});
 
-  std::vector<std::unordered_map<int64_t, size_t>> grad_indices;
-  grad_indices.resize(clients_.size());
+  std::unordered_map<int64_t, size_t> grad_indices;
+  grad_indices.reserve(row);
 
   std::vector<PushSparseTableRequest> reqs;
   reqs.resize(clients_.size());
@@ -546,14 +529,14 @@ void Emitter::PushSparseTable(uint64_t table_id, const Tensor& indices,
   std::vector<bool> mask(clients_.size(), false);
 
   for (int64_t i = 0; i < row; ++i) {
-    int64_t sparse_id = idp[i];
+    int64_t sparse_id = ptr[i];
     size_t server_id = SparseTableRouter(model_id_, table_id, sparse_id);
 
     mask[server_id] = true;
 
-    auto it = grad_indices[server_id].find(sparse_id);
-    if (it == grad_indices[server_id].end()) {
-      grad_indices[server_id][sparse_id] = reqs[server_id].indices.size();
+    auto it = grad_indices.find(sparse_id);
+    if (it == grad_indices.end()) {
+      grad_indices[sparse_id] = reqs[server_id].indices.size();
 
       reqs[server_id].indices.emplace_back(sparse_id);
       reqs[server_id].grads.emplace_back(m_grads.Vector(i).Clone());
@@ -562,11 +545,13 @@ void Emitter::PushSparseTable(uint64_t table_id, const Tensor& indices,
     }
   }
 
+  // Read Atomic value to local.
+  float l_lr = lr_.load();
   for (size_t i = 0; i < mask.size(); ++i) {
     if (mask[i]) {
       reqs[i].model_id = model_id_;
       reqs[i].table_id = table_id;
-      reqs[i].lr = lr_.load();
+      reqs[i].lr = l_lr;
     }
   }
 

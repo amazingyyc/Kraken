@@ -445,6 +445,20 @@ int32_t Ps::PullSparseTable(uint64_t model_id, uint64_t table_id,
   return it->second->PullSparseTable(table_id, indices, vals);
 }
 
+int32_t Ps::CombinePullSparseTable(
+    uint64_t model_id,
+    const std::unordered_map<uint64_t, std::vector<int64_t>>& indices,
+    std::unordered_map<uint64_t, std::vector<Tensor>>* vals) {
+  std::shared_lock<std::shared_mutex> lock(mu_);
+
+  auto it = models_.find(model_id);
+  if (it == models_.end()) {
+    return ErrorCode::kUnRegisterModelError;
+  }
+
+  return it->second->CombinePullSparseTable(indices, vals);
+}
+
 int32_t Ps::PushSparseTable(uint64_t model_id, uint64_t table_id,
                             const std::vector<int64_t>& indices,
                             const std::vector<Tensor>& grads, float lr) {

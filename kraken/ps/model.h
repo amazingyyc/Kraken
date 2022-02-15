@@ -58,7 +58,11 @@ public:
 
   int32_t PullSparseTable(uint64_t table_id,
                           const std::vector<int64_t>& indices,
-                          std::vector<Tensor>* vars);
+                          std::vector<Tensor>* vals);
+
+  int32_t CombinePullSparseTable(
+      const std::unordered_map<uint64_t, std::vector<int64_t>>& indices,
+      std::unordered_map<uint64_t, std::vector<Tensor>>* vals);
 };
 
 }  // namespace kraken
