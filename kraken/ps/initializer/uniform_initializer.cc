@@ -4,13 +4,12 @@
 
 namespace kraken {
 
-UniformInitializer::UniformInitializer(
-    const std::unordered_map<std::string, std::string>& conf)
-    : Initializer(InitializerType::kUniform, conf), lower_(0.0), upper_(1.0) {
-  GetConf<float>("lower", &lower_);
-  GetConf<float>("upper", &upper_);
+UniformInitializer::UniformInitializer(float lower, float upper)
+    : Initializer(InitializerType::kUniform), lower_(lower), upper_(upper) {
+}
 
-  LOG_INFO("Uniform Initializer, lower:" << lower_ << ", upper:" << upper_);
+std::unordered_map<std::string, std::string> UniformInitializer::conf() const {
+  return {{"lower", std::to_string(lower_)}, {"upper", std::to_string(upper_)}};
 }
 
 void UniformInitializer::Initialize(Tensor* val) const {

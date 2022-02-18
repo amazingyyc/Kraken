@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cinttypes>
+#include <string>
 #include <unordered_map>
 
 #include "common/utils.h"
@@ -14,7 +15,9 @@ private:
   float value_;
 
 public:
-  ConstantInitializer(const std::unordered_map<std::string, std::string>& conf);
+  ConstantInitializer(float value);
+
+  std::unordered_map<std::string, std::string> conf() const override;
 
   void Initialize(Tensor* val) const override;
 };

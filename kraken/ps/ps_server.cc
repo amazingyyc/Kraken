@@ -84,19 +84,7 @@ int32_t PsServer::PullSparseTable(const PullSparseTableRequest& req,
 int32_t PsServer::CombinePullSparseTable(
     const CombinePullSparseTableRequest& req,
     CombinePullSparseTableResponse* rsp) {
-  rsp->vals.resize(req.indices.size());
-
-  for (size_t i = 0; i < req.indices.size(); ++i) {
-    auto ecode =
-        ps_.PullSparseTable(req.indices[i].model_id, req.indices[i].table_id,
-                            req.indices[i].indices, &(rsp->vals[i].vals));
-
-    if (ecode != ErrorCode::kSuccess) {
-      return ecode;
-    }
-  }
-
-  return ErrorCode::kSuccess;
+  return ps_.CombinePullSparseTable(req.model_id, req.indices, &(rsp->vals));
 }
 
 int32_t PsServer::PushSparseTable(const PushSparseTableRequest& req,

@@ -1,29 +1,32 @@
 #pragma once
 
 #include <cinttypes>
+#include <unordered_map>
 #include <vector>
 
 #include "common/deserialize.h"
 #include "common/serialize.h"
-#include "protocol/pull_sparse_table_prot.h"
 #include "t/tensor.h"
 
 namespace kraken {
 
 struct CombinePullSparseTableRequest {
-  std::vector<PullSparseTableRequest> indices;
+  uint64_t model_id;
+
+  // <TableId, Indices> map.
+  std::unordered_map<uint64_t, std::vector<int64_t>> indices;
 };
 
 template <>
 inline bool Serialize::operator<<(
-    const std::vector<PullSparseTableRequest>& v) {
+    const std::unordered_map<uint64_t, std::vector<int64_t>>& v) {
   uint64_t size = v.size();
   if (((*this) << size) == false) {
     return false;
   }
 
-  for (auto& i : v) {
-    if (((*this) << i) == false) {
+  for (const auto& [key, val] : v) {
+    if (((*this) << key) == false || ((*this) << val) == false) {
       return false;
     }
   }
@@ -33,21 +36,29 @@ inline bool Serialize::operator<<(
 
 template <>
 inline bool Serialize::operator<<(const CombinePullSparseTableRequest& v) {
-  return (*this) << v.indices;
+  return (*this) << v.model_id && (*this) << v.indices;
 }
 
 template <>
-inline bool Deserialize::operator>>(std::vector<PullSparseTableRequest>& v) {
+inline bool Deserialize::operator>>(
+    std::unordered_map<uint64_t, std::vector<int64_t>>& v) {
+  v.clear();
+
   uint64_t size;
   if (((*this) >> size) == false) {
     return false;
   }
 
-  v.resize(size);
+  v.reserve(size);
   for (uint64_t i = 0; i < size; ++i) {
-    if (((*this) >> v[i]) == false) {
+    uint64_t key;
+    std::vector<int64_t> value;
+
+    if (((*this) >> key) == false || ((*this) >> value) == false) {
       return false;
     }
+
+    v.emplace(key, std::move(value));
   }
 
   return true;
@@ -55,23 +66,24 @@ inline bool Deserialize::operator>>(std::vector<PullSparseTableRequest>& v) {
 
 template <>
 inline bool Deserialize::operator>>(CombinePullSparseTableRequest& v) {
-  return (*this) >> v.indices;
+  return (*this) >> v.model_id && (*this) >> v.indices;
 }
 
 struct CombinePullSparseTableResponse {
-  std::vector<PullSparseTableResponse> vals;
+  // <TableId, Val> map.
+  std::unordered_map<uint64_t, std::vector<Tensor>> vals;
 };
 
 template <>
 inline bool Serialize::operator<<(
-    const std::vector<PullSparseTableResponse>& v) {
+    const std::unordered_map<uint64_t, std::vector<Tensor>>& v) {
   uint64_t size = v.size();
   if (((*this) << size) == false) {
     return false;
   }
 
-  for (auto& i : v) {
-    if (((*this) << i) == false) {
+  for (const auto& [key, val] : v) {
+    if (((*this) << key) == false || ((*this) << val) == false) {
       return false;
     }
   }
@@ -85,17 +97,25 @@ inline bool Serialize::operator<<(const CombinePullSparseTableResponse& v) {
 }
 
 template <>
-inline bool Deserialize::operator>>(std::vector<PullSparseTableResponse>& v) {
+inline bool Deserialize::operator>>(
+    std::unordered_map<uint64_t, std::vector<Tensor>>& v) {
+  v.clear();
+
   uint64_t size;
   if (((*this) >> size) == false) {
     return false;
   }
 
-  v.resize(size);
+  v.reserve(size);
   for (uint64_t i = 0; i < size; ++i) {
-    if (((*this) >> v[i]) == false) {
+    uint64_t key;
+    std::vector<Tensor> value;
+
+    if (((*this) >> key) == false || ((*this) >> value) == false) {
       return false;
     }
+
+    v.emplace(key, std::move(value));
   }
 
   return true;

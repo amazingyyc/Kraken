@@ -4,13 +4,12 @@
 
 namespace kraken {
 
-ConstantInitializer::ConstantInitializer(
-    const std::unordered_map<std::string, std::string>& conf)
-    : Initializer(InitializerType::kConstant, conf), value_(0) {
-  // Parse value.
-  GetConf<float>("value", &value_);
+ConstantInitializer::ConstantInitializer(float value)
+    : Initializer(InitializerType::kConstant), value_(value) {
+}
 
-  LOG_INFO("Constant Initializer, value:" << value_);
+std::unordered_map<std::string, std::string> ConstantInitializer::conf() const {
+  return {{"value", std::to_string(value_)}};
 }
 
 void ConstantInitializer::Initialize(Tensor* val) const {

@@ -207,6 +207,19 @@ public:
                           std::vector<Tensor>* vals);
 
   /**
+   * \brief Pull Sparse vector from this server.
+   *
+   * \param model_id Model id.
+   * \param indices A <TableId, Indices> map.
+   * \param vals The result.
+   * \return int32_t Error code.
+   */
+  int32_t CombinePullSparseTable(
+      uint64_t model_id,
+      const std::unordered_map<uint64_t, std::vector<int64_t>>& indices,
+      std::unordered_map<uint64_t, std::vector<Tensor>>* vals);
+
+  /**
    * \brief Push gradient to server.
    *
    * \param model_id Model id.

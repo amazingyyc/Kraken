@@ -4,12 +4,13 @@
 
 namespace kraken {
 
-XavierUniformInitializer::XavierUniformInitializer(
-    const std::unordered_map<std::string, std::string>& conf)
-    : Initializer(InitializerType::kXavierUniform, conf), gain_(1.0) {
-  GetConf<float>("gain", &gain_);
+XavierUniformInitializer::XavierUniformInitializer(float gain)
+    : Initializer(InitializerType::kXavierUniform), gain_(gain) {
+}
 
-  LOG_INFO("XavierUniform Initializer, gain:" << gain_);
+std::unordered_map<std::string, std::string> XavierUniformInitializer::conf()
+    const {
+  return {{"gain", std::to_string(gain_)}};
 }
 
 void XavierUniformInitializer::Initialize(Tensor* val) const {

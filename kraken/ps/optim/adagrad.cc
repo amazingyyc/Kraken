@@ -8,26 +8,11 @@
 
 namespace kraken {
 
-Adagrad::Adagrad(const std::unordered_map<std::string, std::string>& conf)
-    : Optim(OptimType::kAdagrad, conf), has_weight_decay_(false), eps_(1e-10) {
-  if (GetConf<float>("weight_decay", &weight_decay_)) {
-    has_weight_decay_ = true;
-  }
-
-  GetConf<float>("eps", &eps_);
-
-  std::ostringstream oss;
-  oss << "Create Adagrad optim";
-
-  if (has_weight_decay_) {
-    oss << ", weight_decay:" << weight_decay_;
-  } else {
-    oss << ", not set weight_decay";
-  }
-
-  oss << ", eps:" << eps_ << ".";
-
-  LOG_INFO(oss.str());
+Adagrad::Adagrad(bool has_weight_decay, float weight_decay, float eps)
+    : Optim(OptimType::kAdagrad),
+      has_weight_decay_(has_weight_decay),
+      weight_decay_(weight_decay),
+      eps_(eps) {
 }
 
 int32_t Adagrad::Update(const Tensor& grad, float lr, Tensor* val,

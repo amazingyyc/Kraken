@@ -450,8 +450,8 @@ bool CheckPoint::Save(const std::string& dir, SparseTable* table) const {
   }
 
   // Initializer.
-  if ((serialize << table->initializer()->type()) == false ||
-      (serialize << table->initializer()->conf()) == false) {
+  if ((serialize << table->initializer_->type()) == false ||
+      (serialize << table->initializer_->conf()) == false) {
     return false;
   }
 
@@ -769,16 +769,10 @@ bool CheckPoint::Load(Ps* ps, const std::string& model_dir) {
   // Create model.
   std::unique_ptr<Model> model;
   {
-    std::unique_ptr<Optim> optim;
-    if (model_info.optim_type == OptimType::kAdagrad) {
-      optim.reset(new Adagrad(model_info.optim_conf));
-    } else if (model_info.optim_type == OptimType::kAdam) {
-      optim.reset(new Adam(model_info.optim_conf));
-    } else if (model_info.optim_type == OptimType::kRMSprop) {
-      optim.reset(new RMSprop(model_info.optim_conf));
-    } else if (model_info.optim_type == OptimType::kSGD) {
-      optim.reset(new SGD(model_info.optim_conf));
-    } else {
+    std::unique_ptr<Optim> optim =
+        Optim::Create(model_info.optim_type, model_info.optim_conf);
+
+    if (optim == nullptr) {
       LOG_ERROR("Unsupported optim type:" << (int32_t)model_info.optim_type);
       return false;
     }
@@ -799,18 +793,10 @@ bool CheckPoint::Load(Ps* ps, const std::string& model_dir) {
       return false;
     }
 
-    std::unique_ptr<Initializer> initializer;
-    if (v.init_type == InitializerType::kConstant) {
-      initializer.reset(new ConstantInitializer(v.init_conf));
-    } else if (v.init_type == InitializerType::kNormal) {
-      initializer.reset(new NormalInitializer(v.init_conf));
-    } else if (v.init_type == InitializerType::kUniform) {
-      initializer.reset(new UniformInitializer(v.init_conf));
-    } else if (v.init_type == InitializerType::kXavierNormal) {
-      initializer.reset(new XavierNormalInitializer(v.init_conf));
-    } else if (v.init_type == InitializerType::kXavierUniform) {
-      initializer.reset(new XavierUniformInitializer(v.init_conf));
-    } else {
+    std::unique_ptr<Initializer> initializer =
+        Initializer::Create(v.init_type, v.init_conf);
+
+    if (initializer == nullptr) {
       LOG_ERROR("Unrecognized initialize type:" << (int32_t)v.init_type);
       return false;
     }

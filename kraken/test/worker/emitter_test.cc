@@ -53,6 +53,10 @@ TEST(Emitter, CompressTypekNo) {
 
     emitter->UpdateLR(lr);
     emitter->PushDenseTable(0, g0);
+
+    // Wait push finish.
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
     Tensor r0 = emitter->PullDenseTable(0);
 
     AssertTensorFloatEQ(r0, d0 - lr * g0);
@@ -99,11 +103,41 @@ TEST(Emitter, CompressTypekNo) {
 
     emitter->UpdateLR(lr);
     emitter->PushSparseTable(2, indices, grad);
+
+    // Wait push finish.
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
     Tensor real = emitter->PullSparseTable(2, indices);
 
     AssertTensorFloatEQ(
         real, Tensor::Dense({2, 100}, ElementType::From<float>()).Constant(v0) -
                   lr * grad);
+  }
+
+  {
+    Tensor indices0 = VectorToTensor<int64_t>(std::vector<int64_t>({2, 3}));
+    Tensor indices1 = VectorToTensor<int64_t>(std::vector<int64_t>({2, 3}));
+
+    std::vector<Tensor> before =
+        emitter->CombinePullSparseTable({2, 3}, {indices0, indices1});
+
+    Tensor grad0 = RandomTensor<float>(Shape({2, 100}));
+    Tensor grad1 = RandomTensor<float>(Shape({2, 100}));
+
+    float lr = utils::ThreadLocalRandom<float>(0.1, 1.0);
+    emitter->UpdateLR(lr);
+
+    emitter->PushSparseTable(2, indices0, grad0);
+    emitter->PushSparseTable(3, indices1, grad1);
+
+    // Wait push finish.
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    std::vector<Tensor> after =
+        emitter->CombinePullSparseTable({2, 3}, {indices0, indices1});
+
+    AssertTensorFloatEQ(after[0], before[0] - lr * grad0);
+    AssertTensorFloatEQ(after[1], before[1] - lr * grad1);
   }
 
   emitter->Stop();
@@ -155,6 +189,10 @@ TEST(Emitter, CompressTypekSnappy) {
 
     emitter->UpdateLR(lr);
     emitter->PushDenseTable(0, g0);
+
+    // Wait push finish.
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
     Tensor r0 = emitter->PullDenseTable(0);
 
     AssertTensorFloatEQ(r0, d0 - lr * g0);
@@ -201,11 +239,41 @@ TEST(Emitter, CompressTypekSnappy) {
 
     emitter->UpdateLR(lr);
     emitter->PushSparseTable(2, indices, grad);
+
+    // Wait push finish.
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
     Tensor real = emitter->PullSparseTable(2, indices);
 
     AssertTensorFloatEQ(
         real, Tensor::Dense({2, 100}, ElementType::From<float>()).Constant(v0) -
                   lr * grad);
+  }
+
+  {
+    Tensor indices0 = VectorToTensor<int64_t>(std::vector<int64_t>({2, 3}));
+    Tensor indices1 = VectorToTensor<int64_t>(std::vector<int64_t>({2, 3}));
+
+    std::vector<Tensor> before =
+        emitter->CombinePullSparseTable({2, 3}, {indices0, indices1});
+
+    Tensor grad0 = RandomTensor<float>(Shape({2, 100}));
+    Tensor grad1 = RandomTensor<float>(Shape({2, 100}));
+
+    float lr = utils::ThreadLocalRandom<float>(0.1, 1.0);
+    emitter->UpdateLR(lr);
+
+    emitter->PushSparseTable(2, indices0, grad0);
+    emitter->PushSparseTable(3, indices1, grad1);
+
+    // Wait push finish.
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    std::vector<Tensor> after =
+        emitter->CombinePullSparseTable({2, 3}, {indices0, indices1});
+
+    AssertTensorFloatEQ(after[0], before[0] - lr * grad0);
+    AssertTensorFloatEQ(after[1], before[1] - lr * grad1);
   }
 
   emitter->Stop();

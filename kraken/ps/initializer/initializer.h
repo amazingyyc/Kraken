@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cinttypes>
+#include <string>
 #include <unordered_map>
 
 #include "common/utils.h"
@@ -20,64 +21,22 @@ class Initializer {
 protected:
   InitializerType type_;
 
-  std::unordered_map<std::string, std::string> conf_;
-
 protected:
-  Initializer(InitializerType type) : type_(type) {
-  }
-
-  Initializer(InitializerType type,
-              const std::unordered_map<std::string, std::string>& conf)
-      : type_(type), conf_(conf) {
-  }
-
-  template <typename T>
-  bool GetConf(const std::string& k, T* v) {
-    return false;
-  }
+  Initializer(InitializerType type);
 
 public:
   virtual ~Initializer() = default;
 
-  InitializerType type() const {
-    return type_;
-  }
+  InitializerType type() const;
 
-  const std::unordered_map<std::string, std::string>& conf() const {
-    return conf_;
-  }
+  virtual std::unordered_map<std::string, std::string> conf() const;
 
   virtual void Initialize(Tensor* val) const = 0;
+
+public:
+  static std::unique_ptr<Initializer> Create(
+      InitializerType init_type,
+      const std::unordered_map<std::string, std::string>& init_conf);
 };
-
-template <>
-inline bool Initializer::GetConf<float>(const std::string& k, float* v) {
-  auto it = conf_.find(k);
-  if (it == conf_.end()) {
-    return false;
-  }
-
-  *v = std::stof(it->second);
-
-  return true;
-}
-
-template <>
-inline bool Initializer::GetConf<bool>(const std::string& k, bool* v) {
-  auto it = conf_.find(k);
-  if (it == conf_.end()) {
-    return false;
-  }
-
-  std::string lv = utils::ToLower(it->second);
-
-  if (lv == "true" || lv == "1") {
-    *v = true;
-  } else {
-    *v = false;
-  }
-
-  return true;
-}
 
 }  // namespace kraken

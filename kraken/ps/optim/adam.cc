@@ -9,42 +9,15 @@
 
 namespace kraken {
 
-Adam::Adam(const std::unordered_map<std::string, std::string>& conf)
-    : Optim(OptimType::kAdam, conf),
-      has_weight_decay_(false),
-      beta1_(0.9),
-      beta2_(0.999),
-      eps_(1e-08),
-      amsgrad_(false) {
-  if (GetConf<float>("weight_decay", &weight_decay_)) {
-    has_weight_decay_ = true;
-  }
-
-  GetConf<float>("beta1", &beta1_);
-  GetConf<float>("beta2", &beta2_);
-  GetConf<float>("eps", &eps_);
-  GetConf<bool>("amsgrad", &amsgrad_);
-
-  std::ostringstream oss;
-  oss << "Create Adam optim";
-
-  if (has_weight_decay_) {
-    oss << ", weight_decay:" << weight_decay_;
-  } else {
-    oss << ", not set weight_decay";
-  }
-
-  oss << ", beta1:" << beta1_;
-  oss << ", beta2:" << beta2_;
-  oss << ", eps:" << eps_;
-
-  if (amsgrad_) {
-    oss << ", amsgrad: true.";
-  } else {
-    oss << ", amsgrad: false.";
-  }
-
-  LOG_INFO(oss.str());
+Adam::Adam(bool has_weight_decay, float weight_decay, float beta1, float beta2,
+           float eps, bool amsgrad)
+    : Optim(OptimType::kAdam),
+      has_weight_decay_(has_weight_decay),
+      weight_decay_(weight_decay),
+      beta1_(beta1),
+      beta2_(beta2),
+      eps_(eps),
+      amsgrad_(amsgrad) {
 }
 
 int32_t Adam::Update(const Tensor& grad, float lr, Tensor* val,
