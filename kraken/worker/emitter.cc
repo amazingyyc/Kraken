@@ -145,8 +145,8 @@ uint64_t Emitter::RegisterDenseTable(const std::string& name,
 
     table_id = rsp.table_id;
 
-    LOG_INFO("Apply DenseTable: " << name << ", id: " << table_id
-                                  << ", from server 0.");
+    LOG_INFO("Apply DenseTable:" << name << ", id:" << table_id
+                                 << ", from server 0.");
   }
 
   {
@@ -351,8 +351,8 @@ Tensor Emitter::PullSparseTable(uint64_t table_id, const Tensor& indices) {
   int64_t* ptr = indices_i64.Data<int64_t>();
 
   // The index in Req/Rsp for every sparse_id.
-  std::unordered_map<int64_t, size_t> val_indices;
-  val_indices.reserve(row);
+  std::unordered_map<int64_t, size_t> sparse_indices;
+  sparse_indices.reserve(row);
 
   std::vector<PullSparseTableRequest> reqs;
   std::vector<PullSparseTableResponse> rsps;
@@ -363,12 +363,12 @@ Tensor Emitter::PullSparseTable(uint64_t table_id, const Tensor& indices) {
   for (int64_t i = 0; i < row; ++i) {
     int64_t sparse_id = ptr[i];
 
-    if (val_indices.find(sparse_id) == val_indices.end()) {
+    if (sparse_indices.find(sparse_id) == sparse_indices.end()) {
       size_t server_id = SparseTableRouter(model_id_, table_id, sparse_id);
 
       mask[server_id] = true;
 
-      val_indices[sparse_id] = reqs[server_id].indices.size();
+      sparse_indices[sparse_id] = reqs[server_id].indices.size();
       reqs[server_id].indices.emplace_back(sparse_id);
     }
   }
@@ -390,7 +390,7 @@ Tensor Emitter::PullSparseTable(uint64_t table_id, const Tensor& indices) {
     int64_t sparse_id = ptr[i];
     size_t server_id = SparseTableRouter(model_id_, table_id, sparse_id);
 
-    size_t val_i = val_indices[sparse_id];
+    size_t val_i = sparse_indices[sparse_id];
 
     vals.emplace_back(rsps.at(server_id).vals.at(val_i));
   }

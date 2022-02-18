@@ -18,7 +18,7 @@ private:
   float eps_;
 
 public:
-  Adagrad(const std::unordered_map<std::string, std::string>& conf);
+  Adagrad(bool has_weight_decay, float weight_decay, float eps);
 
   int32_t Update(const Tensor& grad, float lr, Tensor* val,
                  Bag* bag) const override;

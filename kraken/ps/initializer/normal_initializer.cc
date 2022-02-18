@@ -4,13 +4,12 @@
 
 namespace kraken {
 
-NormalInitializer::NormalInitializer(
-    const std::unordered_map<std::string, std::string>& conf)
-    : Initializer(InitializerType::kNormal, conf), mean_(0.0), stddev_(1.0) {
-  GetConf<float>("mean", &mean_);
-  GetConf<float>("stddev", &stddev_);
+NormalInitializer::NormalInitializer(float mean, float stddev)
+    : Initializer(InitializerType::kNormal), mean_(mean), stddev_(stddev) {
+}
 
-  LOG_INFO("Normal Initializer, mean:" << mean_ << ", stddev:" << stddev_);
+std::unordered_map<std::string, std::string> NormalInitializer::conf() const {
+  return {{"mean", std::to_string(mean_)}, {"stddev", std::to_string(stddev_)}};
 }
 
 void NormalInitializer::Initialize(Tensor* val) const {

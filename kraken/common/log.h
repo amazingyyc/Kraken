@@ -2,14 +2,42 @@
 
 #include <iostream>
 #include <sstream>
+#include <string>
 #include <thread>
+#include <unordered_map>
 
 #include "common/utils.h"
 
 namespace kraken {
 namespace log {
 extern uint32_t LOG_LEVEL;
+
+class Logger {
+private:
+  std::ostringstream& oss_;
+
+public:
+  Logger(std::ostringstream& oss) : oss_(oss) {
+  }
+
+  template <typename T>
+  Logger& operator<<(const T& v) {
+    oss_ << v;
+    return *this;
+  }
+};
+
+template <>
+inline Logger& Logger::operator<<(
+    const std::unordered_map<std::string, std::string>& map) {
+  for (const auto& [k, v] : map) {
+    oss_ << "[" << k << ", " << v << "], ";
+  }
+
+  return *this;
 }
+
+}  // namespace log
 
 #define LOG_DEBUG_LEVEL 0
 #define LOG_INFO_LEVEL 1
@@ -18,11 +46,12 @@ extern uint32_t LOG_LEVEL;
 
 #define REAL_PRINT_LOG(msg) \
   std::ostringstream _oss; \
-  _oss << "[" << std::this_thread::get_id() << "] "; \
-  _oss << kraken::utils::CurrentTimestamp() << " "; \
-  _oss << __FILE__ << ":"; \
-  _oss << __LINE__ << ":"; \
-  _oss << msg << "\n"; \
+  kraken::log::Logger _logger(_oss); \
+  _logger << "[" << std::this_thread::get_id() << "] "; \
+  _logger << kraken::utils::CurrentTimestamp() << " "; \
+  _logger << __FILE__ << ":"; \
+  _logger << __LINE__ << ":"; \
+  _logger << msg << "\n"; \
   std::cout << _oss.str();
 
 #define PRINT_LOG(msg, level) \

@@ -208,7 +208,7 @@ public:
 
   /**
    * \brief Pull Sparse vector from this server.
-   * 
+   *
    * \param model_id Model id.
    * \param indices A <TableId, Indices> map.
    * \param vals The result.

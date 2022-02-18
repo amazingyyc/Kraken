@@ -10,54 +10,16 @@
 
 namespace kraken {
 
-SGD::SGD(const std::unordered_map<std::string, std::string>& conf)
-    : Optim(OptimType::kSGD, conf),
-      has_weight_decay_(false),
-      has_momentum_(false),
-      has_dampening_(false),
-      nesterov_(false) {
-  if (GetConf<float>("weight_decay", &weight_decay_)) {
-    has_weight_decay_ = true;
-  }
-
-  if (GetConf<float>("momentum", &momentum_)) {
-    has_momentum_ = true;
-  }
-
-  if (GetConf<float>("dampening", &dampening_)) {
-    has_dampening_ = true;
-  }
-
-  GetConf<bool>("nesterov", &nesterov_);
-
-  std::ostringstream oss;
-  oss << "Create SGD optim";
-
-  if (has_weight_decay_) {
-    oss << ", weight_decay:" << weight_decay_;
-  } else {
-    oss << ", not set weight_decay";
-  }
-
-  if (has_momentum_) {
-    oss << ", momentum:" << momentum_;
-  } else {
-    oss << ", not set momentum.";
-  }
-
-  if (has_dampening_) {
-    oss << ", dampening:" << dampening_;
-  } else {
-    oss << ", not set dampening";
-  }
-
-  if (nesterov_) {
-    oss << ", nesterov: true.";
-  } else {
-    oss << ", nesterov: false.";
-  }
-
-  LOG_INFO(oss.str());
+SGD::SGD(bool has_weight_decay, float weight_decay, bool has_momentum,
+         float momentum, bool has_dampening, float dampening, bool nesterov)
+    : Optim(OptimType::kSGD),
+      has_weight_decay_(has_weight_decay),
+      weight_decay_(weight_decay),
+      has_momentum_(has_momentum),
+      momentum_(momentum),
+      has_dampening_(has_dampening),
+      dampening_(dampening),
+      nesterov_(nesterov) {
 }
 
 int32_t SGD::Update(const Tensor& grad, float lr, Tensor* val, Bag* bag) const {

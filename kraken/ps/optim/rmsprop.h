@@ -24,7 +24,8 @@ private:
   bool centered_;
 
 public:
-  RMSprop(const std::unordered_map<std::string, std::string>& conf);
+  RMSprop(bool has_weight_decay, float weight_decay, bool has_momentum,
+          float momentum, float alpha, float eps, bool centered);
 
   int32_t Update(const Tensor& grad, float lr, Tensor* val,
                  Bag* bag) const override;

@@ -23,7 +23,8 @@ private:
   bool amsgrad_;
 
 public:
-  Adam(const std::unordered_map<std::string, std::string>& conf);
+  Adam(bool has_weight_decay, float weight_decay, float beta1, float beta2,
+       float eps, bool amsgrad);
 
   int32_t Update(const Tensor& grad, float lr, Tensor* val,
                  Bag* bag) const override;

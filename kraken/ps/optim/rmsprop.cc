@@ -8,38 +8,16 @@
 
 namespace kraken {
 
-RMSprop::RMSprop(const std::unordered_map<std::string, std::string>& conf)
-    : Optim(OptimType::kRMSprop, conf),
-      has_weight_decay_(false),
-      has_momentum_(false),
-      alpha_(0.99),
-      eps_(1e-8),
-      centered_(false) {
-  if (GetConf<float>("weight_decay", &weight_decay_)) {
-    has_weight_decay_ = true;
-  }
-
-  if (GetConf<float>("momentum", &momentum_)) {
-    has_momentum_ = true;
-  }
-
-  GetConf<float>("alpha", &alpha_);
-  GetConf<float>("eps", &eps_);
-  GetConf<bool>("centered", &centered_);
-
-  std::ostringstream oss;
-  oss << "Create RMSprop optim";
-
-  oss << ", alpha:" << alpha_ << ".";
-  oss << ", eps:" << eps_ << ".";
-
-  if (centered_) {
-    oss << ", centered: true.";
-  } else {
-    oss << ", centered: false.";
-  }
-
-  LOG_INFO(oss.str());
+RMSprop::RMSprop(bool has_weight_decay, float weight_decay, bool has_momentum,
+                 float momentum, float alpha, float eps, bool centered)
+    : Optim(OptimType::kRMSprop),
+      has_weight_decay_(has_weight_decay),
+      weight_decay_(weight_decay),
+      has_momentum_(has_momentum),
+      momentum_(momentum),
+      alpha_(alpha),
+      eps_(eps),
+      centered_(centered) {
 }
 
 int32_t RMSprop::Update(const Tensor& grad, float lr, Tensor* val,

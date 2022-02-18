@@ -22,7 +22,8 @@ private:
   bool nesterov_;
 
 public:
-  SGD(const std::unordered_map<std::string, std::string>& conf);
+  SGD(bool has_weight_decay, float weight_decay, bool has_momentum,
+      float momentum, bool has_dampening, float dampening, bool nesterov);
 
   int32_t Update(const Tensor& grad, float lr, Tensor* val,
                  Bag* bag) const override;

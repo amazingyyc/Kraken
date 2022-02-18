@@ -3,15 +3,8 @@
 #include "common/error_code.h"
 #include "common/exception.h"
 #include "common/log.h"
-#include "ps/initializer/constant_initializer.h"
-#include "ps/initializer/normal_initializer.h"
-#include "ps/initializer/uniform_initializer.h"
-#include "ps/initializer/xavier_normal_initializer.h"
-#include "ps/initializer/xavier_uniform_initializer.h"
-#include "ps/optim/adagrad.h"
-#include "ps/optim/adam.h"
-#include "ps/optim/rmsprop.h"
-#include "ps/optim/sgd.h"
+#include "ps/initializer/initializer.h"
+#include "ps/optim/optim.h"
 #include "rpc/protocol.h"
 
 namespace kraken {
@@ -51,7 +44,9 @@ int32_t Ps::ApplyModel(
       // (TODO) check OptimType.
       *model_id = k;
 
-      LOG_INFO("Apply model:" << name << " already exist.");
+      LOG_INFO("Apply model:" << name << ", OptimType:" << (int32_t)optim_type
+                              << ", OptimConf:" << optim_conf
+                              << ", already exist, id:" << *model_id);
 
       return ErrorCode::kSuccess;
     }
@@ -73,8 +68,9 @@ int32_t Ps::ApplyModel(
 
   model_infos_.emplace(id, std::move(model_info));
 
-  LOG_INFO("Apply model:" << name << " id:" << id << ", optim_type"
-                          << (int32_t)optim_type);
+  LOG_INFO("Applied model:" << name << ", id:" << id
+                            << ", OptimType:" << (int32_t)optim_type
+                            << ", OptimConf:" << optim_conf);
 
   return ErrorCode::kSuccess;
 }
@@ -86,7 +82,7 @@ int32_t Ps::ApplyDenseTable(uint64_t model_id, const std::string& name,
 
   auto it = model_infos_.find(model_id);
   if (it == model_infos_.end()) {
-    LOG_ERROR("Cannot find model:" << model_id);
+    LOG_ERROR("Can't find model:" << model_id);
     return ErrorCode::kUnRegisterModelError;
   }
 
@@ -101,8 +97,9 @@ int32_t Ps::ApplyDenseTable(uint64_t model_id, const std::string& name,
 
       *table_id = k;
 
-      LOG_INFO("Apply DenseTable name:" << name << ", id:" << k
-                                        << " already exist!");
+      LOG_INFO("Apply DenseTable:" << name << ", shape:" << shape.Str()
+                                   << ", ElementType" << element_type.Name()
+                                   << ", already exist, id:" << k);
 
       return ErrorCode::kSuccess;
     }
@@ -124,9 +121,9 @@ int32_t Ps::ApplyDenseTable(uint64_t model_id, const std::string& name,
 
   model_info.table_infos.emplace(id, std::move(table_info));
 
-  LOG_INFO("Apply DenseTable name:" << name << ", id:" << id
-                                    << ", shape:" << shape.Str()
-                                    << ", ElementType:" << element_type.Name());
+  LOG_INFO("Applied DenseTable:" << name << ", id:" << id
+                                 << ", shape:" << shape.Str()
+                                 << ", ElementType:" << element_type.Name());
 
   return ErrorCode::kSuccess;
 }
@@ -140,7 +137,7 @@ int32_t Ps::ApplySparseTable(
 
   auto it = model_infos_.find(model_id);
   if (it == model_infos_.end()) {
-    LOG_ERROR("Cannot find model:" << model_id);
+    LOG_ERROR("Can't find model:" << model_id);
     return ErrorCode::kUnRegisterModelError;
   }
 
@@ -155,8 +152,11 @@ int32_t Ps::ApplySparseTable(
 
       *table_id = k;
 
-      LOG_INFO("Apply SparseTable: " << name << ", id: " << k
-                                     << " already exist!");
+      LOG_INFO("Apply SparseTable:" << name << ", dimension:" << dimension
+                                    << ", ElementType:" << element_type.Name()
+                                    << ", InitType:" << (int32_t)init_type
+                                    << ", InitConf:" << init_conf
+                                    << ", already exist, id:" << k);
 
       return ErrorCode::kSuccess;
     }
@@ -180,10 +180,11 @@ int32_t Ps::ApplySparseTable(
 
   model_info.table_infos.emplace(id, std::move(table_info));
 
-  LOG_INFO("Apply SparseTable name:" << name << ", id:" << id
-                                     << ", dimension:" << dimension
-                                     << ", ElementType:" << element_type.Name()
-                                     << ", init type:" << (int32_t)init_type);
+  LOG_INFO("Applied SparseTable:" << name << ", id:" << id
+                                  << ", dimension:" << dimension
+                                  << ", ElementType:" << element_type.Name()
+                                  << ", InitType:" << (int32_t)init_type
+                                  << ", InitConf:" << init_conf);
 
   return ErrorCode::kSuccess;
 }
@@ -205,39 +206,34 @@ int32_t Ps::RegisterModel(
 
       model_infos_.emplace(id, std::move(model_info));
 
-      LOG_INFO("Register model info:" << name << ", id:" << id
-                                      << ", name:" << name << ", optim_type:"
-                                      << (uint32_t)optim_type);
+      LOG_INFO("Register ModelInfo:" << name << ", id" << id
+                                     << ", OptimType:" << (int32_t)optim_type
+                                     << ", OptimConf:" << optim_conf);
     } else {
-      LOG_INFO("Register model info:" << name << ", id:" << id
-                                      << " already exist.");
+      LOG_INFO("Register ModelInfo:"
+               << name << ", OptimType:" << (int32_t)optim_type
+               << ", OptimConf:" << optim_conf << ", already exist, id:" << id);
     }
   }
 
   {
     auto it = models_.find(id);
     if (it == models_.end()) {
-      std::unique_ptr<Optim> optim;
-      if (optim_type == OptimType::kAdagrad) {
-        optim.reset(new Adagrad(optim_conf));
-      } else if (optim_type == OptimType::kAdam) {
-        optim.reset(new Adam(optim_conf));
-      } else if (optim_type == OptimType::kRMSprop) {
-        optim.reset(new RMSprop(optim_conf));
-      } else if (optim_type == OptimType::kSGD) {
-        optim.reset(new SGD(optim_conf));
-      } else {
+      std::unique_ptr<Optim> optim = Optim::Create(optim_type, optim_conf);
+      if (optim == nullptr) {
         return ErrorCode::kUnSupportOptimTypeError;
       }
 
       std::unique_ptr<Model> model(new Model(id, name, std::move(optim)));
       models_.emplace(id, std::move(model));
 
-      LOG_INFO("Register model:" << name << ", id:" << id << ", name:" << name
-                                 << ", optim_type:" << (uint32_t)optim_type);
+      LOG_INFO("Register model:" << name << ", id:" << id
+                                 << ", OptimType:" << (int32_t)optim_type
+                                 << ", OptimConf:" << optim_conf);
     } else {
-      LOG_INFO("Registerd model: " << name << ", id: " << it->second->id()
-                                   << " already exist.");
+      LOG_INFO("Registerd model:"
+               << name << ", OptimType:" << (int32_t)optim_type
+               << ", OptimConf:" << optim_conf << ", already exist, id:" << id);
     }
   }
 
@@ -265,8 +261,9 @@ int32_t Ps::RegisterDenseTableInfo(uint64_t model_id, uint64_t id,
       return ErrorCode::kDenseTableUnCompatibleError;
     }
 
-    LOG_INFO("Register DenseTableInfo: " << name << ", id: " << id
-                                         << " already exist.");
+    LOG_INFO("Register DenseTableInfo:"
+             << name << ", shape:" << shape.Str() << ", ElementType"
+             << element_type.Name() << ", already exist, id:" << id);
 
     return ErrorCode::kSuccess;
   }
@@ -280,7 +277,7 @@ int32_t Ps::RegisterDenseTableInfo(uint64_t model_id, uint64_t id,
 
   model_info.table_infos.emplace(id, std::move(table_info));
 
-  LOG_INFO("Register DenseTableInfo name:"
+  LOG_INFO("Register DenseTableInfo:"
            << name << ", id:" << id << ", shape:" << shape.Str()
            << ", ElementType:" << element_type.Name());
 
@@ -305,8 +302,6 @@ int32_t Ps::RegisterSparseTable(
     const std::unordered_map<std::string, std::string>& init_conf) {
   std::shared_lock<std::shared_mutex> lock(mu_);
 
-  std::cout << "1\n";
-
   {
     // Insert TableInfo.
     auto it = model_infos_.find(model_id);
@@ -326,8 +321,11 @@ int32_t Ps::RegisterSparseTable(
         return ErrorCode::kSparseTableUnCompatibleError;
       }
 
-      LOG_INFO("Register SparseTableInfo: " << name << ", id: " << id
-                                            << " already exist.");
+      LOG_INFO("Register SparseTableInfo:"
+               << name << ", dimension:" << dimension << ", ElementType:"
+               << element_type.Name() << ", InitType:" << (int32_t)init_type
+               << ", InitConf:" << init_conf << ", already exist, id:" << id);
+
     } else {
       TableInfo table_info;
       table_info.id = id;
@@ -340,29 +338,19 @@ int32_t Ps::RegisterSparseTable(
 
       model_info.table_infos.emplace(id, std::move(table_info));
 
-      LOG_INFO("Apply SparseTableInfo name:"
+      LOG_INFO("Apply SparseTableInfo:"
                << name << ", id:" << id << ", dimension:" << dimension
-               << ", ElementType:" << element_type.Name()
-               << ", init type:" << (int32_t)init_type);
+               << ", ElementType:" << element_type.Name() << ", InitType:"
+               << (int32_t)init_type << ", InitConf:" << init_conf);
     }
   }
 
-  std::cout << "2\n";
-
   {
     // Insert SparseTable.
-    std::unique_ptr<Initializer> initializer;
-    if (init_type == InitializerType::kConstant) {
-      initializer.reset(new ConstantInitializer(init_conf));
-    } else if (init_type == InitializerType::kNormal) {
-      initializer.reset(new NormalInitializer(init_conf));
-    } else if (init_type == InitializerType::kUniform) {
-      initializer.reset(new UniformInitializer(init_conf));
-    } else if (init_type == InitializerType::kXavierNormal) {
-      initializer.reset(new XavierNormalInitializer(init_conf));
-    } else if (init_type == InitializerType::kXavierUniform) {
-      initializer.reset(new XavierUniformInitializer(init_conf));
-    } else {
+    std::unique_ptr<Initializer> initializer =
+        Initializer::Create(init_type, init_conf);
+
+    if (initializer == nullptr) {
       return ErrorCode::kUnSupportInitializerTypeError;
     }
 
@@ -378,8 +366,6 @@ int32_t Ps::RegisterSparseTable(
       return ecode;
     }
   }
-
-  std::cout << "3\n";
 
   return ErrorCode::kSuccess;
 }
