@@ -21,6 +21,10 @@ const std::string& Model::name() const {
   return name_;
 }
 
+Optim* Model::optim() const {
+  return optim_.get();
+}
+
 int32_t Model::RegisterDenseTable(uint64_t id, const std::string& name,
                                   const Tensor& val) {
   std::unique_lock<std::shared_mutex> lock(mu_);

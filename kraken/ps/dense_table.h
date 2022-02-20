@@ -2,7 +2,6 @@
 
 #include <shared_mutex>
 
-#include "io/check_point.h"
 #include "ps/optim/optim.h"
 #include "ps/table.h"
 #include "t/element_type.h"
@@ -11,8 +10,19 @@
 
 namespace kraken {
 
+namespace io {
+class CheckpointExecutor;
+class Checkpoint;
+}  // namespace io
+
+namespace watch {
+class Watcher;
+}
+
 class DenseTable : public Table {
-  friend class io::CheckPoint;
+  friend class io::CheckpointExecutor;
+  friend class io::Checkpoint;
+  friend class watch::Watcher;
 
 private:
   std::shared_mutex mu_;

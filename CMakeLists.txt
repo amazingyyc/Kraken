@@ -68,6 +68,10 @@ file(GLOB_RECURSE KRAKEN_TEST_FILES "kraken/*_test.cc")
 file(GLOB_RECURSE KRAKEN_PYBIND11_HEAD_FILES "kraken/pybind11/*.h")
 file(GLOB_RECURSE KRAKEN_PYBIND11_SRC_FILES "kraken/pybind11/*.cc")
 
+# watcher file
+file(GLOB_RECURSE KRAKEN_WATCHER_HEAD_FILES "kraken/watch/*.h")
+file(GLOB_RECURSE KRAKEN_WATCHER_SRC_FILES "kraken/watch/*.cc")
+
 # remove test/main file
 list(FILTER KRAKEN_SRC_FILES EXCLUDE REGEX ".*_test.cc")
 list(FILTER KRAKEN_SRC_FILES EXCLUDE REGEX ".*_main.cc")
@@ -75,6 +79,10 @@ list(FILTER KRAKEN_SRC_FILES EXCLUDE REGEX ".*_main.cc")
 # remove for pybind11 file
 list(REMOVE_ITEM KRAKEN_HEAD_FILES ${KRAKEN_PYBIND11_HEAD_FILES})
 list(REMOVE_ITEM KRAKEN_SRC_FILES ${KRAKEN_PYBIND11_SRC_FILES})
+
+# remove watcher file
+list(REMOVE_ITEM KRAKEN_HEAD_FILES ${KRAKEN_WATCHER_HEAD_FILES})
+list(REMOVE_ITEM KRAKEN_SRC_FILES ${KRAKEN_WATCHER_SRC_FILES})
 
 # test file
 file(GLOB_RECURSE KRAKEN_TEST_HEAD_FILES "kraken/test/*.h")
@@ -101,30 +109,55 @@ include(snappy)
 set(BUILD_TESTS OFF CACHE BOOL "set libzmq BUILD_TESTS to be OFF")
 include(libzmq)
 
-# ########################################################################################
-# dynamic library
-find_package(PythonLibs REQUIRED)
-find_package(Torch REQUIRED PATHS "${PYTORCH_CMAKE_PREFIX_PATH}/Torch")
-
-message(STATUS "TORCH_LIBRARIES:${TORCH_LIBRARIES}")
-message(STATUS "KRAKEN_PYBIND11_SRC_FILES:${KRAKEN_PYBIND11_SRC_FILES}")
-
-add_library(kraken_native SHARED
-  ${KRAKEN_HEAD_FILES}
-  ${KRAKEN_SRC_FILES}
-  ${KRAKEN_PYBIND11_HEAD_FILES}
-  ${KRAKEN_PYBIND11_SRC_FILES})
-
 # snappy disable RTTI by default so we should disable the sub-class
 set_source_files_properties(kraken/common/snappy.cc
   PROPERTIES
   COMPILE_FLAGS
   -fno-rtti)
 
+# ########################################################################################
+# dynamic library
+find_package(PythonLibs REQUIRED)
+message(STATUS "PYTHON_LIBRARIES:${PYTHON_LIBRARIES}")
+
+find_package(Torch REQUIRED PATHS "${PYTORCH_CMAKE_PREFIX_PATH}/Torch")
+
+message(STATUS "TORCH_LIBRARIES:${TORCH_LIBRARIES}")
+message(STATUS "KRAKEN_PYBIND11_SRC_FILES:${KRAKEN_PYBIND11_SRC_FILES}")
+
+# ########################################################################################
+# kraken_native
+add_library(kraken_native SHARED
+  ${KRAKEN_HEAD_FILES}
+  ${KRAKEN_SRC_FILES}
+  ${KRAKEN_PYBIND11_HEAD_FILES}
+  ${KRAKEN_PYBIND11_SRC_FILES})
+
 # remove lib prefix for kraken_native
 set_target_properties(kraken_native PROPERTIES PREFIX "")
 target_include_directories(kraken_native PUBLIC ${PYTHON_INCLUDE_DIRS})
 target_link_libraries(kraken_native
+  stdc++fs
+  libzmq-static
+  snappy
+  libcuckoo
+  pybind11_headers
+  ${PYTHON_LIBRARIES}
+  ${TORCH_LIBRARIES}
+  ${PYTORCH_LIBRARY_PREFIX_PATH}/libtorch_python.so)
+
+# ########################################################################################
+# kraken watcher
+add_library(kraken_watcher SHARED
+  ${KRAKEN_HEAD_FILES}
+  ${KRAKEN_SRC_FILES}
+  ${KRAKEN_WATCHER_HEAD_FILES}
+  ${KRAKEN_WATCHER_SRC_FILES})
+
+# remove lib prefix for kraken_watcher
+set_target_properties(kraken_watcher PROPERTIES PREFIX "")
+target_include_directories(kraken_watcher PUBLIC ${PYTHON_INCLUDE_DIRS})
+target_link_libraries(kraken_watcher
   stdc++fs
   libzmq-static
   snappy
