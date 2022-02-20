@@ -7,4 +7,12 @@ python3 setup.py install
 ```
 
 ## Demo
-Folder: `examples/wide_deep`
+Folder: `examples/WideAndDeep`
+
+```python
+# start server in build folder
+./kraken_server
+
+# Run script
+python3 main.py
+```

@@ -13,7 +13,7 @@ Ps::Ps(size_t shard_num, size_t shard_id, const std::string& save_dir,
        size_t max_save_count)
     : shard_num_(shard_num),
       shard_id_(shard_id),
-      check_point_(this, save_dir, max_save_count) {
+      checkpoint_executor_(save_dir, max_save_count) {
 }
 
 size_t Ps::shard_num() const {
@@ -25,12 +25,12 @@ size_t Ps::shard_id() const {
 }
 
 void Ps::Load(const std::string& load_dir) {
-  ARGUMENT_CHECK(check_point_.Load(load_dir),
+  ARGUMENT_CHECK(checkpoint_executor_.Load(this, load_dir),
                  "Load model from:" << load_dir << " error!");
 }
 
 void Ps::Stop() {
-  check_point_.Stop();
+  checkpoint_executor_.Stop();
 }
 
 int32_t Ps::ApplyModel(
@@ -466,7 +466,7 @@ int32_t Ps::SaveCheckPoint(uint64_t model_id) {
   };
 
   // use sub-thread to save check point.
-  check_point_.Save(model_id, std::move(done));
+  checkpoint_executor_.Save(this, model_id, std::move(done));
 
   return ErrorCode::kSuccess;
 }

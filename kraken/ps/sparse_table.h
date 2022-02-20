@@ -5,7 +5,6 @@
 
 #include "common/error_code.h"
 #include "common/spin_locker.h"
-#include "io/check_point.h"
 #include "libcuckoo/libcuckoo/cuckoohash_map.hh"
 #include "ps/initializer/initializer.h"
 #include "ps/optim/optim.h"
@@ -15,8 +14,19 @@
 
 namespace kraken {
 
+namespace io {
+class CheckpointExecutor;
+class Checkpoint;
+}  // namespace io
+
+namespace watch {
+class Watcher;
+}
+
 class SparseTable : public Table {
-  friend class io::CheckPoint;
+  friend class io::CheckpointExecutor;
+  friend class io::Checkpoint;
+  friend class watch::Watcher;
 
 private:
   // For sparse table this must be a matrix. shape is [N, dimension].

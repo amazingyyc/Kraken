@@ -4,7 +4,8 @@
 #include <shared_mutex>
 #include <unordered_map>
 
-#include "io/check_point.h"
+#include "io/checkpoint.h"
+#include "io/checkpoint_executor.h"
 #include "ps/info.h"
 #include "ps/model.h"
 #include "ps/optim/optim.h"
@@ -12,7 +13,8 @@
 namespace kraken {
 
 class Ps {
-  friend class io::CheckPoint;
+  friend class io::CheckpointExecutor;
+  friend class io::Checkpoint;
 
 private:
   size_t shard_num_;
@@ -28,7 +30,7 @@ private:
   std::unordered_map<uint64_t, std::unique_ptr<Model>> models_;
 
   // save Checkpoint.
-  io::CheckPoint check_point_;
+  io::CheckpointExecutor checkpoint_executor_;
 
 public:
   Ps(size_t shard_num, size_t shard_id, const std::string& save_dir,

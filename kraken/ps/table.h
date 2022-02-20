@@ -2,11 +2,19 @@
 
 #include <string>
 
-#include "io/check_point.h"
 #include "ps/optim/optim.h"
 #include "t/tensor.h"
 
 namespace kraken {
+
+namespace io {
+class CheckpointExecutor;
+class Checkpoint;
+}  // namespace io
+
+namespace watch {
+class Watcher;
+}
 
 /**
  * \brief The table type.
@@ -40,7 +48,9 @@ struct Bag {
 };
 
 class Table {
-  friend class io::CheckPoint;
+  friend class io::CheckpointExecutor;
+  friend class io::Checkpoint;
+  friend class watch::Watcher;
 
 public:
   struct Value {

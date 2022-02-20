@@ -3,18 +3,28 @@
 #include <memory>
 #include <shared_mutex>
 
-#include "io/check_point.h"
 #include "ps/initializer/initializer.h"
 #include "ps/optim/optim.h"
 #include "ps/table.h"
 
 namespace kraken {
 
+namespace io {
+class CheckpointExecutor;
+class Checkpoint;
+}  // namespace io
+
+namespace watch {
+class Watcher;
+}
+
 /**
  * \brief The model represent a DeepLearning model will contain the tarinable Dense/Sparse table.
  */
 class Model {
-  friend class io::CheckPoint;
+  friend class io::CheckpointExecutor;
+  friend class io::Checkpoint;
+  friend class watch::Watcher;
 
 private:
   std::shared_mutex mu_;
@@ -34,6 +44,8 @@ public:
   uint16_t id() const;
 
   const std::string& name() const;
+
+  Optim* optim() const;
 
   int32_t RegisterDenseTable(uint64_t id, const std::string& name,
                              const Tensor& var);
