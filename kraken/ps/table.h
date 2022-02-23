@@ -84,10 +84,10 @@ public:
 
   virtual int32_t PushPull(const Tensor& grad, float lr, Tensor* val);
 
-  virtual int32_t Push(const std::vector<int64_t>& indices,
+  virtual int32_t Push(const std::vector<uint64_t>& indices,
                        const std::vector<Tensor>& grads, float lr);
 
-  virtual int32_t Pull(const std::vector<int64_t>& indices,
+  virtual int32_t Pull(const std::vector<uint64_t>& indices,
                        std::vector<Tensor>* vals);
 };
 

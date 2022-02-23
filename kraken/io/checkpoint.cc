@@ -447,7 +447,7 @@ bool Checkpoint::LoadSparseTable(const std::string& path,
   }
 
   for (uint64_t i = 0; i < val_size; ++i) {
-    int64_t sparse_id;
+    uint64_t sparse_id;
     Table::Value val;
 
     if ((deserialize >> sparse_id) == false || (deserialize >> val) == false) {
@@ -499,7 +499,7 @@ bool Checkpoint::LoadSparseTable(const std::string& path, size_t shard_id,
   }
 
   for (uint64_t i = 0; i < val_size; ++i) {
-    int64_t sparse_id;
+    uint64_t sparse_id;
     Table::Value val;
 
     if ((deserialize >> sparse_id) == false || (deserialize >> val) == false) {

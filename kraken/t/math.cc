@@ -1153,6 +1153,9 @@ void Cast(const TensorImpl& x, TensorImpl& y) {
 
   CONVERT_FUNC(uint32_t, int64_t);
   CONVERT_FUNC(int32_t, int64_t);
+  CONVERT_FUNC(uint32_t, uint64_t);
+  CONVERT_FUNC(int32_t, uint64_t);
+  CONVERT_FUNC(int64_t, uint64_t);
 
   RUNTIME_ERROR("Unsupport convert from:" << x.element_type().Name()
                                           << " to:" << y.element_type().Name());

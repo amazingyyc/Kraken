@@ -13,7 +13,7 @@ struct PullSparseTableRequest {
   uint64_t model_id;
   uint64_t table_id;
 
-  std::vector<int64_t> indices;
+  std::vector<uint64_t> indices;
 };
 
 template <>

@@ -72,7 +72,7 @@ TEST(Emitter, CompressTypekNo) {
   }
 
   {
-    Tensor indices = VectorToTensor<int64_t>(std::vector<int64_t>({0, 1}));
+    Tensor indices = VectorToTensor<uint64_t>(std::vector<uint64_t>({0, 1}));
 
     Tensor real = emitter->PullSparseTable(2, indices);
 
@@ -81,8 +81,8 @@ TEST(Emitter, CompressTypekNo) {
   }
 
   {
-    Tensor indices0 = VectorToTensor<int64_t>(std::vector<int64_t>({0, 1}));
-    Tensor indices1 = VectorToTensor<int64_t>(std::vector<int64_t>({0, 1}));
+    Tensor indices0 = VectorToTensor<uint64_t>(std::vector<uint64_t>({0, 1}));
+    Tensor indices1 = VectorToTensor<uint64_t>(std::vector<uint64_t>({0, 1}));
 
     std::vector<Tensor> reals =
         emitter->CombinePullSparseTable({2, 3}, {indices0, indices1});
@@ -96,7 +96,7 @@ TEST(Emitter, CompressTypekNo) {
   }
 
   {
-    Tensor indices = VectorToTensor<int64_t>(std::vector<int64_t>({0, 1}));
+    Tensor indices = VectorToTensor<uint64_t>(std::vector<uint64_t>({0, 1}));
     Tensor grad = RandomTensor<float>(Shape({2, 100}));
 
     float lr = utils::ThreadLocalRandom<float>(0.1, 1.0);
@@ -115,8 +115,8 @@ TEST(Emitter, CompressTypekNo) {
   }
 
   {
-    Tensor indices0 = VectorToTensor<int64_t>(std::vector<int64_t>({2, 3}));
-    Tensor indices1 = VectorToTensor<int64_t>(std::vector<int64_t>({2, 3}));
+    Tensor indices0 = VectorToTensor<uint64_t>(std::vector<uint64_t>({2, 3}));
+    Tensor indices1 = VectorToTensor<uint64_t>(std::vector<uint64_t>({2, 3}));
 
     std::vector<Tensor> before =
         emitter->CombinePullSparseTable({2, 3}, {indices0, indices1});
@@ -208,7 +208,7 @@ TEST(Emitter, CompressTypekSnappy) {
   }
 
   {
-    Tensor indices = VectorToTensor<int64_t>(std::vector<int64_t>({0, 1}));
+    Tensor indices = VectorToTensor<uint64_t>(std::vector<uint64_t>({0, 1}));
 
     Tensor real = emitter->PullSparseTable(2, indices);
 
@@ -217,8 +217,8 @@ TEST(Emitter, CompressTypekSnappy) {
   }
 
   {
-    Tensor indices0 = VectorToTensor<int64_t>(std::vector<int64_t>({0, 1}));
-    Tensor indices1 = VectorToTensor<int64_t>(std::vector<int64_t>({0, 1}));
+    Tensor indices0 = VectorToTensor<uint64_t>(std::vector<uint64_t>({0, 1}));
+    Tensor indices1 = VectorToTensor<uint64_t>(std::vector<uint64_t>({0, 1}));
 
     std::vector<Tensor> reals =
         emitter->CombinePullSparseTable({2, 3}, {indices0, indices1});
@@ -232,7 +232,7 @@ TEST(Emitter, CompressTypekSnappy) {
   }
 
   {
-    Tensor indices = VectorToTensor<int64_t>(std::vector<int64_t>({0, 1}));
+    Tensor indices = VectorToTensor<uint64_t>(std::vector<uint64_t>({0, 1}));
     Tensor grad = RandomTensor<float>(Shape({2, 100}));
 
     float lr = utils::ThreadLocalRandom<float>(0.1, 1.0);
@@ -251,8 +251,8 @@ TEST(Emitter, CompressTypekSnappy) {
   }
 
   {
-    Tensor indices0 = VectorToTensor<int64_t>(std::vector<int64_t>({2, 3}));
-    Tensor indices1 = VectorToTensor<int64_t>(std::vector<int64_t>({2, 3}));
+    Tensor indices0 = VectorToTensor<uint64_t>(std::vector<uint64_t>({2, 3}));
+    Tensor indices1 = VectorToTensor<uint64_t>(std::vector<uint64_t>({2, 3}));
 
     std::vector<Tensor> before =
         emitter->CombinePullSparseTable({2, 3}, {indices0, indices1});

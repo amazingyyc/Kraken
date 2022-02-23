@@ -14,12 +14,12 @@ struct CombinePullSparseTableRequest {
   uint64_t model_id;
 
   // <TableId, Indices> map.
-  std::unordered_map<uint64_t, std::vector<int64_t>> indices;
+  std::unordered_map<uint64_t, std::vector<uint64_t>> indices;
 };
 
 template <>
 inline bool Serialize::operator<<(
-    const std::unordered_map<uint64_t, std::vector<int64_t>>& v) {
+    const std::unordered_map<uint64_t, std::vector<uint64_t>>& v) {
   uint64_t size = v.size();
   if (((*this) << size) == false) {
     return false;
@@ -41,7 +41,7 @@ inline bool Serialize::operator<<(const CombinePullSparseTableRequest& v) {
 
 template <>
 inline bool Deserialize::operator>>(
-    std::unordered_map<uint64_t, std::vector<int64_t>>& v) {
+    std::unordered_map<uint64_t, std::vector<uint64_t>>& v) {
   v.clear();
 
   uint64_t size;
@@ -52,7 +52,7 @@ inline bool Deserialize::operator>>(
   v.reserve(size);
   for (uint64_t i = 0; i < size; ++i) {
     uint64_t key;
-    std::vector<int64_t> value;
+    std::vector<uint64_t> value;
 
     if (((*this) >> key) == false || ((*this) >> value) == false) {
       return false;

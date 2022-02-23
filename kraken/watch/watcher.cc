@@ -234,7 +234,7 @@ bool Watcher::IsDenseTableValExist(uint64_t table_id) {
   return it->second->type_ == TableType::kDense;
 }
 
-bool Watcher::IsSparseTableValExist(uint64_t table_id, int64_t sparse_id) {
+bool Watcher::IsSparseTableValExist(uint64_t table_id, uint64_t sparse_id) {
   auto it = model_->tables_.find(table_id);
   if (it == model_->tables_.end()) {
     return false;
@@ -262,7 +262,7 @@ Tensor Watcher::DenseTableVal(uint64_t table_id) const {
   return table->val_.val;
 }
 
-Tensor Watcher::SparseTableVal(uint64_t table_id, int64_t sparse_id) const {
+Tensor Watcher::SparseTableVal(uint64_t table_id, uint64_t sparse_id) const {
   auto it = model_->tables_.find(table_id);
 
   ARGUMENT_CHECK(it != model_->tables_.end(),

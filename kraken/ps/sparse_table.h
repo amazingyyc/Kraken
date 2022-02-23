@@ -37,7 +37,7 @@ private:
 
   std::unique_ptr<Initializer> initializer_;
 
-  libcuckoo::cuckoohash_map<int64_t, Value> vals_;
+  libcuckoo::cuckoohash_map<uint64_t, Value> vals_;
 
 public:
   SparseTable(Optim* optim, uint64_t id, const std::string& name,
@@ -51,10 +51,10 @@ public:
 
   Initializer* initializer() const;
 
-  int32_t Push(const std::vector<int64_t>& indices,
+  int32_t Push(const std::vector<uint64_t>& indices,
                const std::vector<Tensor>& grads, float lr) override;
 
-  int32_t Pull(const std::vector<int64_t>& indices,
+  int32_t Pull(const std::vector<uint64_t>& indices,
                std::vector<Tensor>* vals) override;
 };
 
