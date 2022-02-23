@@ -44,10 +44,10 @@ public:
   bool IsTableExist(const std::string& table_name) const;
 
   bool IsDenseTableValExist(uint64_t table_id);
-  bool IsSparseTableValExist(uint64_t table_id, int64_t sparse_id);
+  bool IsSparseTableValExist(uint64_t table_id, uint64_t sparse_id);
 
   Tensor DenseTableVal(uint64_t table_id) const;
-  Tensor SparseTableVal(uint64_t table_id, int64_t sparse_id) const;
+  Tensor SparseTableVal(uint64_t table_id, uint64_t sparse_id) const;
 };
 
 }  // namespace watch

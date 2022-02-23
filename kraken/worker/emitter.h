@@ -66,7 +66,7 @@ protected:
    * \return size_t Tabel id.
    */
   size_t SparseTableRouter(uint64_t model_id, uint64_t table_id,
-                           int64_t sparse_id);
+                           uint64_t sparse_id);
 
   /**
    * \brief Request all server with same request.

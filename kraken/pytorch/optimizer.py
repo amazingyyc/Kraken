@@ -10,7 +10,7 @@ import kraken_native
 
 class Optimizer:
 
-  def __init__(self, model_name: str, named_parameters, lr: Union[float, LR], optim: Optim, dense_async=True):
+  def __init__(self, model_name: str, named_parameters, lr: Union[float, LR], optim: Optim):
 
     self._model_name = model_name
 
@@ -22,10 +22,6 @@ class Optimizer:
     self._optim = optim
     self._name_param = {}
     self._name_table_id = {}
-
-    # Whether async send Dense gradient to server.
-    self._dense_async = dense_async
-    logging.info(f'dense_async is:{self._dense_async}')
 
     self._model_id = kraken_native.register_model(self._model_name, self._optim.type(), self._optim.conf())
     logging.info(f'Register model:[{self._model_name}], model_id:[{self._model_id}].')
@@ -77,26 +73,30 @@ class Optimizer:
     logging.info(f'Create gradient hook for:[{name}], table_id:[{table_id}].')
 
     def hook(grad):
-      # At here we will check the flag: dense_async, it True we will send gradient to server async and not wait.
-      # If False we will send Parameter's Gradient to server and wait fetch the Val.
-      if self._dense_async:
-        kraken_native.push_dense_table(table_id, grad)
-        return None
-      else:
-        return kraken_native.push_pull_dense_table(table_id, grad)
+      # We will send gradient to server async.
+      kraken_native.push_dense_table(table_id, grad)
+      return grad
 
     return hook
 
   def step(self):
+    dense_params = []
+    dense_table_ids = []
+
     for name, param in self._name_param.items():
       if not isinstance(param, SparseTable):
-        if self._dense_async:
-          param.data = kraken_native.pull_dense_table(self._name_table_id[name])
-        else:
-          # dense_async is False means the Prameter's value has been assign to the grad.
-          param.data = param.grad
+        dense_params.append(param)
+        dense_table_ids.append(self._name_table_id[name])
 
       param.grad = None
+
+    dense_table_datas = kraken_native.combine_pull_dense_table(dense_table_ids)
+
+    assert len(dense_params) == len(dense_table_datas)
+
+    # update parameter's data.
+    for i in range(len(dense_params)):
+      dense_params[i].data = dense_table_datas[i]
 
     # Update learning rate.
     self._lr.step()

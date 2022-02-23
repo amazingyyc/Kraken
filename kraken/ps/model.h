@@ -65,15 +65,15 @@ public:
                              Tensor* val);
 
   int32_t PushSparseTable(uint64_t table_id,
-                          const std::vector<int64_t>& indices,
+                          const std::vector<uint64_t>& indices,
                           const std::vector<Tensor>& grads, float lr);
 
   int32_t PullSparseTable(uint64_t table_id,
-                          const std::vector<int64_t>& indices,
+                          const std::vector<uint64_t>& indices,
                           std::vector<Tensor>* vals);
 
   int32_t CombinePullSparseTable(
-      const std::unordered_map<uint64_t, std::vector<int64_t>>& indices,
+      const std::unordered_map<uint64_t, std::vector<uint64_t>>& indices,
       std::unordered_map<uint64_t, std::vector<Tensor>>* vals);
 };
 

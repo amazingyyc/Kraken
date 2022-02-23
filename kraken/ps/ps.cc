@@ -419,7 +419,7 @@ int32_t Ps::PushDenseTable(uint64_t model_id, uint64_t table_id,
 }
 
 int32_t Ps::PullSparseTable(uint64_t model_id, uint64_t table_id,
-                            const std::vector<int64_t>& indices,
+                            const std::vector<uint64_t>& indices,
                             std::vector<Tensor>* vals) {
   std::shared_lock<std::shared_mutex> lock(mu_);
 
@@ -433,7 +433,7 @@ int32_t Ps::PullSparseTable(uint64_t model_id, uint64_t table_id,
 
 int32_t Ps::CombinePullSparseTable(
     uint64_t model_id,
-    const std::unordered_map<uint64_t, std::vector<int64_t>>& indices,
+    const std::unordered_map<uint64_t, std::vector<uint64_t>>& indices,
     std::unordered_map<uint64_t, std::vector<Tensor>>* vals) {
   std::shared_lock<std::shared_mutex> lock(mu_);
 
@@ -446,7 +446,7 @@ int32_t Ps::CombinePullSparseTable(
 }
 
 int32_t Ps::PushSparseTable(uint64_t model_id, uint64_t table_id,
-                            const std::vector<int64_t>& indices,
+                            const std::vector<uint64_t>& indices,
                             const std::vector<Tensor>& grads, float lr) {
   std::shared_lock<std::shared_mutex> lock(mu_);
 
