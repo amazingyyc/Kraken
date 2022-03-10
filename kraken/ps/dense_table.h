@@ -10,19 +10,45 @@
 
 namespace kraken {
 
-namespace io {
-class CheckpointExecutor;
-class Checkpoint;
-}  // namespace io
-
-namespace watch {
-class Watcher;
-}
-
 class DenseTable : public Table {
-  friend class io::CheckpointExecutor;
-  friend class io::Checkpoint;
-  friend class watch::Watcher;
+public:
+  class UniqueHandler {
+  private:
+    std::shared_mutex& mu_;
+
+  public:
+    UniqueHandler(std::shared_mutex& mu) : mu_(mu) {
+      mu_.lock();
+    }
+
+    UniqueHandler(const UniqueHandler&) = delete;
+    UniqueHandler(const UniqueHandler&&) = delete;
+    const UniqueHandler& operator=(const UniqueHandler&) = delete;
+    const UniqueHandler& operator=(const UniqueHandler&&) = delete;
+
+    ~UniqueHandler() {
+      mu_.unlock();
+    }
+  };
+
+  class SharedHandler {
+  private:
+    std::shared_mutex& mu_;
+
+  public:
+    SharedHandler(std::shared_mutex& mu) : mu_(mu) {
+      mu_.lock_shared();
+    }
+
+    SharedHandler(const SharedHandler&) = delete;
+    SharedHandler(const SharedHandler&&) = delete;
+    const SharedHandler& operator=(const SharedHandler&) = delete;
+    const SharedHandler& operator=(const SharedHandler&&) = delete;
+
+    ~SharedHandler() {
+      mu_.unlock_shared();
+    }
+  };
 
 private:
   std::shared_mutex mu_;
@@ -30,11 +56,16 @@ private:
   Value val_;
 
 public:
-  DenseTable(Optim* optim, uint64_t id, const std::string& name,
-             const Tensor& val);
+  DenseTable(uint64_t id, const std::string& name, const Tensor& val);
+
+  DenseTable(uint64_t id, const std::string& name, const Value& val);
 
 public:
-  const Tensor& val() const;
+  UniqueHandler unique_handler();
+
+  SharedHandler shared_handler();
+
+  const Value& val() const;
 
   int32_t Push(const Tensor& grad, float lr) override;
 

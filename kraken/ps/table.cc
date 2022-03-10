@@ -5,8 +5,8 @@
 
 namespace kraken {
 
-Table::Table(TableType type, Optim* optim, uint64_t id, const std::string& name)
-    : type_(type), optim_(optim), id_(id), name_(name) {
+Table::Table(TableType type, uint64_t id, const std::string& name)
+    : type_(type), id_(id), name_(name) {
 }
 
 TableType Table::type() const {

@@ -7,39 +7,51 @@
 
 namespace kraken {
 
-DenseTable::DenseTable(Optim* optim, uint64_t id, const std::string& name,
-                       const Tensor& val)
-    : Table(TableType::kDense, optim, id, name) {
+DenseTable::DenseTable(uint64_t id, const std::string& name, const Tensor& val)
+    : Table(TableType::kDense, id, name) {
   val_.val = val;
 }
 
-const Tensor& DenseTable::val() const {
-  return val_.val;
+DenseTable::DenseTable(uint64_t id, const std::string& name, const Value& val)
+    : Table(TableType::kDense, id, name), val_(val) {
+}
+
+DenseTable::UniqueHandler DenseTable::unique_handler() {
+  return DenseTable::UniqueHandler(mu_);
+}
+
+DenseTable::SharedHandler DenseTable::shared_handler() {
+  return DenseTable::SharedHandler(mu_);
+}
+
+const Value& DenseTable::val() const {
+  return val_;
 }
 
 int32_t DenseTable::Push(const Tensor& grad, float lr) {
-  std::unique_lock<std::shared_mutex> lock(mu_);
+  // std::unique_lock<std::shared_mutex> lock(mu_);
 
-  return optim_->Update(grad, lr, &val_.val, &val_.bag);
+  // return optim_->Update(grad, lr, &val_.val, &val_.bag);
+  return ErrorCode::kSuccess;
 }
 
 int32_t DenseTable::Pull(Tensor* val) {
-  std::shared_lock<std::shared_mutex> lock(mu_);
+  // std::shared_lock<std::shared_mutex> lock(mu_);
 
-  *val = val_.val.Clone();
+  // *val = val_.val.Clone();
 
   return ErrorCode::kSuccess;
 }
 
 int32_t DenseTable::PushPull(const Tensor& grad, float lr, Tensor* val) {
-  std::unique_lock<std::shared_mutex> lock(mu_);
+  // std::unique_lock<std::shared_mutex> lock(mu_);
 
-  int32_t ecode = optim_->Update(grad, lr, &val_.val, &val_.bag);
-  if (ecode != ErrorCode::kSuccess) {
-    return ecode;
-  }
+  // int32_t ecode = optim_->Update(grad, lr, &val_.val, &val_.bag);
+  // if (ecode != ErrorCode::kSuccess) {
+  //   return ecode;
+  // }
 
-  *val = val_.val.Clone();
+  // *val = val_.val.Clone();
 
   return ErrorCode::kSuccess;
 }

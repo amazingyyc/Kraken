@@ -1,40 +1,40 @@
-#pragma once
+// #pragma once
 
-#include <cinttypes>
+// #include <cinttypes>
 
-#include "common/deserialize.h"
-#include "common/serialize.h"
-#include "t/tensor.h"
+// #include "common/deserialize.h"
+// #include "common/serialize.h"
+// #include "t/tensor.h"
 
-namespace kraken {
+// namespace kraken {
 
-struct PullDenseTableRequest {
-  uint64_t model_id;
-  uint64_t table_id;
-};
+// struct PullDenseTableRequest {
+//   uint64_t model_id;
+//   uint64_t table_id;
+// };
 
-template <>
-inline bool Serialize::operator<<(const PullDenseTableRequest& v) {
-  return (*this) << v.model_id && (*this) << v.table_id;
-}
+// template <>
+// inline bool Serialize::operator<<(const PullDenseTableRequest& v) {
+//   return (*this) << v.model_id && (*this) << v.table_id;
+// }
 
-template <>
-inline bool Deserialize::operator>>(PullDenseTableRequest& v) {
-  return (*this) >> v.model_id && (*this) >> v.table_id;
-}
+// template <>
+// inline bool Deserialize::operator>>(PullDenseTableRequest& v) {
+//   return (*this) >> v.model_id && (*this) >> v.table_id;
+// }
 
-struct PullDenseTableResponse {
-  Tensor val;
-};
+// struct PullDenseTableResponse {
+//   Tensor val;
+// };
 
-template <>
-inline bool Serialize::operator<<(const PullDenseTableResponse& v) {
-  return (*this) << v.val;
-}
+// template <>
+// inline bool Serialize::operator<<(const PullDenseTableResponse& v) {
+//   return (*this) << v.val;
+// }
 
-template <>
-inline bool Deserialize::operator>>(PullDenseTableResponse& v) {
-  return (*this) >> v.val;
-}
+// template <>
+// inline bool Deserialize::operator>>(PullDenseTableResponse& v) {
+//   return (*this) >> v.val;
+// }
 
-}  // namespace kraken
+// }  // namespace kraken

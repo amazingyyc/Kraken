@@ -1,67 +1,42 @@
 #include "worker/emitter.h"
 
-#include <tuple>
+// #include <tuple>
 
 #include "common/log.h"
-#include "protocol/apply_dense_table_prot.h"
-#include "protocol/apply_model_prot.h"
-#include "protocol/apply_sparse_table_prot.h"
-#include "protocol/combine_pull_dense_table_prot.h"
-#include "protocol/combine_pull_sparse_table_prot.h"
-#include "protocol/pull_dense_table_prot.h"
-#include "protocol/pull_sparse_table_prot.h"
-#include "protocol/push_dense_table_prot.h"
-#include "protocol/push_pull_dense_table_prot.h"
-#include "protocol/push_sparse_table_prot.h"
-#include "protocol/register_dense_table_info_prot.h"
+#include "protocol/fetch_router_prot.h"
+#include "protocol/init_model_prot.h"
 #include "protocol/register_dense_table_prot.h"
-#include "protocol/register_model_prot.h"
-#include "protocol/register_sparse_table_info_prot.h"
 #include "protocol/register_sparse_table_prot.h"
 #include "protocol/rpc_func_type.h"
-#include "protocol/save_check_point_prot.h"
 
 namespace kraken {
 
 Emitter::Emitter() : Emitter(EmitterType::kDefault) {
 }
 
-Emitter::Emitter(EmitterType type)
-    : type_(type), initialized_(false), router_(1) {
+Emitter::Emitter(EmitterType type) : type_(type), initialized_(false) {
 }
 
-size_t Emitter::DenseTableRouter(uint64_t model_id, uint64_t table_id) {
-  return router_(model_id, table_id);
-}
-
-size_t Emitter::SparseTableRouter(uint64_t model_id, uint64_t table_id,
-                                  uint64_t sparse_id) {
-  return router_(model_id, table_id, sparse_id);
-}
-
-void Emitter::Initialize(const std::string& addrs, CompressType compress_type) {
+void Emitter::Initialize(const std::string& s_addr,
+                         CompressType compress_type) {
   if (initialized_.load()) {
     return;
   }
 
-  // Parse address.
-  std::vector<std::string> tokens;
-  utils::Split(addrs, ",", &tokens);
+  std::unique_lock<std::shared_mutex> _(mu_);
 
-  for (uint32_t i = 0; i < tokens.size(); ++i) {
-    std::unique_ptr<Client> client(new Client(i, tokens[i], compress_type));
-    clients_.emplace_back(std::move(client));
-  }
+  LOG_INFO("Try to connect scheduler:" << s_addr);
+  s_connecter_.reset(new IndepConnecter(s_addr, compress_type_));
+  s_connecter_->Start();
 
-  // Start client.
-  for (uint32_t i = 0; i < tokens.size(); ++i) {
-    clients_[i]->Start();
-  }
+  // Fetch router.
+  FetchRouterRequest req;
+  FetchRouterResponse reply;
 
-  // Update router.
-  router_ = ConsistentHasher(clients_.size());
+  RPC_CALL(s_connecter_->Call(RPCFuncType::kFetchRouterType, req, &reply));
+  router_ = reply.router;
 
-  LOG_INFO("Create connection with:" << addrs);
+  LOG_INFO("Fetch router:" << router_.Str());
 
   // set flag.
   initialized_.store(true);
@@ -70,502 +45,399 @@ void Emitter::Initialize(const std::string& addrs, CompressType compress_type) {
 void Emitter::Stop() {
   ARGUMENT_CHECK(initialized_.load(), "Emitter not initialize.");
 
-  for (auto& c : clients_) {
-    c->Stop();
-  }
+  s_connecter_->Stop();
+  s_connecter_.reset(nullptr);
 
   initialized_.store(false);
-}
-
-uint64_t Emitter::RegisterModel(
-    const std::string& model_name, OptimType optim_type,
-    const std::unordered_map<std::string, std::string>& optim_conf) {
-  ARGUMENT_CHECK(initialized_.load(), "Emitter not initialize.");
-
-  model_name_ = model_name;
-
-  {
-    // Step1: Apply a model id in leader server.
-    ApplyModelRequest req;
-    req.model_name = model_name;
-    req.optim_type = optim_type;
-    req.optim_conf = optim_conf;
-
-    ApplyModelResponse rsp;
-
-    RPC_CALL(clients_[0]->Call(RPCFuncType::kApplyModelType, req, &rsp));
-
-    // Store model id.
-    model_id_ = rsp.model_id;
-
-    LOG_INFO("Apply model: " << model_name_ << ", id: " << model_id_
-                             << ", from server 0.");
-  }
-
-  {
-    // Step2: Register model in all server.
-    RegisterModelRequest req;
-    req.id = model_id_;
-    req.name = model_name;
-    req.optim_type = optim_type;
-    req.optim_conf = optim_conf;
-
-    std::vector<RegisterModelResponse> rsps;
-
-    // We do not care about the response, just check the error code.
-    RPC_CALL(ParallelCallAll(RPCFuncType::kRegisterModelType, req, &rsps));
-
-    LOG_INFO("Register model: " << model_name_ << ", id: " << model_id_
-                                << " in all server.");
-  }
-
-  return model_id_;
 }
 
 void Emitter::UpdateLR(float lr) {
   lr_.store(lr);
 }
 
-uint64_t Emitter::RegisterDenseTable(const std::string& name,
-                                     const Tensor& val) {
+void Emitter::InitModel(
+    const std::string& model_name, OptimType optim_type,
+    const std::unordered_map<std::string, std::string>& optim_conf) {
   ARGUMENT_CHECK(initialized_.load(), "Emitter not initialize.");
 
-  uint64_t table_id;
-  {
-    // Apply table id.
-    ApplyDenseTableRequest req;
-    ApplyDenseTableResponse rsp;
+  model_name_ = model_name;
 
-    req.model_id = model_id_;
-    req.name = name;
-    req.shape = val.shape();
-    req.element_type = val.element_type();
+  InitModelRequest req;
+  req.name = model_name;
+  req.optim_type = optim_type;
+  req.optim_conf = optim_conf;
+  InitModelResponse reply;
 
-    RPC_CALL(clients_[0]->Call(RPCFuncType::kApplyDenseTableType, req, &rsp));
+  RPC_CALL(s_connecter_->Call(RPCFuncType::kInitModelType, req, &reply));
+}
 
-    table_id = rsp.table_id;
+uint64_t Emitter::RegisterDenseTable(const std::string& name,
+                                     const Tensor& val) {
+  RegisterDenseTableRequest req;
+  req.name = name;
+  req.val = val;
+  RegisterDenseTableResponse reply;
 
-    LOG_INFO("Apply DenseTable:" << name << ", id:" << table_id
-                                 << ", from server 0.");
-  }
+  RPC_CALL(
+      s_connecter_->Call(RPCFuncType::kRegisterDenseTableType, req, &reply));
 
-  {
-    // Register DenseTable in all server.
-    RegisterDenseTableInfoRequest req;
-    req.model_id = model_id_;
-    req.id = table_id;
-    req.name = name;
-    req.shape = val.shape();
-    req.element_type = val.element_type();
+  LOG_INFO("Register DenseTable:" << name << ", id:" << reply.table_id);
 
-    std::vector<RegisterDenseTableInfoResponse> rsps;
-
-    RPC_CALL(
-        ParallelCallAll(RPCFuncType::kRegisterDenseTableInfoType, req, &rsps));
-
-    LOG_INFO("Register DenseTableInfo:" << name << ", id:" << table_id
-                                        << " in all server.");
-  }
-
-  {
-    // Get server id.
-    size_t server_id = DenseTableRouter(model_id_, table_id);
-
-    // Register dense table in special server for training.
-    RegisterDenseTableRequest req;
-    RegisterDenseTableResponse rsp;
-
-    req.model_id = model_id_;
-    req.id = table_id;
-    req.name = name;
-    req.val = val;
-
-    RPC_CALL(clients_[server_id]->Call(RPCFuncType::kRegisterDenseTableType,
-                                       req, &rsp));
-
-    LOG_INFO("Register DenseTable: " << name << ", id: " << table_id
-                                     << ", in server:" << server_id);
-  }
-
-  return table_id;
+  return reply.table_id;
 }
 
 uint64_t Emitter::RegisterSparseTable(
     const std::string& name, int64_t dimension, ElementType element_type,
     InitializerType init_type,
     const std::unordered_map<std::string, std::string>& init_conf) {
-  ARGUMENT_CHECK(initialized_.load(), "Emitter not initialize.");
+  RegisterSparseTableRequest req;
+  req.name = name;
+  req.dimension = dimension;
+  req.element_type = element_type;
+  req.init_type = init_type;
+  req.init_conf = init_conf;
 
-  uint64_t table_id;
-  {
-    // Apply table id.
-    ApplySparseTableRequest req;
-    ApplySparseTableResponse rsp;
-
-    req.model_id = model_id_;
-    req.name = name;
-    req.dimension = dimension;
-    req.element_type = element_type;
-    req.init_type = init_type;
-    req.init_conf = init_conf;
-
-    RPC_CALL(clients_[0]->Call(RPCFuncType::kApplySparseTableType, req, &rsp));
-
-    table_id = rsp.table_id;
-
-    LOG_INFO("Apply SparseTable: " << name << ", id: " << table_id
-                                   << ", from server 0.");
-  }
-
-  {
-    // Register sparse table in all server.
-    RegisterSparseTableRequest req;
-    std::vector<RegisterSparseTableResponse> rsps;
-
-    req.model_id = model_id_;
-    req.id = table_id;
-    req.name = name;
-    req.dimension = dimension;
-    req.element_type = element_type;
-    req.init_type = init_type;
-    req.init_conf = init_conf;
-
-    RPC_CALL(
-        ParallelCallAll(RPCFuncType::kRegisterSparseTableType, req, &rsps));
-
-    LOG_INFO("Register SparseTable: " << name << ", id: " << table_id
-                                      << ", in all server.");
-  }
-
-  return table_id;
-}
-
-Tensor Emitter::PullDenseTable(uint64_t table_id) {
-  ARGUMENT_CHECK(initialized_.load(), "Emitter not initialize.");
-
-  size_t server_id = DenseTableRouter(model_id_, table_id);
-
-  PullDenseTableRequest req;
-  PullDenseTableResponse rsp;
-
-  req.model_id = model_id_;
-  req.table_id = table_id;
+  RegisterSparseTableResponse reply;
 
   RPC_CALL(
-      clients_[server_id]->Call(RPCFuncType::kPullDenseTableType, req, &rsp));
+      s_connecter_->Call(RPCFuncType::kRegisterSparseTableType, req, &reply));
 
-  return rsp.val;
+  LOG_INFO("Register SparseTable: " << name << ", id: " << reply.table_id);
+
+  return reply.table_id;
 }
 
-std::vector<Tensor> Emitter::CombinePullDenseTable(
-    const std::vector<uint64_t>& table_ids) {
-  ARGUMENT_CHECK(initialized_.load(), "Emitter not initialize.");
+// Tensor Emitter::PullDenseTable(uint64_t table_id) {
+//   ARGUMENT_CHECK(initialized_.load(), "Emitter not initialize.");
 
-  std::vector<size_t> table_val_idx;
-  table_val_idx.resize(table_ids.size());
+//   size_t server_id = DenseTableRouter(model_id_, table_id);
 
-  std::vector<CombinePullDenseTableRequest> reqs;
-  reqs.resize(clients_.size());
+//   PullDenseTableRequest req;
+//   PullDenseTableResponse rsp;
 
-  std::vector<CombinePullDenseTableResponse> rsps;
+//   req.model_id = model_id_;
+//   req.table_id = table_id;
 
-  std::vector<bool> mask(clients_.size(), false);
+//   RPC_CALL(
+//       clients_[server_id]->Call(RPCFuncType::kPullDenseTableType, req,
+//       &rsp));
 
-  for (size_t i = 0; i < table_ids.size(); ++i) {
-    uint64_t table_id = table_ids[i];
-    size_t server_id = DenseTableRouter(model_id_, table_id);
+//   return rsp.val;
+// }
 
-    mask[server_id] = true;
+// std::vector<Tensor> Emitter::CombinePullDenseTable(
+//     const std::vector<uint64_t>& table_ids) {
+//   ARGUMENT_CHECK(initialized_.load(), "Emitter not initialize.");
 
-    table_val_idx[i] = reqs[server_id].table_ids.size();
-    reqs[server_id].table_ids.emplace_back(table_id);
-  }
+//   std::vector<size_t> table_val_idx;
+//   table_val_idx.resize(table_ids.size());
 
-  for (size_t i = 0; i < mask.size(); ++i) {
-    if (mask[i]) {
-      reqs[i].model_id = model_id_;
-    }
-  }
+//   std::vector<CombinePullDenseTableRequest> reqs;
+//   reqs.resize(clients_.size());
 
-  RPC_CALL(
-      ParallelCall(RPCFuncType::kCombinePullDenseTableType, mask, reqs, &rsps));
+//   std::vector<CombinePullDenseTableResponse> rsps;
 
-  std::vector<Tensor> vals;
-  vals.reserve(table_ids.size());
+//   std::vector<bool> mask(clients_.size(), false);
 
-  for (size_t i = 0; i < table_ids.size(); ++i) {
-    uint64_t table_id = table_ids[i];
-    size_t server_id = DenseTableRouter(model_id_, table_id);
+//   for (size_t i = 0; i < table_ids.size(); ++i) {
+//     uint64_t table_id = table_ids[i];
+//     size_t server_id = DenseTableRouter(model_id_, table_id);
 
-    vals.emplace_back(rsps[server_id].vals.at(table_val_idx[i]));
-  }
+//     mask[server_id] = true;
 
-  return vals;
-}
+//     table_val_idx[i] = reqs[server_id].table_ids.size();
+//     reqs[server_id].table_ids.emplace_back(table_id);
+//   }
 
-void Emitter::PushDenseTable(uint64_t table_id, const Tensor& grad) {
-  ARGUMENT_CHECK(initialized_.load(), "Emitter not initialize.");
+//   for (size_t i = 0; i < mask.size(); ++i) {
+//     if (mask[i]) {
+//       reqs[i].model_id = model_id_;
+//     }
+//   }
 
-  size_t server_id = DenseTableRouter(model_id_, table_id);
+//   RPC_CALL(
+//       ParallelCall(RPCFuncType::kCombinePullDenseTableType, mask, reqs,
+//       &rsps));
 
-  PushDenseTableRequest req;
-  req.model_id = model_id_;
-  req.table_id = table_id;
-  req.grad = grad;
-  req.lr = lr_.load();
+//   std::vector<Tensor> vals;
+//   vals.reserve(table_ids.size());
 
-  auto callback = [](int32_t ecode, PushDenseTableResponse& /*not care*/) {
-    RPC_CALL(ecode);
-  };
+//   for (size_t i = 0; i < table_ids.size(); ++i) {
+//     uint64_t table_id = table_ids[i];
+//     size_t server_id = DenseTableRouter(model_id_, table_id);
 
-  clients_[server_id]->CallAsync<PushDenseTableRequest, PushDenseTableResponse>(
-      RPCFuncType::kPushDenseTableType, req, std::move(callback));
-}
+//     vals.emplace_back(rsps[server_id].vals.at(table_val_idx[i]));
+//   }
 
-Tensor Emitter::PushPullDenseTable(uint64_t table_id, const Tensor& grad) {
-  ARGUMENT_CHECK(initialized_.load(), "Emitter not initialize.");
+//   return vals;
+// }
 
-  size_t server_id = DenseTableRouter(model_id_, table_id);
+// void Emitter::PushDenseTable(uint64_t table_id, const Tensor& grad) {
+//   ARGUMENT_CHECK(initialized_.load(), "Emitter not initialize.");
 
-  PushPullDenseTableRequest req;
-  PushPullDenseTableResponse rsp;
+//   size_t server_id = DenseTableRouter(model_id_, table_id);
 
-  req.model_id = model_id_;
-  req.table_id = table_id;
-  req.grad = grad;
-  req.lr = lr_.load();
+//   PushDenseTableRequest req;
+//   req.model_id = model_id_;
+//   req.table_id = table_id;
+//   req.grad = grad;
+//   req.lr = lr_.load();
 
-  RPC_CALL(clients_[server_id]->Call(RPCFuncType::kPushPullDenseTableType, req,
-                                     &rsp));
+//   auto callback = [](int32_t ecode, PushDenseTableResponse& /*not care*/) {
+//     RPC_CALL(ecode);
+//   };
 
-  return rsp.val;
-}
+//   clients_[server_id]->CallAsync<PushDenseTableRequest,
+//   PushDenseTableResponse>(
+//       RPCFuncType::kPushDenseTableType, req, std::move(callback));
+// }
 
-Tensor Emitter::PullSparseTable(uint64_t table_id, const Tensor& indices) {
-  ARGUMENT_CHECK(initialized_.load(), "Emitter not initialize.");
+// Tensor Emitter::PushPullDenseTable(uint64_t table_id, const Tensor& grad) {
+//   ARGUMENT_CHECK(initialized_.load(), "Emitter not initialize.");
 
-  // Maybe share memory with pytorch.
-  Tensor indices_u64 = indices.Cast(ElementType::From<uint64_t>());
+//   size_t server_id = DenseTableRouter(model_id_, table_id);
 
-  int64_t row = indices_u64.Size();
-  uint64_t* ptr = indices_u64.Data<uint64_t>();
+//   PushPullDenseTableRequest req;
+//   PushPullDenseTableResponse rsp;
 
-  // The index in Req/Rsp for every sparse_id.
-  std::unordered_map<int64_t, size_t> sparse_indices;
-  sparse_indices.reserve(row);
+//   req.model_id = model_id_;
+//   req.table_id = table_id;
+//   req.grad = grad;
+//   req.lr = lr_.load();
 
-  std::vector<PullSparseTableRequest> reqs;
-  std::vector<PullSparseTableResponse> rsps;
-  reqs.resize(clients_.size());
+//   RPC_CALL(clients_[server_id]->Call(RPCFuncType::kPushPullDenseTableType,
+//   req,
+//                                      &rsp));
 
-  std::vector<bool> mask(clients_.size(), false);
+//   return rsp.val;
+// }
 
-  for (int64_t i = 0; i < row; ++i) {
-    uint64_t sparse_id = ptr[i];
+// Tensor Emitter::PullSparseTable(uint64_t table_id, const Tensor& indices) {
+//   ARGUMENT_CHECK(initialized_.load(), "Emitter not initialize.");
 
-    if (sparse_indices.find(sparse_id) == sparse_indices.end()) {
-      size_t server_id = SparseTableRouter(model_id_, table_id, sparse_id);
+//   // Maybe share memory with pytorch.
+//   Tensor indices_u64 = indices.Cast(ElementType::From<uint64_t>());
 
-      mask[server_id] = true;
+//   int64_t row = indices_u64.Size();
+//   uint64_t* ptr = indices_u64.Data<uint64_t>();
 
-      sparse_indices[sparse_id] = reqs[server_id].indices.size();
-      reqs[server_id].indices.emplace_back(sparse_id);
-    }
-  }
+//   // The index in Req/Rsp for every sparse_id.
+//   std::unordered_map<int64_t, size_t> sparse_indices;
+//   sparse_indices.reserve(row);
 
-  for (size_t i = 0; i < reqs.size(); ++i) {
-    if (mask[i]) {
-      reqs[i].model_id = model_id_;
-      reqs[i].table_id = table_id;
-    }
-  }
+//   std::vector<PullSparseTableRequest> reqs;
+//   std::vector<PullSparseTableResponse> rsps;
+//   reqs.resize(clients_.size());
 
-  // Send to server.
-  RPC_CALL(ParallelCall(RPCFuncType::kPullSparseTableType, mask, reqs, &rsps));
+//   std::vector<bool> mask(clients_.size(), false);
 
-  std::vector<Tensor> vals;
-  vals.reserve(row);
+//   for (int64_t i = 0; i < row; ++i) {
+//     uint64_t sparse_id = ptr[i];
 
-  for (int64_t i = 0; i < row; ++i) {
-    uint64_t sparse_id = ptr[i];
-    size_t server_id = SparseTableRouter(model_id_, table_id, sparse_id);
+//     if (sparse_indices.find(sparse_id) == sparse_indices.end()) {
+//       size_t server_id = SparseTableRouter(model_id_, table_id, sparse_id);
 
-    size_t val_i = sparse_indices[sparse_id];
+//       mask[server_id] = true;
 
-    vals.emplace_back(rsps.at(server_id).vals.at(val_i));
-  }
+//       sparse_indices[sparse_id] = reqs[server_id].indices.size();
+//       reqs[server_id].indices.emplace_back(sparse_id);
+//     }
+//   }
 
-  Tensor val = indices_u64.ConcatVector(vals);
+//   for (size_t i = 0; i < reqs.size(); ++i) {
+//     if (mask[i]) {
+//       reqs[i].model_id = model_id_;
+//       reqs[i].table_id = table_id;
+//     }
+//   }
 
-  std::vector<int64_t> dims = indices_u64.shape().dims();
-  int64_t col = val.Size() / indices_u64.Size();
+//   // Send to server.
+//   RPC_CALL(ParallelCall(RPCFuncType::kPullSparseTableType, mask, reqs,
+//   &rsps));
 
-  dims.emplace_back(col);
+//   std::vector<Tensor> vals;
+//   vals.reserve(row);
 
-  return val.Reshape(dims);
-}
+//   for (int64_t i = 0; i < row; ++i) {
+//     uint64_t sparse_id = ptr[i];
+//     size_t server_id = SparseTableRouter(model_id_, table_id, sparse_id);
 
-std::vector<Tensor> Emitter::CombinePullSparseTable(
-    const std::vector<uint64_t>& table_ids,
-    const std::vector<Tensor>& indices) {
-  ARGUMENT_CHECK(initialized_.load(), "Emitter not initialize.");
-  ARGUMENT_CHECK(
-      table_ids.size() == indices.size(),
-      "CombinePullSparseTable need table_ids and indices has same size.");
+//     size_t val_i = sparse_indices[sparse_id];
 
-  // Maybe share memory with pytorch.
-  std::vector<Tensor> indice_u64s;
-  indice_u64s.reserve(indices.size());
-  for (size_t i = 0; i < indices.size(); ++i) {
-    indice_u64s.emplace_back(indices[i].Cast(ElementType::From<uint64_t>()));
-  }
+//     vals.emplace_back(rsps.at(server_id).vals.at(val_i));
+//   }
 
-  std::vector<CombinePullSparseTableRequest> reqs;
-  std::vector<CombinePullSparseTableResponse> rsps;
-  reqs.resize(clients_.size());
+//   Tensor val = indices_u64.ConcatVector(vals);
 
-  std::vector<bool> mask(clients_.size(), false);
+//   std::vector<int64_t> dims = indices_u64.shape().dims();
+//   int64_t col = val.Size() / indices_u64.Size();
 
-  // <talbe_id, sparse_id>
-  using KeyT = std::pair<uint64_t, int64_t>;
-  struct KeyHash : public std::unary_function<KeyT, std::size_t> {
-    std::size_t operator()(const KeyT& k) const {
-      return k.first ^ k.second;
-    }
-  };
+//   dims.emplace_back(col);
 
-  std::unordered_map<KeyT, size_t, KeyHash> sparse_indices;
+//   return val.Reshape(dims);
+// }
 
-  for (size_t i = 0; i < table_ids.size(); ++i) {
-    uint64_t table_id = table_ids[i];
+// std::vector<Tensor> Emitter::CombinePullSparseTable(
+//     const std::vector<uint64_t>& table_ids,
+//     const std::vector<Tensor>& indices) {
+//   ARGUMENT_CHECK(initialized_.load(), "Emitter not initialize.");
+//   ARGUMENT_CHECK(
+//       table_ids.size() == indices.size(),
+//       "CombinePullSparseTable need table_ids and indices has same size.");
 
-    int64_t row = indice_u64s[i].Size();
-    uint64_t* ptr = indice_u64s[i].Data<uint64_t>();
+//   // Maybe share memory with pytorch.
+//   std::vector<Tensor> indice_u64s;
+//   indice_u64s.reserve(indices.size());
+//   for (size_t i = 0; i < indices.size(); ++i) {
+//     indice_u64s.emplace_back(indices[i].Cast(ElementType::From<uint64_t>()));
+//   }
 
-    for (int64_t j = 0; j < row; ++j) {
-      uint64_t sparse_id = ptr[j];
-      size_t server_id = SparseTableRouter(model_id_, table_id, sparse_id);
+//   std::vector<CombinePullSparseTableRequest> reqs;
+//   std::vector<CombinePullSparseTableResponse> rsps;
+//   reqs.resize(clients_.size());
 
-      mask[server_id] = true;
+//   std::vector<bool> mask(clients_.size(), false);
 
-      auto key = std::make_pair(table_id, sparse_id);
+//   // <talbe_id, sparse_id>
+//   using KeyT = std::pair<uint64_t, int64_t>;
+//   struct KeyHash : public std::unary_function<KeyT, std::size_t> {
+//     std::size_t operator()(const KeyT& k) const {
+//       return k.first ^ k.second;
+//     }
+//   };
 
-      if (sparse_indices.find(key) == sparse_indices.end()) {
-        sparse_indices[key] = reqs[server_id].indices[table_id].size();
-        reqs[server_id].indices[table_id].emplace_back(sparse_id);
-      }
-    }
-  }
+//   std::unordered_map<KeyT, size_t, KeyHash> sparse_indices;
 
-  for (size_t i = 0; i < reqs.size(); ++i) {
-    if (mask[i]) {
-      reqs[i].model_id = model_id_;
-    }
-  }
+//   for (size_t i = 0; i < table_ids.size(); ++i) {
+//     uint64_t table_id = table_ids[i];
 
-  RPC_CALL(ParallelCall(RPCFuncType::kCombinePullSparseTableType, mask, reqs,
-                        &rsps));
+//     int64_t row = indice_u64s[i].Size();
+//     uint64_t* ptr = indice_u64s[i].Data<uint64_t>();
 
-  std::vector<Tensor> vals;
-  vals.reserve(indice_u64s.size());
+//     for (int64_t j = 0; j < row; ++j) {
+//       uint64_t sparse_id = ptr[j];
+//       size_t server_id = SparseTableRouter(model_id_, table_id, sparse_id);
 
-  for (size_t i = 0; i < table_ids.size(); ++i) {
-    uint64_t table_id = table_ids[i];
+//       mask[server_id] = true;
 
-    int64_t row = indice_u64s[i].Size();
-    uint64_t* ptr = indice_u64s[i].Data<uint64_t>();
+//       auto key = std::make_pair(table_id, sparse_id);
 
-    std::vector<Tensor> vecs;
-    vecs.reserve(row);
+//       if (sparse_indices.find(key) == sparse_indices.end()) {
+//         sparse_indices[key] = reqs[server_id].indices[table_id].size();
+//         reqs[server_id].indices[table_id].emplace_back(sparse_id);
+//       }
+//     }
+//   }
 
-    for (int64_t j = 0; j < row; ++j) {
-      uint64_t sparse_id = ptr[j];
-      size_t server_id = SparseTableRouter(model_id_, table_id, sparse_id);
+//   for (size_t i = 0; i < reqs.size(); ++i) {
+//     if (mask[i]) {
+//       reqs[i].model_id = model_id_;
+//     }
+//   }
 
-      KeyT key = std::make_pair(table_id, sparse_id);
-      size_t val_i = sparse_indices[key];
+//   RPC_CALL(ParallelCall(RPCFuncType::kCombinePullSparseTableType, mask, reqs,
+//                         &rsps));
 
-      vecs.emplace_back(rsps[server_id].vals[table_id].at(val_i));
-    }
+//   std::vector<Tensor> vals;
+//   vals.reserve(indice_u64s.size());
 
-    Tensor val = indice_u64s[i].ConcatVector(vecs);
+//   for (size_t i = 0; i < table_ids.size(); ++i) {
+//     uint64_t table_id = table_ids[i];
 
-    std::vector<int64_t> dims = indice_u64s[i].shape().dims();
-    int64_t col = val.Size() / indice_u64s[i].Size();
+//     int64_t row = indice_u64s[i].Size();
+//     uint64_t* ptr = indice_u64s[i].Data<uint64_t>();
 
-    dims.emplace_back(col);
+//     std::vector<Tensor> vecs;
+//     vecs.reserve(row);
 
-    vals.emplace_back(val.Reshape(dims));
-  }
+//     for (int64_t j = 0; j < row; ++j) {
+//       uint64_t sparse_id = ptr[j];
+//       size_t server_id = SparseTableRouter(model_id_, table_id, sparse_id);
 
-  return vals;
-}
+//       KeyT key = std::make_pair(table_id, sparse_id);
+//       size_t val_i = sparse_indices[key];
 
-void Emitter::PushSparseTable(uint64_t table_id, const Tensor& indices,
-                              const Tensor& grads) {
-  ARGUMENT_CHECK(initialized_.load(), "Emitter not initialize.");
+//       vecs.emplace_back(rsps[server_id].vals[table_id].at(val_i));
+//     }
 
-  // If the indices shape is [do, d1,...,dk] than grads shape must be [do,
-  // d1,...,dk, dimension]
-  std::vector<int64_t> dims = indices.shape().dims();
-  int64_t dimension = grads.shape()[-1];
-  dims.emplace_back(dimension);
+//     Tensor val = indice_u64s[i].ConcatVector(vecs);
 
-  ARGUMENT_CHECK(Shape(dims) == grads.shape(),
-                 "PushSparseTable indices and grads shape error.");
+//     std::vector<int64_t> dims = indice_u64s[i].shape().dims();
+//     int64_t col = val.Size() / indice_u64s[i].Size();
 
-  Tensor indices_u64 = indices.Cast(ElementType::From<uint64_t>());
-  int64_t row = indices_u64.Size();
-  uint64_t* ptr = indices_u64.Data<uint64_t>();
+//     dims.emplace_back(col);
 
-  Tensor m_grads = grads.Reshape({row, dimension});
+//     vals.emplace_back(val.Reshape(dims));
+//   }
 
-  std::unordered_map<int64_t, size_t> grad_indices;
-  grad_indices.reserve(row);
+//   return vals;
+// }
 
-  std::vector<PushSparseTableRequest> reqs;
-  reqs.resize(clients_.size());
+// void Emitter::PushSparseTable(uint64_t table_id, const Tensor& indices,
+//                               const Tensor& grads) {
+//   ARGUMENT_CHECK(initialized_.load(), "Emitter not initialize.");
 
-  std::vector<bool> mask(clients_.size(), false);
+//   // If the indices shape is [do, d1,...,dk] than grads shape must be [do,
+//   // d1,...,dk, dimension]
+//   std::vector<int64_t> dims = indices.shape().dims();
+//   int64_t dimension = grads.shape()[-1];
+//   dims.emplace_back(dimension);
 
-  for (int64_t i = 0; i < row; ++i) {
-    uint64_t sparse_id = ptr[i];
-    size_t server_id = SparseTableRouter(model_id_, table_id, sparse_id);
+//   ARGUMENT_CHECK(Shape(dims) == grads.shape(),
+//                  "PushSparseTable indices and grads shape error.");
 
-    mask[server_id] = true;
+//   Tensor indices_u64 = indices.Cast(ElementType::From<uint64_t>());
+//   int64_t row = indices_u64.Size();
+//   uint64_t* ptr = indices_u64.Data<uint64_t>();
 
-    auto it = grad_indices.find(sparse_id);
-    if (it == grad_indices.end()) {
-      grad_indices[sparse_id] = reqs[server_id].indices.size();
+//   Tensor m_grads = grads.Reshape({row, dimension});
 
-      reqs[server_id].indices.emplace_back(sparse_id);
-      reqs[server_id].grads.emplace_back(m_grads.Vector(i).Clone());
-    } else {
-      reqs[server_id].grads[it->second] += m_grads.Vector(i);
-    }
-  }
+//   std::unordered_map<int64_t, size_t> grad_indices;
+//   grad_indices.reserve(row);
 
-  // Read Atomic value to local.
-  float l_lr = lr_.load();
-  for (size_t i = 0; i < mask.size(); ++i) {
-    if (mask[i]) {
-      reqs[i].model_id = model_id_;
-      reqs[i].table_id = table_id;
-      reqs[i].lr = l_lr;
-    }
-  }
+//   std::vector<PushSparseTableRequest> reqs;
+//   reqs.resize(clients_.size());
 
-  ParallelCallAsync<PushSparseTableRequest, PushSparseTableResponse>(
-      RPCFuncType::kPushSparseTableType, mask, reqs);
-}
+//   std::vector<bool> mask(clients_.size(), false);
 
-void Emitter::SaveCheckPoint() {
-  SaveCheckPointRequest req;
-  std::vector<SaveCheckPointResponse> rsps;
+//   for (int64_t i = 0; i < row; ++i) {
+//     uint64_t sparse_id = ptr[i];
+//     size_t server_id = SparseTableRouter(model_id_, table_id, sparse_id);
 
-  req.model_id = model_id_;
+//     mask[server_id] = true;
 
-  RPC_CALL(ParallelCallAll(RPCFuncType::kSaveCheckPointType, req, &rsps));
-}
+//     auto it = grad_indices.find(sparse_id);
+//     if (it == grad_indices.end()) {
+//       grad_indices[sparse_id] = reqs[server_id].indices.size();
+
+//       reqs[server_id].indices.emplace_back(sparse_id);
+//       reqs[server_id].grads.emplace_back(m_grads.Vector(i).Clone());
+//     } else {
+//       reqs[server_id].grads[it->second] += m_grads.Vector(i);
+//     }
+//   }
+
+//   // Read Atomic value to local.
+//   float l_lr = lr_.load();
+//   for (size_t i = 0; i < mask.size(); ++i) {
+//     if (mask[i]) {
+//       reqs[i].model_id = model_id_;
+//       reqs[i].table_id = table_id;
+//       reqs[i].lr = l_lr;
+//     }
+//   }
+
+//   ParallelCallAsync<PushSparseTableRequest, PushSparseTableResponse>(
+//       RPCFuncType::kPushSparseTableType, mask, reqs);
+// }
+
+// void Emitter::SaveCheckPoint() {
+//   SaveCheckPointRequest req;
+//   std::vector<SaveCheckPointResponse> rsps;
+
+//   req.model_id = model_id_;
+
+//   RPC_CALL(ParallelCallAll(RPCFuncType::kSaveCheckPointType, req, &rsps));
+// }
 
 }  // namespace kraken

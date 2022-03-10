@@ -25,6 +25,10 @@ std::string ToLower(const std::string& v);
 
 bool EndWith(const std::string& value, const std::string& ending);
 
+uint64_t Hash(uint64_t v1, uint64_t v2);
+
+uint64_t Hash(uint64_t v1, uint64_t v2, uint64_t v3);
+
 template <typename T>
 bool ParseConf(const std::unordered_map<std::string, std::string>& conf,
                const std::string& key, T* v) {

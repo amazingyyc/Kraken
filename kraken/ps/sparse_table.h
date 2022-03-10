@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "common/error_code.h"
+#include "common/parallel_skip_list.h"
 #include "common/spin_locker.h"
 #include "libcuckoo/libcuckoo/cuckoohash_map.hh"
 #include "ps/initializer/initializer.h"
@@ -37,11 +38,11 @@ private:
 
   std::unique_ptr<Initializer> initializer_;
 
-  libcuckoo::cuckoohash_map<uint64_t, Value> vals_;
+  ParallelSkipList<uint64_t, Value> vals_;
 
 public:
-  SparseTable(Optim* optim, uint64_t id, const std::string& name,
-              int64_t dimension, ElementType element_type,
+  SparseTable(uint64_t id, const std::string& name, int64_t dimension,
+              ElementType element_type,
               std::unique_ptr<Initializer>&& initializer);
 
 public:
@@ -50,6 +51,8 @@ public:
   ElementType element_type() const;
 
   Initializer* initializer() const;
+
+  ParallelSkipList<uint64_t, Value>* vals();
 
   int32_t Push(const std::vector<uint64_t>& indices,
                const std::vector<Tensor>& grads, float lr) override;

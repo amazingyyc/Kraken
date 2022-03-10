@@ -5,6 +5,7 @@
 #include "common/deserialize.h"
 #include "common/mem_buffer.h"
 #include "common/mem_reader.h"
+#include "common/utils.h"
 #include "test/utils_test.h"
 
 namespace kraken {

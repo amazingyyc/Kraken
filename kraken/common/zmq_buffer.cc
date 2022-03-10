@@ -29,11 +29,6 @@ const ZMQBuffer& ZMQBuffer::operator=(ZMQBuffer&& other) {
     (*zmq_free_)(ptr_, nullptr);
   }
 
-  ptr_ = nullptr;
-  capacity_ = 0;
-  offset_ = 0;
-  zmq_free_ = nullptr;
-
   ptr_ = other.ptr_;
   capacity_ = other.capacity_;
   offset_ = other.offset_;

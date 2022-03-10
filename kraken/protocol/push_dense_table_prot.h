@@ -1,45 +1,45 @@
-#pragma once
+// #pragma once
 
-#include <cinttypes>
+// #include <cinttypes>
 
-#include "common/deserialize.h"
-#include "common/serialize.h"
-#include "t/tensor.h"
+// #include "common/deserialize.h"
+// #include "common/serialize.h"
+// #include "t/tensor.h"
 
-namespace kraken {
+// namespace kraken {
 
-struct PushDenseTableRequest {
-  uint64_t model_id;
-  uint64_t table_id;
+// struct PushDenseTableRequest {
+//   uint64_t model_id;
+//   uint64_t table_id;
 
-  Tensor grad;
-  float lr;
-};
+//   Tensor grad;
+//   float lr;
+// };
 
-template <>
-inline bool Serialize::operator<<(const PushDenseTableRequest& v) {
-  return (*this) << v.model_id && (*this) << v.table_id && (*this) << v.grad &&
-         (*this) << v.lr;
-}
+// template <>
+// inline bool Serialize::operator<<(const PushDenseTableRequest& v) {
+//   return (*this) << v.model_id && (*this) << v.table_id && (*this) << v.grad &&
+//          (*this) << v.lr;
+// }
 
-template <>
-inline bool Deserialize::operator>>(PushDenseTableRequest& v) {
-  return (*this) >> v.model_id && (*this) >> v.table_id && (*this) >> v.grad &&
-         (*this) >> v.lr;
-}
+// template <>
+// inline bool Deserialize::operator>>(PushDenseTableRequest& v) {
+//   return (*this) >> v.model_id && (*this) >> v.table_id && (*this) >> v.grad &&
+//          (*this) >> v.lr;
+// }
 
-struct PushDenseTableResponse {
-  /*empty*/
-};
+// struct PushDenseTableResponse {
+//   /*empty*/
+// };
 
-template <>
-inline bool Serialize::operator<<(const PushDenseTableResponse& v) {
-  return true;
-}
+// template <>
+// inline bool Serialize::operator<<(const PushDenseTableResponse& v) {
+//   return true;
+// }
 
-template <>
-inline bool Deserialize::operator>>(PushDenseTableResponse& v) {
-  return true;
-}
+// template <>
+// inline bool Deserialize::operator>>(PushDenseTableResponse& v) {
+//   return true;
+// }
 
-}  // namespace kraken
+// }  // namespace kraken

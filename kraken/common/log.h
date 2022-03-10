@@ -5,6 +5,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "common/utils.h"
 
@@ -33,6 +34,17 @@ inline Logger& Logger::operator<<(
   for (const auto& [k, v] : map) {
     oss_ << "[" << k << ", " << v << "], ";
   }
+
+  return *this;
+}
+
+template <>
+inline Logger& Logger::operator<<(const std::unordered_set<uint64_t>& set) {
+  oss_ << "[";
+  for (auto v : set) {
+    oss_ << v << ", ";
+  }
+  oss_ << "]";
 
   return *this;
 }

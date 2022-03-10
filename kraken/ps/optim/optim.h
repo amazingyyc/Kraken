@@ -4,19 +4,13 @@
 #include <string>
 #include <unordered_map>
 
+#include "common/info.h"
 #include "common/utils.h"
 #include "t/tensor.h"
 
 namespace kraken {
 
 struct Bag;
-
-enum class OptimType : uint8_t {
-  kAdagrad = 0,
-  kAdam = 1,
-  kRMSprop = 2,
-  kSGD = 3,
-};
 
 class Optim {
 protected:
@@ -27,6 +21,8 @@ protected:
 
 public:
   virtual ~Optim() = default;
+
+  OptimType optim_type() const;
 
   virtual int32_t Update(const Tensor& grad, float lr, Tensor* val,
                          Bag* bag) const = 0;

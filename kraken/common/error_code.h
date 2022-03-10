@@ -28,6 +28,22 @@ struct ErrorCode {
   static constexpr int32_t kUnSupportCompressTypeError = 19;
   static constexpr int32_t kSnappyUncompressError = 20;
   static constexpr int32_t kSnappyCompressError = 21;
+  static constexpr int32_t kAlreadyExistError = 22;
+  static constexpr int32_t kNotExistError = 23;
+  static constexpr int32_t kZMQConnectError = 24;
+  static constexpr int32_t kPsIdError = 25;
+  static constexpr int32_t kClusterStatusError = 26;
+  static constexpr int32_t kModelAlreadyCreateError = 27;
+  static constexpr int32_t kModelNotFoundError = 28;
+  static constexpr int32_t kTableAlreadyCreateError = 29;
+  static constexpr int32_t kUnRecognizedConnecterIdError = 30;
+  static constexpr int32_t kNodeStatusError = 31;
+  static constexpr int32_t kRouterError = 32;
+  static constexpr int32_t kTimeoutError = 33;
+  static constexpr int32_t kNodeStatusInappropriateError = 34;
+  static constexpr int32_t kUnSupportEventTypeError = 35;
+  static constexpr int32_t kModelNotInitializedError = 36;
+  static constexpr int32_t kAddConnecterError = 37;
 
   static const char* Msg(int32_t code) {
     switch (code) {

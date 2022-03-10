@@ -10,6 +10,10 @@ namespace kraken {
 Optim::Optim(OptimType optim_type) : optim_type_(optim_type) {
 }
 
+OptimType Optim::optim_type() const {
+  return optim_type_;
+}
+
 std::unique_ptr<Optim> Optim::Create(
     OptimType optim_type,
     const std::unordered_map<std::string, std::string>& optim_conf) {

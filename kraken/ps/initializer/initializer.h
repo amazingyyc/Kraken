@@ -4,18 +4,11 @@
 #include <string>
 #include <unordered_map>
 
+#include "common/info.h"
 #include "common/utils.h"
 #include "t/tensor.h"
 
 namespace kraken {
-
-enum class InitializerType : uint8_t {
-  kConstant = 0,
-  kUniform = 1,
-  kNormal = 2,
-  kXavierUniform = 3,
-  kXavierNormal = 4,
-};
 
 class Initializer {
 protected:

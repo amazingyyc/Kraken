@@ -2,72 +2,21 @@
 
 #include <string>
 
+#include "common/info.h"
 #include "ps/optim/optim.h"
 #include "t/tensor.h"
 
 namespace kraken {
 
-namespace io {
-class CheckpointExecutor;
-class Checkpoint;
-}  // namespace io
-
-namespace watch {
-class Watcher;
-}
-
-/**
- * \brief The table type.
- */
-enum class TableType : uint8_t {
-  kDense = 0,
-  kSparse = 1,
-};
-
-enum class StateType : uint32_t {
-  kSteps = 0,
-  kMomentumBuffer = 1,
-  kStateSum = 2,
-  kFirstMoment = 3,
-  kSecondMoment = 4,
-  kSecondMomentMax = 5,
-  kSquareAverage = 6,
-  kGAve = 7,
-};
-
-/**
- * \brief This is a simple struct that store some useful resource.
- * Like in SGD optim we may need store some temporary tensor.
- */
-struct Bag {
-  // tensor state.
-  std::unordered_map<StateType, Tensor> state;
-
-  // integer state.
-  std::unordered_map<StateType, int64_t> state_i;
-};
-
 class Table {
-  friend class io::CheckpointExecutor;
-  friend class io::Checkpoint;
-  friend class watch::Watcher;
-
-public:
-  struct Value {
-    Tensor val;
-    Bag bag;
-  };
-
 protected:
   TableType type_;
-
-  Optim* optim_;
 
   uint64_t id_;
 
   std::string name_;
 
-  Table(TableType type, Optim* optim, uint64_t id, const std::string& name);
+  Table(TableType type, uint64_t id, const std::string& name);
 
 public:
   virtual ~Table() = default;
