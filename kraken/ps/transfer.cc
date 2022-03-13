@@ -2,6 +2,9 @@
 
 #include "protocol/notify_finish_transfer_prot.h"
 #include "protocol/rpc_func_type.h"
+#include "protocol/transfer_dense_table_prot.h"
+#include "protocol/transfer_sparse_meta_data_prot.h"
+#include "protocol/transfer_sparse_values_prot.h"
 
 namespace kraken {
 
@@ -18,14 +21,81 @@ Transfer::~Transfer() {
   connecter_.Stop();
 }
 
-int32_t Transfer::TransferDenseValue(uint64_t table_id, const Value& val) {
-  return ErrorCode::kSuccess;
+int32_t Transfer::TransferDenseTable(uint64_t id, const std::string& name,
+                                     Value& val) {
+  uint32_t try_n = try_num_;
+
+  TransferDenseTableRequest req;
+  req.id = id;
+  req.name = name;
+  req.value = val;
+
+  TransferDenseTableResponse reply;
+
+  int32_t error_code = ErrorCode::kSuccess;
+  while (try_n-- > 0) {
+    error_code =
+        connecter_.Call(RPCFuncType::kTransferDenseTableType, req, &reply);
+
+    if (error_code == ErrorCode::kSuccess) {
+      return ErrorCode::kSuccess;
+    }
+  }
+
+  return error_code;
 }
 
-int32_t Transfer::TransferSparseValues(uint64_t table_id,
+int32_t Transfer::TransferSparseMetaData(
+    uint64_t id, std::string name, int64_t dimension, ElementType element_type,
+    InitializerType init_type,
+    const std::unordered_map<std::string, std::string>& init_conf) {
+  uint32_t try_n = try_num_;
+
+  TransferSparseMetaDataRequest req;
+  req.id = id;
+  req.name = name;
+  req.dimension = dimension;
+  req.element_type = element_type;
+  req.init_type = init_type;
+  req.init_conf = init_conf;
+
+  TransferSparseMetaDataResponse reply;
+
+  int32_t error_code = ErrorCode::kSuccess;
+  while (try_n-- > 0) {
+    error_code =
+        connecter_.Call(RPCFuncType::kTransferSparseMetaDataType, req, &reply);
+
+    if (error_code == ErrorCode::kSuccess) {
+      return ErrorCode::kSuccess;
+    }
+  }
+
+  return error_code;
+}
+
+int32_t Transfer::TransferSparseValues(uint64_t id,
                                        const std::vector<uint64_t>& sparse_ids,
                                        const std::vector<Value>& vals) {
-  return ErrorCode::kSuccess;
+  uint32_t try_n = try_num_;
+
+  TransferSparseValuesRequest req;
+  req.id = id;
+  req.sparse_ids = sparse_ids;
+  req.values = vals;
+  TransferSparseValuesResponse reply;
+
+  int32_t error_code = ErrorCode::kSuccess;
+  while (try_n-- > 0) {
+    error_code =
+        connecter_.Call(RPCFuncType::kTransferSparseValuesType, req, &reply);
+
+    if (error_code == ErrorCode::kSuccess) {
+      return ErrorCode::kSuccess;
+    }
+  }
+
+  return error_code;
 }
 
 int32_t Transfer::NotifyFinishTransfer(uint64_t node_id) {

@@ -28,19 +28,18 @@ const Value& DenseTable::val() const {
   return val_;
 }
 
-int32_t DenseTable::Push(const Tensor& grad, float lr) {
-  // std::unique_lock<std::shared_mutex> lock(mu_);
+int32_t DenseTable::Pull(Tensor* val) {
+  std::shared_lock<std::shared_mutex> lock(mu_);
 
-  // return optim_->Update(grad, lr, &val_.val, &val_.bag);
+  *val = val_.val.Clone();
+
   return ErrorCode::kSuccess;
 }
 
-int32_t DenseTable::Pull(Tensor* val) {
-  // std::shared_lock<std::shared_mutex> lock(mu_);
+int32_t DenseTable::Push(Optim* optim, const Tensor& grad, float lr) {
+  std::unique_lock<std::shared_mutex> lock(mu_);
 
-  // *val = val_.val.Clone();
-
-  return ErrorCode::kSuccess;
+  return optim->Update(grad, lr, &val_);
 }
 
 int32_t DenseTable::PushPull(const Tensor& grad, float lr, Tensor* val) {

@@ -152,6 +152,7 @@ int32_t Scheduler::InitModel(
     const std::string& name, OptimType optim_type,
     const std::unordered_map<std::string, std::string>& optim_conf) {
   if (model_init_) {
+    LOG_INFO("Model already initialized!");
     return ErrorCode::kSuccess;
   }
 
@@ -178,6 +179,9 @@ int32_t Scheduler::InitModel(
     RPC_CALL(connecter_.Call(RPCFuncType::kInitModelType, ids, req, &replies));
   }
 
+  LOG_INFO("Init model:" << name << ", optim_type:" << (int32_t)optim_type
+                         << ", optim_conf:" << optim_conf);
+
   return ErrorCode::kSuccess;
 }
 
@@ -196,6 +200,8 @@ int32_t Scheduler::RegisterDenseTable(std::string name, const Tensor& val,
 
       *table_id = v.id;
 
+      LOG_INFO("DenseTable:" << name << " already registered!");
+
       return ErrorCode::kSuccess;
     }
   }
@@ -206,24 +212,18 @@ int32_t Scheduler::RegisterDenseTable(std::string name, const Tensor& val,
     real_id++;
   }
 
-  {
-    std::vector<uint64_t> ids;
-    ids.reserve(router_.nodes().size());
+  // Select a ps node.
+  uint64_t node_id = router_.Hit(utils::Hash(real_id));
 
-    for (const auto& [k, v] : router_.nodes()) {
-      ids.emplace_back(v.id);
-    }
+  CreateDenseTableRequest req;
+  req.id = real_id;
+  req.name = name;
+  req.val = val;
 
-    CreateDenseTableRequest req;
-    req.id = real_id;
-    req.name = name;
-    req.val = val;
+  CreateDenseTableResponse reply;
 
-    std::vector<CreateDenseTableResponse> replies;
-
-    RPC_CALL(connecter_.Call(RPCFuncType::kCreateDenseTableType, ids, req,
-                             &replies));
-  }
+  RPC_CALL(connecter_.Call(RPCFuncType::kCreateDenseTableType, node_id, req,
+                           &reply));
 
   TableMetaData table_mdata;
   table_mdata.id = real_id;
@@ -235,6 +235,11 @@ int32_t Scheduler::RegisterDenseTable(std::string name, const Tensor& val,
   model_mdata_.table_mdatas.emplace(real_id, std::move(table_mdata));
 
   *table_id = real_id;
+
+  LOG_INFO("Register DenseTable:"
+           << name << ", id:" << real_id
+           << ", ElementType:" << val.element_type().Name()
+           << ", shape:" << val.shape().Str() << " in Ps:" << node_id);
 
   return ErrorCode::kSuccess;
 }
@@ -256,6 +261,9 @@ int32_t Scheduler::RegisterSparseTable(
       }
 
       *table_id = v.id;
+
+      LOG_INFO("SparseTable:" << name << " already registered!");
+
       return ErrorCode::kSuccess;
     }
   }
@@ -300,6 +308,12 @@ int32_t Scheduler::RegisterSparseTable(
   model_mdata_.table_mdatas.emplace(real_id, std::move(table_mdata));
 
   *table_id = real_id;
+
+  LOG_INFO("Register SparseTable:"
+           << name << ", id:" << real_id << ", dimension:" << dimension
+           << ", ElementType:" << element_type.Name()
+           << ", init_type:" << (int32_t)init_type
+           << ", init_conf:" << init_conf << ", in all Ps.");
 
   return ErrorCode::kSuccess;
 }

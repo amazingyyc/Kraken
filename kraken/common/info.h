@@ -61,34 +61,41 @@ enum class StateType : uint32_t {
 
 // This is a simple struct that store some useful resource.
 // Like in SGD optim we may need store some temporary tensor.
-struct Bag {
-  // tensor state.
-  std::unordered_map<StateType, Tensor> state;
+// struct Bag {
+//   // tensor state.
+//   std::unordered_map<StateType, Tensor> state;
 
-  // integer state.
-  std::unordered_map<StateType, int64_t> state_i;
+//   // integer state.
+//   std::unordered_map<StateType, int64_t> state_i;
 
-  Bag Clone() const {
-    Bag n_bag;
+//   Bag Clone() const {
+//     Bag n_bag;
 
-    for (auto& [k, v] : state) {
-      n_bag.state.emplace(k, v.Clone());
-    }
+//     for (auto& [k, v] : state) {
+//       n_bag.state.emplace(k, v.Clone());
+//     }
 
-    n_bag.state_i = state_i;
+//     n_bag.state_i = state_i;
 
-    return n_bag;
-  }
-};
+//     return n_bag;
+//   }
+// };
 
 struct Value {
   Tensor val;
-  Bag bag;
+
+  std::unordered_map<StateType, Tensor> states;
+  std::unordered_map<StateType, int64_t> states_i;
 
   Value Clone() const {
     Value n_value;
     n_value.val = val.Clone();
-    n_value.bag = bag.Clone();
+
+    for (const auto& [k, v] : states) {
+      n_value.states.emplace(k, v.Clone());
+    }
+
+    n_value.states_i = states_i;
 
     return n_value;
   }

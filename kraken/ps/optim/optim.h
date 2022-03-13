@@ -5,12 +5,9 @@
 #include <unordered_map>
 
 #include "common/info.h"
-#include "common/utils.h"
 #include "t/tensor.h"
 
 namespace kraken {
-
-struct Bag;
 
 class Optim {
 protected:
@@ -24,8 +21,7 @@ public:
 
   OptimType optim_type() const;
 
-  virtual int32_t Update(const Tensor& grad, float lr, Tensor* val,
-                         Bag* bag) const = 0;
+  virtual int32_t Update(const Tensor& grad, float lr, Value* value) const = 0;
 
 public:
   static std::unique_ptr<Optim> Create(

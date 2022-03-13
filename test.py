@@ -1,30 +1,22 @@
 # coding=utf-8
-import kraken_watcher as kw
+import kraken.pytorch as kk
 import numpy as np
+import torch
 
-watcher = kw.Watcher()
-watcher.load('/root/code/Kraken/0')
+kk.initialize('127.0.0.1:50000')
 
-modle_info = watcher.model_info()
-print('modle_info:', modle_info)
+kk.init_model('test_model', kk.OptimType.kSGD)
 
-dense_table_infos = watcher.dense_table_infos()
-print('dense_table_infos:', dense_table_infos)
+t0 = torch.rand(2, 3)
+t1 = torch.rand(2, 3)
+t2 = torch.rand(3, 4)
+t3 = torch.rand(2, 3)
+t4 = torch.rand(3, 4)
 
-sparse_table_infos = watcher.sparse_table_infos()
-# exist_sparse_table_ids = watcher.exist_sparse_table_ids(1)
+kk.register_dense_table('dense_table_0', t0)
+kk.register_dense_table('dense_table_1', t1)
+kk.register_dense_table('dense_table_2', t2)
+kk.register_dense_table('dense_table_3', t3)
+kk.register_dense_table('dense_table_4', t4)
 
-# t = watcher.dense_table_val(5)
-# t = np.array(t, copy = False)
-
-# t1 = watcher.sparse_table_val(1, 0)
-# t1 = np.array(t1, copy = False)
-
-# print('----------------------------')
-# print(modle_info)
-# print(modle_info.optim_type)
-# print(dense_table_infos)
-# print(sparse_table_infos)
-# print(exist_sparse_table_ids)
-# # print(t)
-# print(t1)
+kk.stop()

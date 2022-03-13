@@ -73,9 +73,7 @@ public:
 
   std::vector<uint64_t> VirtualHashs(uint64_t id) const;
 
-  uint64_t Hit(uint64_t hash) const;
-
-  uint64_t Hit(uint64_t v1, uint64_t v2) const;
+  uint64_t Hit(uint64_t hv) const;
 
   std::string Str() const;
 };

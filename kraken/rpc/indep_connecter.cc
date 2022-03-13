@@ -43,6 +43,10 @@ void IndepConnecter::HandleReply(zmq_msg_t& reply) {
 }
 
 void IndepConnecter::Run() {
+  zmq_context_ = zmq_init(1);
+  ARGUMENT_CHECK(zmq_context_ != nullptr, "zmq_init return nullptr, error:"
+                                              << zmq_strerror(zmq_errno()));
+
   // create zmq socket.
   void* zsocket = zmq_socket(zmq_context_, ZMQ_DEALER);
   ARGUMENT_CHECK(zsocket != nullptr, "zmq_socket return nullptr, error:"
@@ -195,6 +199,10 @@ void IndepConnecter::Run() {
   }
 
   ZMQ_CALL(zmq_close(zsocket));
+
+  // close zmq context.
+  ZMQ_CALL(zmq_term(zmq_context_));
+  zmq_context_ = nullptr;
 }
 
 void IndepConnecter::EnqueTask(Task&& task) {
@@ -210,11 +218,11 @@ void IndepConnecter::EnqueTask(Task&& task) {
       "write eventfd errno:" << errno << ", msg:" << strerror(errno));
 }
 
-void IndepConnecter::Start() {
-  zmq_context_ = zmq_init(1);
-  ARGUMENT_CHECK(zmq_context_ != nullptr, "zmq_init return nullptr, error:"
-                                              << zmq_strerror(zmq_errno()));
+const std::string& IndepConnecter::addr() const {
+  return addr_;
+}
 
+void IndepConnecter::Start() {
   // create eventfd.
   efd_ = eventfd(0, EFD_SEMAPHORE);
   ARGUMENT_CHECK(efd_ != -1, "eventfd error:" << efd_);
@@ -241,10 +249,6 @@ void IndepConnecter::Stop() {
 
   // close eventfd
   close(efd_);
-
-  // close zmq context.
-  ZMQ_CALL(zmq_term(zmq_context_));
-  zmq_context_ = nullptr;
 }
 
 }  // namespace kraken

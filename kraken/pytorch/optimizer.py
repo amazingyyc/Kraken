@@ -23,8 +23,9 @@ class Optimizer:
     self._name_param = {}
     self._name_table_id = {}
 
-    self._model_id = kraken_native.register_model(self._model_name, self._optim.type(), self._optim.conf())
-    logging.info(f'Register model:[{self._model_name}], model_id:[{self._model_id}].')
+    kraken_native.init_model(self._model_name, self._optim.type(), self._optim.conf())
+    logging.info(
+        f'Register model:[{self._model_name}], optim_type:{self._optim.type()}, optim_conf:{self._optim.conf()}.')
 
     # We should update learning rate when initialize model.
     kraken_native.update_lr(self._lr.lr())
@@ -34,32 +35,33 @@ class Optimizer:
         self._name_param[name] = param
 
         if isinstance(param, SparseTable):
-          # Check whether the user has set a name.
-          real_name = name
-          if param.name() is not None:
-            real_name = param.name()
+          raise ValueError('Not support SparseTable.')
+          # # Check whether the user has set a name.
+          # real_name = name
+          # if param.name() is not None:
+          #   real_name = param.name()
 
-          dimension = param.dimension()
-          dtype = param.dtype()
-          initializer = param.initializer()
+          # dimension = param.dimension()
+          # dtype = param.dtype()
+          # initializer = param.initializer()
 
-          table_id = kraken_native.register_sparse_table(name=real_name,
-                                                         dimension=dimension,
-                                                         dtype=dtype,
-                                                         init_type=initializer.type(),
-                                                         init_conf=initializer.conf())
+          # table_id = kraken_native.register_sparse_table(name=real_name,
+          #                                                dimension=dimension,
+          #                                                dtype=dtype,
+          #                                                init_type=initializer.type(),
+          #                                                init_conf=initializer.conf())
 
-          param.set_table_id(table_id)
-          param.set_name(real_name)
+          # param.set_table_id(table_id)
+          # param.set_name(real_name)
 
-          self._name_table_id[name] = table_id
+          # self._name_table_id[name] = table_id
 
-          logging.info(
-              f'Register SparseTable:[{name}], ' \
-              f'table id:[{table_id}], ' \
-              f'dimension:[{param.dimension()}], ' \
-              f'dtype:[{param.dtype()}].'
-          )
+          # logging.info(
+          #     f'Register SparseTable:[{name}], ' \
+          #     f'table id:[{table_id}], ' \
+          #     f'dimension:[{param.dimension()}], ' \
+          #     f'dtype:[{param.dtype()}].'
+          # )
         else:
           table_id = kraken_native.register_dense_table(name, param.data)
           self._name_table_id[name] = table_id

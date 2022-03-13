@@ -1,5 +1,6 @@
 #include "ps/optim/optim.h"
 
+#include "common/utils.h"
 #include "ps/optim/adagrad.h"
 #include "ps/optim/adam.h"
 #include "ps/optim/rmsprop.h"

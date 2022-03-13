@@ -392,13 +392,25 @@ inline bool Deserialize::operator>>(
 }
 
 template <>
-inline bool Deserialize::operator>>(Bag& v) {
-  return (*this) >> v.state && (*this) >> v.state_i;
+inline bool Deserialize::operator>>(Value& v) {
+  return (*this) >> v.val && (*this) >> v.states && (*this) >> v.states_i;
 }
 
 template <>
-inline bool Deserialize::operator>>(Value& v) {
-  return (*this) >> v.val && (*this) >> v.bag;
+inline bool Deserialize::operator>>(std::vector<Value>& v) {
+  uint64_t size;
+  if (((*this) >> size) == false) {
+    return false;
+  }
+
+  v.resize(size);
+  for (uint64_t i = 0; i < size; ++i) {
+    if (((*this) >> v[i]) == false) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 template <>

@@ -22,7 +22,7 @@ SGD::SGD(bool has_weight_decay, float weight_decay, bool has_momentum,
       nesterov_(nesterov) {
 }
 
-int32_t SGD::Update(const Tensor& grad, float lr, Tensor* val, Bag* bag) const {
+int32_t SGD::Update(const Tensor& grad, float lr, Value* value) const {
   // Grad maybe Coo tensor.
   Tensor grad_t = grad;
   if (grad_t.IsCoo()) {
@@ -33,31 +33,31 @@ int32_t SGD::Update(const Tensor& grad, float lr, Tensor* val, Bag* bag) const {
     grad_t = grad_t.ToDense();
   }
 
-  if (grad_t.Size() != val->Size() ||
-      grad_t.element_type() != val->element_type()) {
+  if (grad_t.Size() != value->val.Size() ||
+      grad_t.element_type() != value->val.element_type()) {
     return ErrorCode::kGradientUnCompatibleError;
   }
 
   if (has_weight_decay_) {
-    grad_t += weight_decay_ * (*val);
+    grad_t += weight_decay_ * (value->val);
   }
 
   if (has_momentum_) {
-    if (bag->state.find(StateType::kMomentumBuffer) == bag->state.end()) {
-      bag->state.emplace(StateType::kMomentumBuffer, grad_t.Clone());
+    if (value->states.find(StateType::kMomentumBuffer) == value->states.end()) {
+      value->states.emplace(StateType::kMomentumBuffer, grad_t.Clone());
     } else {
-      Tensor& mb = bag->state[StateType::kMomentumBuffer];
+      Tensor& mb = value->states[StateType::kMomentumBuffer];
       mb = momentum_ * mb + (1.0 - dampening_) * grad_t;
     }
 
     if (nesterov_) {
-      grad_t += momentum_ * bag->state[StateType::kMomentumBuffer];
+      grad_t += momentum_ * value->states[StateType::kMomentumBuffer];
     } else {
-      grad_t = bag->state[StateType::kMomentumBuffer];
+      grad_t = value->states[StateType::kMomentumBuffer];
     }
   }
 
-  *val -= (grad_t * lr);
+  value->val -= (grad_t * lr);
 
   return ErrorCode::kSuccess;
 }

@@ -1,156 +1,112 @@
-// #include "pybind11/pytorch.h"
+#include "pybind11/pytorch.h"
 
-// #include <cinttypes>
-// #include <memory>
-// #include <vector>
+#include <cinttypes>
+#include <memory>
+#include <vector>
 
-// #include "common/exception.h"
-// #include "t/element_type.h"
-// #include "t/shape.h"
-// #include "t/storage.h"
-// #include "t/tensor.h"
-// #include "worker/worker.h"
+#include "common/exception.h"
+#include "pybind11/pytorch_utils.h"
+#include "t/element_type.h"
+#include "t/shape.h"
+#include "t/storage.h"
+#include "t/tensor.h"
+#include "worker/emitter.h"
 
-// namespace kraken {
-// namespace py {
+namespace kraken {
+namespace py {
 
-// std::once_flag flag;
-// Worker worker;
+std::once_flag flag;
+Emitter emitter;
 
-// void Initialize(const std::string& addrs, EmitterType emitter_type,
-//                 CompressType compress_type, uint64_t life_span, float eta) {
-//   std::call_once(flag, [&addrs, emitter_type, compress_type, life_span, eta]() {
-//     worker.Initialize(addrs, emitter_type, compress_type, life_span, eta);
-//   });
-// }
+void Initialize(const std::string& addrs) {
+  std::call_once(flag, [&addrs]() { emitter.Initialize(addrs); });
+}
 
-// void Stop() {
-//   worker.Stop();
-// }
+void Stop() {
+  emitter.Stop();
+}
 
-// Shape TorchSizesToShape(const torch::IntArrayRef& sizes) {
-//   std::vector<int64_t> dims;
-//   for (auto d : sizes) {
-//     dims.emplace_back(d);
-//   }
+void InitModel(const std::string& model_name, OptimType optim_type,
+               const std::unordered_map<std::string, std::string>& optim_conf) {
+  emitter.InitModel(model_name, optim_type, optim_conf);
+}
 
-//   return Shape(dims);
-// }
+void UpdateLR(float lr) {
+  emitter.UpdateLR(lr);
+}
 
-// torch::IntArrayRef ShapeToTorchSizes(const Shape& shape) {
-//   const auto& dims = shape.dims();
+uint64_t RegisterDenseTable(const std::string& name, torch::Tensor val) {
+  ARGUMENT_CHECK(!val.is_cuda(),
+                 "RegisterDenseTable need torch::Tensor is CPU.");
 
-//   return torch::IntArrayRef(dims);
-// }
+  // Convert to contiguous tensor.
+  torch::Tensor cval = val;
+  if (!val.is_contiguous()) {
+    cval = val.contiguous();
+  }
 
-// ElementType TorchDTypeToElementType(torch::Dtype dtype) {
-//   switch (dtype) {
-//     case torch::kUInt8:
-//       return ElementType::From<uint8_t>();
-//     case torch::kInt8:
-//       return ElementType::From<int8_t>();
-//     case torch::kInt16:
-//       return ElementType::From<int16_t>();
-//     case torch::kInt32:
-//       return ElementType::From<int32_t>();
-//     case torch::kInt64:
-//       return ElementType::From<int64_t>();
-//     case torch::kFloat16:
-//       return ElementType::From<half>();
-//     case torch::kFloat32:
-//       return ElementType::From<float>();
-//     case torch::kFloat64:
-//       return ElementType::From<double>();
-//     default:
-//       RUNTIME_ERROR("The Torch dtype does not support:" << dtype);
-//   }
-// }
+  Tensor kval = TorchTensorToTensor(cval);
 
-// torch::Dtype ElementTypeToTorchDType(ElementType etype) {
-//   switch (etype.dtype) {
-//     case DType::kUint8:
-//       return torch::kUInt8;
-//     case DType::kInt8:
-//       return torch::kInt8;
-//     case DType::kInt16:
-//       return torch::kInt16;
-//     case DType::kInt32:
-//       return torch::kInt32;
-//     case DType::kInt64:
-//       return torch::kInt64;
-//     case DType::kFloat16:
-//       return torch::kFloat16;
-//     case DType::kFloat32:
-//       return torch::kFloat32;
-//     case DType::kFloat64:
-//       return torch::kFloat64;
-//     default:
-//       RUNTIME_ERROR("The ElementType does not support:" << etype.Name());
-//   }
-// }
+  return emitter.RegisterDenseTable(name, kval);
+}
 
-// // Becareful the returned tensor will share memory with torch tensor.
-// Tensor TorchTensorToTensor(const torch::Tensor& tval) {
-//   ARGUMENT_CHECK(tval.is_contiguous(),
-//                  "TorchTensorToTensor need torch tensor is contiguous.");
+uint64_t RegisterSparseTable(
+    const std::string& name, int64_t dimension, pybind11::object dtype,
+    InitializerType init_type,
+    const std::unordered_map<std::string, std::string>& init_conf) {
+  torch::Dtype ttype = torch::python::detail::py_object_to_dtype(dtype);
+  ElementType etype = TorchDTypeToElementType(ttype);
 
-//   auto storage = Storage::From(tval.data_ptr(), tval.nbytes());
+  return emitter.RegisterSparseTable(name, dimension, etype, init_type,
+                                     init_conf);
+}
 
-//   Shape shape = TorchSizesToShape(tval.sizes());
-//   ElementType etype = TorchDTypeToElementType(tval.scalar_type());
+torch::Tensor PullDenseTable(uint64_t table_id) {
+  Tensor kval = emitter.PullDenseTable(table_id);
 
-//   return Tensor::Dense(shape, storage, 0, etype);
-// }
+  torch::IntArrayRef sizes = ShapeToTorchSizes(kval.shape());
+  torch::Dtype dtype = ElementTypeToTorchDType(kval.element_type());
 
-// uint64_t RegisterModel(
-//     const std::string& model_name, OptimType optim_type,
-//     const std::unordered_map<std::string, std::string>& optim_conf) {
-//   return worker.RegisterModel(model_name, optim_type, optim_conf);
-// }
+  torch::Tensor val = torch::zeros(sizes, dtype);
 
-// void UpdateLR(float lr) {
-//   worker.UpdateLR(lr);
-// }
+  // Copy memory.
+  memcpy(val.data_ptr(), kval.Ptr(), kval.NumBytes());
 
-// uint64_t RegisterDenseTable(const std::string& name, torch::Tensor val) {
-//   ARGUMENT_CHECK(!val.is_cuda(),
-//                  "RegisterDenseTable need torch::Tensor is CPU.");
+  return val;
+}
 
-//   // Convert to contiguous tensor.
-//   torch::Tensor cval = val;
-//   if (!val.is_contiguous()) {
-//     cval = val.contiguous();
-//   }
+std::vector<torch::Tensor> CombinePullDenseTable(
+    const std::vector<uint64_t>& table_ids) {
+  std::vector<Tensor> kvals = emitter.CombinePullDenseTable(table_ids);
+  std::vector<torch::Tensor> vals;
 
-//   Tensor kval = TorchTensorToTensor(cval);
+  for (auto& kv : kvals) {
+    torch::IntArrayRef sizes = ShapeToTorchSizes(kv.shape());
+    torch::Dtype dtype = ElementTypeToTorchDType(kv.element_type());
 
-//   return worker.RegisterDenseTable(name, kval);
-// }
+    torch::Tensor v = torch::zeros(sizes, dtype);
 
-// uint64_t RegisterSparseTable(
-//     const std::string& name, int64_t dimension, pybind11::object dtype,
-//     InitializerType init_type,
-//     const std::unordered_map<std::string, std::string>& init_conf) {
-//   torch::Dtype ttype = torch::python::detail::py_object_to_dtype(dtype);
-//   ElementType etype = TorchDTypeToElementType(ttype);
+    memcpy(v.data_ptr(), kv.Ptr(), kv.NumBytes());
 
-//   return worker.RegisterSparseTable(name, dimension, etype, init_type,
-//                                     init_conf);
-// }
+    vals.emplace_back(v);
+  }
 
-// torch::Tensor PullDenseTable(uint64_t table_id) {
-//   Tensor kval = worker.PullDenseTable(table_id);
+  return vals;
+}
 
-//   torch::IntArrayRef sizes = ShapeToTorchSizes(kval.shape());
-//   torch::Dtype dtype = ElementTypeToTorchDType(kval.element_type());
+void PushDenseTable(uint64_t table_id, torch::Tensor grad) {
+  ARGUMENT_CHECK(!grad.is_cuda(), "PushDenseTable need torch::Tensor is CPU.");
 
-//   torch::Tensor val = torch::zeros(sizes, dtype);
+  // Convert to contiguous tensor.
+  torch::Tensor cgrad = grad;
+  if (!grad.is_contiguous()) {
+    cgrad = grad.contiguous();
+  }
 
-//   // Copy memory.
-//   memcpy(val.data_ptr(), kval.Ptr(), kval.NumBytes());
+  Tensor kgrad = TorchTensorToTensor(cgrad);
 
-//   return val;
-// }
+  emitter.PushDenseTable(table_id, kgrad);
+}
 
 // std::vector<torch::Tensor> CombinePullDenseTable(
 //     const std::vector<uint64_t>& table_ids) {
@@ -172,7 +128,8 @@
 // }
 
 // void PushDenseTable(uint64_t table_id, torch::Tensor grad) {
-//   ARGUMENT_CHECK(!grad.is_cuda(), "PushDenseTable need torch::Tensor is CPU.");
+//   ARGUMENT_CHECK(!grad.is_cuda(), "PushDenseTable need torch::Tensor is
+//   CPU.");
 
 //   // Convert to contiguous tensor.
 //   torch::Tensor cgrad = grad;
@@ -186,7 +143,8 @@
 // }
 
 // torch::Tensor PushPullDenseTable(uint64_t table_id, torch::Tensor grad) {
-//   ARGUMENT_CHECK(!grad.is_cuda(), "PushDenseTable need torch::Tensor is CPU.");
+//   ARGUMENT_CHECK(!grad.is_cuda(), "PushDenseTable need torch::Tensor is
+//   CPU.");
 
 //   // Convert to contiguous tensor.
 //   torch::Tensor cgrad = grad;
@@ -292,5 +250,5 @@
 //   worker.SaveCheckPoint();
 // }
 
-// }  // namespace py
-// }  // namespace kraken
+}  // namespace py
+}  // namespace kraken

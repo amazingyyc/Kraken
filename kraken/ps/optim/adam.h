@@ -26,8 +26,7 @@ public:
   Adam(bool has_weight_decay, float weight_decay, float beta1, float beta2,
        float eps, bool amsgrad);
 
-  int32_t Update(const Tensor& grad, float lr, Tensor* val,
-                 Bag* bag) const override;
+  int32_t Update(const Tensor& grad, float lr, Value* value) const override;
 };
 
 }  // namespace kraken

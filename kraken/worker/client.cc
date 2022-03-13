@@ -2,25 +2,43 @@
 
 // namespace kraken {
 
-// Client::Client(uint32_t server_id, const std::string& addr,
-//                CompressType compress_type)
-//     : server_id_(server_id), addr_(addr), caller_(addr, compress_type) {
+// Client::Client(CompressType compress_type) : compress_type_(compress_type) {
 // }
 
-// uint32_t Client::server_id() const {
-//   return server_id_;
+// Client::~Client() {
+//   for (auto& [_, conn] : connecters_) {
+//     conn->Stop();
+//   }
+
+//   connecters_.clear();
 // }
 
-// const std::string& Client::addr() const {
-//   return addr_;
+// void Client::Add(uint64_t node_id, const std::string& addr) {
+//   auto it = connecters_.find(node_id);
+//   if (it != connecters_.end()) {
+//     if (it->second->addr() == addr) {
+//       return;
+//     }
+
+//     it->second->Stop();
+//     connecters_.erase(it);
+//   }
+
+//   std::unique_ptr<IndepConnecter> conn(
+//       new IndepConnecter(addr, compress_type_));
+//   conn->Start();
+
+//   connecters_.emplace(node_id, std::move(conn));
+
+//   return;
 // }
 
-// void Client::Start() {
-//   caller_.Start();
-// }
-
-// void Client::Stop() {
-//   caller_.Stop();
+// void Client::Remove(uint64_t node_id) {
+//   auto it = connecters_.find(node_id);
+//   if (it != connecters_.end()) {
+//     it->second->Stop();
+//     connecters_.erase(it);
+//   }
 // }
 
 // }  // namespace kraken

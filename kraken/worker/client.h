@@ -1,43 +1,150 @@
 // #pragma once
 
 // #include <cinttypes>
+// #include <shared_mutex>
 // #include <string>
+// #include <unordered_map>
 
-// #include "rpc/caller.h"
-// #include "rpc/protocol.h"
+// #include "rpc/indep_connecter.h"
 
 // namespace kraken {
 
 // class Client {
 // private:
-//   uint32_t server_id_;
+//   CompressType compress_type_;
 
-//   std::string addr_;
-
-//   Caller caller_;
-
-// public:
-//   Client(uint32_t server_id, const std::string& addr,
-//          CompressType compress_type);
+//   std::unordered_map<uint64_t /*Ps node id*/, std::unique_ptr<IndepConnecter>>
+//       connecters_;
 
 // public:
-//   uint32_t server_id() const;
+//   Client(CompressType compress_type);
 
-//   const std::string& addr() const;
+//   ~Client();
 
-//   void Start();
+// public:
+//   void Add(uint64_t node_id, const std::string& addr);
 
-//   void Stop();
+//   void Remove(uint64_t node_id);
 
-//   template <typename ReqType, typename RspType>
-//   int32_t Call(uint32_t type, const ReqType& req, RspType* rsp) {
-//     return caller_.Call<ReqType, RspType>(type, req, rsp);
+//   // The caller must make sure the node_id is Added.
+//   template <typename ReqType, typename ReplyType>
+//   int32_t Call(uint64_t node_id, uint32_t rpc_type, const ReqType& req,
+//                ReplyType* reply, int64_t timeout_ms = 5000) const {
+//     auto it = connecters_.find(node_id);
+
+//     return it->second->Call<ReqType, ReplyType>(rpc_type, req, reply,
+//                                                 timeout_ms);
 //   }
 
-//   template <typename ReqType, typename RspType>
-//   void CallAsync(uint32_t type, const ReqType& req,
-//                  std::function<void(int32_t, RspType&)>&& callback) {
-//     caller_.CallAsync<ReqType, RspType>(type, req, std::move(callback));
+//   template <typename ReqType, typename ReplyType>
+//   int32_t Call(uint32_t rpc_type,
+//                const std::unordered_map<uint64_t, ReqType>& reqs,
+//                std::unordered_map<uint64_t, ReplyType>* replies,
+//                int64_t timeout_ms = 5000) const {
+//     size_t count = reqs.size();
+//     if (count == 0) {
+//       return ErrorCode::kSuccess;
+//     }
+
+//     std::vector<uint64_t> node_ids;
+//     node_ids.reserve(count);
+//     for (const auto& [k, _] : reqs) {
+//       node_ids.emplace_back(k);
+//     }
+
+//     std::vector<ReplyType> replies_v;
+//     replies_v.resize(count);
+
+//     std::vector<int32_t> error_codes;
+//     error_codes.resize(count);
+
+//     ThreadBarrier barrier(count);
+//     for (size_t i = 0; i < count; ++i) {
+//       auto callback = [&error_codes, &replies_v, i, &barrier](
+//                           int32_t r_error_code, ReplyType& r_reply) {
+//         error_codes[i] = r_error_code;
+//         replies_v[i] = std::move(r_reply);
+
+//         barrier.Release();
+//       };
+
+//       auto cit = connecters_.find(node_ids[i]);
+//       auto rit = reqs.find(node_ids[i]);
+
+//       cit->second->CallAsync<ReqType, ReplyType>(
+//           rpc_type, rit->second, std::move(callback), timeout_ms);
+//     }
+
+//     barrier.Wait();
+
+//     for (size_t i = 0; i < count; ++i) {
+//       if (error_codes[i] != ErrorCode::kSuccess) {
+//         return error_codes[i];
+//       }
+//     }
+
+//     replies->reserve(count);
+//     for (size_t i = 0; i < count; ++i) {
+//       replies->emplace(node_ids[i], std::move(replies_v[i]));
+//     }
+
+//     return ErrorCode::kSuccess;
+//   }
+
+//   template <typename ReqType, typename ReplyType>
+//   int32_t Call(const std::vector<uint64_t>& node_ids, uint32_t rpc_type,
+//                const std::vector<ReqType>& reqs,
+//                std::vector<ReplyType>* replies,
+//                int64_t timeout_ms = 5000) const {
+//     assert(node_ids.size() == reqs.size());
+
+//     if (node_ids.empty()) {
+//       return ErrorCode::kSuccess;
+//     }
+
+//     size_t count = node_ids.size();
+
+//     ThreadBarrier barrier(count);
+
+//     std::vector<int32_t> error_codes;
+//     error_codes.resize(count);
+
+//     replies->resize(count);
+
+//     for (size_t i = 0; i < count; ++i) {
+//       auto callback = [&error_codes, replies, i, &barrier](int32_t r_error_code,
+//                                                            ReplyType& r_reply) {
+//         error_codes[i] = r_error_code;
+//         (*replies)[i] = std::move(r_reply);
+
+//         barrier.Release();
+//       };
+
+//       auto it = connecters_.find(node_ids[i]);
+//       it->second->CallAsync<ReqType, ReplyType>(
+//           rpc_type, reqs[i], std::move(callback), timeout_ms);
+//     }
+
+//     barrier.Wait();
+
+//     for (size_t i = 0; i < count; ++i) {
+//       if (error_codes[i] != ErrorCode::kSuccess) {
+//         return error_codes[i];
+//       }
+//     }
+
+//     return ErrorCode::kSuccess;
+//   }
+
+//   // The caller must make sure the node_id is Added.
+//   template <typename ReqType, typename ReplyType>
+//   void CallAsync(uint64_t node_id, uint32_t rpc_type, const ReqType& req,
+//                  std::function<void(int32_t, ReplyType&)>&& callback,
+//                  int64_t timeout_ms = 5000) const {
+//     auto it = connecters_.find(node_id);
+
+//     it->second->CallAsync<ReqType, ReplyType>(rpc_type, req,
+//                                               std::move(callback), timeout_ms);
 //   }
 // };
 

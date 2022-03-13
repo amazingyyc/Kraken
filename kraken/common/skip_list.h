@@ -205,7 +205,7 @@ public:
 
   bool Insert(const Key& key, const Value& value) {
     Node* prev[kMaxHeight];
-    Node* x = FindGreaterOrEqual(key, &prev);
+    Node* x = FindGreaterOrEqual(key, prev);
 
     if (x != nullptr && x->key == key) {
       return false;

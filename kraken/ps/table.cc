@@ -17,15 +17,15 @@ uint64_t Table::id() const {
   return id_;
 }
 
-const std::string Table::name() const {
+const std::string& Table::name() const {
   return name_;
 }
 
-int32_t Table::Push(const Tensor& grad, float lr) {
+int32_t Table::Pull(Tensor* var) {
   return ErrorCode::kInterfaceUnImplementError;
 }
 
-int32_t Table::Pull(Tensor* var) {
+int32_t Table::Push(Optim* optim, const Tensor& grad, float lr) {
   return ErrorCode::kInterfaceUnImplementError;
 }
 
@@ -33,13 +33,12 @@ int32_t Table::PushPull(const Tensor& grad, float lr, Tensor* val) {
   return ErrorCode::kInterfaceUnImplementError;
 }
 
-int32_t Table::Push(const std::vector<uint64_t>& indices,
-                    const std::vector<Tensor>& grads, float lr) {
-  return ErrorCode::kInterfaceUnImplementError;
-}
-
 int32_t Table::Pull(const std::vector<uint64_t>& indices,
                     std::vector<Tensor>* vals) {
+  return ErrorCode::kInterfaceUnImplementError;
+}
+int32_t Table::Push(const std::vector<uint64_t>& indices,
+                    const std::vector<Tensor>& grads, float lr) {
   return ErrorCode::kInterfaceUnImplementError;
 }
 

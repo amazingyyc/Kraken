@@ -70,22 +70,5 @@ bool EndWith(const std::string& value, const std::string& ending) {
   return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
 }
 
-uint64_t Hash(uint64_t v1, uint64_t v2) {
-  uint64_t seed = 0;
-  seed ^= v1 + 0x9e3779b9;
-  seed ^= v2 + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-
-  return seed;
-}
-
-uint64_t Hash(uint64_t v1, uint64_t v2, uint64_t v3) {
-  uint64_t seed = 0;
-  seed ^= v1 + 0x9e3779b9;
-  seed ^= v2 + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-  seed ^= v3 + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-
-  return seed;
-}
-
 }  // namespace utils
 }  // namespace kraken

@@ -1,12 +1,11 @@
 #pragma once
 
-#include <atomic>
 #include <cinttypes>
 #include <memory>
-#include <shared_mutex>
 #include <vector>
 
 #include "common/router.h"
+#include "rpc/group_connecters.h"
 #include "rpc/indep_connecter.h"
 #include "rpc/protocol.h"
 
@@ -18,22 +17,25 @@ enum class EmitterType : uint8_t {
              // Communication-Efficient Model and Data Parallelism
 };
 
+// We assume that Emitter is thread-safe guarantee by caller.
 class Emitter {
 protected:
   EmitterType type_;
-  std::atomic<bool> initialized_;
+  bool initialized_;
 
   // Scheduler addr.
   std::string s_addr_;
-  CompressType compress_type_;
 
-  std::shared_mutex mu_;
   // Scheduler connecter.
   std::unique_ptr<IndepConnecter> s_connecter_;
+
+  // connect to Ps node.
+  GroupConnecters clients_;
+
   Router router_;
 
   std::string model_name_;
-  std::atomic<float> lr_;
+  float lr_;
 
 public:
   Emitter();
@@ -41,8 +43,16 @@ public:
 protected:
   Emitter(EmitterType type);
 
+protected:
+  void UpdataRouter();
+
+  int32_t PullDenseTableImpl(uint64_t table_id, Tensor *val);
+
+  int32_t CombinePullDenseTableImpl(const std::vector<uint64_t>& table_ids,
+                                    std::vector<Tensor>* vals);
+
 public:
-  void Initialize(const std::string& s_addr, CompressType compress_type);
+  void Initialize(const std::string& s_addr);
 
   void Stop();
 
@@ -58,6 +68,13 @@ public:
       const std::string& name, int64_t dimension, ElementType element_type,
       InitializerType init_type,
       const std::unordered_map<std::string, std::string>& init_conf);
+
+  Tensor PullDenseTable(uint64_t table_id);
+
+  std::vector<Tensor> CombinePullDenseTable(
+      const std::vector<uint64_t>& table_ids);
+
+  void PushDenseTable(uint64_t table_id, const Tensor& grad);
 };
 
 }  // namespace kraken

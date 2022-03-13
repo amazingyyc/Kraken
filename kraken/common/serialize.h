@@ -280,13 +280,24 @@ inline bool Serialize::operator<<(
 }
 
 template <>
-inline bool Serialize::operator<<(const Bag& v) {
-  return ((*this) << v.state) && ((*this) << v.state_i);
+inline bool Serialize::operator<<(const Value& v) {
+  return ((*this) << v.val) && ((*this) << v.states) && ((*this) << v.states_i);
 }
 
 template <>
-inline bool Serialize::operator<<(const Value& v) {
-  return ((*this) << v.val) && ((*this) << v.bag);
+inline bool Serialize::operator<<(const std::vector<Value>& v) {
+  uint64_t size = v.size();
+  if (((*this) << size) == false) {
+    return false;
+  }
+
+  for (auto& i : v) {
+    if (((*this) << i) == false) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 template <>

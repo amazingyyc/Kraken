@@ -73,6 +73,8 @@ private:
   void EnqueTask(Task&& task);
 
 public:
+  const std::string& addr() const;
+
   void Start();
 
   void Stop();

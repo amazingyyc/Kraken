@@ -33,7 +33,7 @@ class CMakeBuildExt(build_ext):
 
 setup(
     name='kraken',
-    version='0.0.1',
+    version='0.0.2',
     author='amazingyyc',
     author_email='amazingyyc@outlook.com',
     zip_safe=False,

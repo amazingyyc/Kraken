@@ -67,9 +67,9 @@ public:
 
   const Value& val() const;
 
-  int32_t Push(const Tensor& grad, float lr) override;
-
   int32_t Pull(Tensor* val) override;
+
+  int32_t Push(Optim* optim, const Tensor& grad, float lr) override;
 
   int32_t PushPull(const Tensor& grad, float lr, Tensor* val) override;
 };

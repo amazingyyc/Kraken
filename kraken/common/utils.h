@@ -25,9 +25,30 @@ std::string ToLower(const std::string& v);
 
 bool EndWith(const std::string& value, const std::string& ending);
 
-uint64_t Hash(uint64_t v1, uint64_t v2);
+inline uint64_t Hash(uint64_t v) {
+  v = v * 3935559000370003845 + 2691343689449507681;
 
-uint64_t Hash(uint64_t v1, uint64_t v2, uint64_t v3);
+  v ^= v >> 21;
+  v ^= v << 37;
+  v ^= v >> 4;
+
+  v *= 4768777513237032717;
+
+  v ^= v << 20;
+  v ^= v >> 41;
+  v ^= v << 5;
+
+  return v;
+}
+
+// (TODO) change a hash function.
+inline uint64_t Hash(uint64_t v1, uint64_t v2) {
+  uint64_t seed = 0;
+  seed ^= v1 + 0x9e3779b9;
+  seed ^= v2 + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+
+  return seed;
+}
 
 template <typename T>
 bool ParseConf(const std::unordered_map<std::string, std::string>& conf,

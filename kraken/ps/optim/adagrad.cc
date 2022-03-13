@@ -15,8 +15,7 @@ Adagrad::Adagrad(bool has_weight_decay, float weight_decay, float eps)
       eps_(eps) {
 }
 
-int32_t Adagrad::Update(const Tensor& grad, float lr, Tensor* val,
-                        Bag* bag) const {
+int32_t Adagrad::Update(const Tensor& grad, float lr, Value* value) const {
   // Grad maybe Coo tensor.
   Tensor grad_t = grad;
   if (grad_t.IsCoo()) {
@@ -27,23 +26,23 @@ int32_t Adagrad::Update(const Tensor& grad, float lr, Tensor* val,
     grad_t = grad_t.ToDense();
   }
 
-  if (grad_t.Size() != val->Size() ||
-      grad_t.element_type() != val->element_type()) {
+  if (grad_t.Size() != value->val.Size() ||
+      grad_t.element_type() != value->val.element_type()) {
     return ErrorCode::kGradientUnCompatibleError;
   }
 
-  if (bag->state.find(StateType::kStateSum) == bag->state.end()) {
-    bag->state.emplace(StateType::kStateSum, grad_t.Like().Zero());
+  if (value->states.find(StateType::kStateSum) == value->states.end()) {
+    value->states.emplace(StateType::kStateSum, grad_t.Like().Zero());
   }
 
   if (has_weight_decay_) {
-    grad_t += weight_decay_ * (*val);
+    grad_t += weight_decay_ * (value->val);
   }
 
-  Tensor& state_sum = bag->state[StateType::kStateSum];
+  Tensor& state_sum = value->states[StateType::kStateSum];
   state_sum += grad_t.Square();
 
-  (*val) -= (lr * (grad_t / (state_sum.Sqrt() + eps_)));
+  (value->val) -= (lr * (grad_t / (state_sum.Sqrt() + eps_)));
 
   return ErrorCode::kSuccess;
 }

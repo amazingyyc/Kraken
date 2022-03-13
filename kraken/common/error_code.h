@@ -44,6 +44,11 @@ struct ErrorCode {
   static constexpr int32_t kUnSupportEventTypeError = 35;
   static constexpr int32_t kModelNotInitializedError = 36;
   static constexpr int32_t kAddConnecterError = 37;
+  static constexpr int32_t kTableNotExistError = 38;
+  static constexpr int32_t kProxyNodeIdNotExistError = 39;
+  static constexpr int32_t kRouterVersionError = 40;
+  static constexpr int32_t kUnRecognizedNodeIdError = 41;
+  static constexpr int32_t kRouteWrongNodeError = 42;
 
   static const char* Msg(int32_t code) {
     switch (code) {

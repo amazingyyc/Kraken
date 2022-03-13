@@ -19,11 +19,8 @@ struct Compress {
   static bool NoUnCompressDeser(const char* body, size_t body_len, Type* v) {
     MemReader reader(body, body_len);
     Deserialize deserialize(&reader);
-    if ((deserialize >> (*v)) == false) {
-      return false;
-    }
 
-    return true;
+    return deserialize >> (*v);
   }
 
   template <typename Type>
@@ -38,11 +35,8 @@ struct Compress {
 
     MemReader reader(sink.ptr(), sink.offset());
     Deserialize deserialize(&reader);
-    if ((deserialize >> (*v)) == false) {
-      return false;
-    }
 
-    return true;
+    return deserialize >> (*v);
   }
 
   template <typename ReplyType>

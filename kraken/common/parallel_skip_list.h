@@ -72,6 +72,18 @@ public:
     return SlotCount;
   }
 
+  UniqueHandler HashUniqueSkipListHandler(const Key& key) {
+    size_t slot = hash_(key) % SlotCount;
+
+    return UniqueHandler(lockers_[slot], skip_lists_[slot]);
+  }
+
+  SharedHandler HashSharedSkipListHandler(const Key& key) {
+    size_t slot = hash_(key) % SlotCount;
+
+    return SharedHandler(lockers_[slot], skip_lists_[slot]);
+  }
+
   UniqueHandler UniqueSkipListHandler(size_t slot) {
     assert(slot < SlotCount);
 

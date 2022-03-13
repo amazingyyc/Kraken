@@ -158,21 +158,17 @@ std::vector<uint64_t> Router::VirtualHashs(uint64_t id) const {
   return {};
 }
 
-uint64_t Router::Hit(uint64_t hash) const {
+uint64_t Router::Hit(uint64_t hv) const {
   if (vnodes_.empty()) {
     return uint64_t(-1);
   }
 
-  auto it = vnodes_.lower_bound(hash);
+  auto it = vnodes_.lower_bound(hv);
   if (it == vnodes_.end()) {
     return vnodes_.begin()->second.node_id;
   } else {
     return it->second.node_id;
   }
-}
-
-uint64_t Router::Hit(uint64_t v1, uint64_t v2) const {
-  return Hit(utils::Hash(v1, v2));
 }
 
 std::string Router::Str() const {

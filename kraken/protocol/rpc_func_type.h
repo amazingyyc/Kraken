@@ -17,6 +17,14 @@ struct RPCFuncType {
   static constexpr uint32_t kFetchModelMetaDataType = 9;
   static constexpr uint32_t kNotifyFinishTransferType = 10;
   static constexpr uint32_t kFetchRouterType = 11;
+  static constexpr uint32_t kTransferDenseTableType = 12;
+  static constexpr uint32_t kTransferSparseMetaDataType = 13;
+  static constexpr uint32_t kTransferSparseValuesType = 14;
+  static constexpr uint32_t kTryFetchDenseTableType = 15;
+  static constexpr uint32_t kTryCombineFetchDenseTableType = 16;
+  static constexpr uint32_t kPullDenseTableType = 17;
+  static constexpr uint32_t kCombinePullDenseTableType = 18;
+  static constexpr uint32_t kPushDenseTableType = 19;
 
   // static constexpr uint32_t kApplyModelType = 0;
   // static constexpr uint32_t kApplyDenseTableType = 1;

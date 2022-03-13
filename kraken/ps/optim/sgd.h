@@ -25,8 +25,7 @@ public:
   SGD(bool has_weight_decay, float weight_decay, bool has_momentum,
       float momentum, bool has_dampening, float dampening, bool nesterov);
 
-  int32_t Update(const Tensor& grad, float lr, Tensor* val,
-                 Bag* bag) const override;
+  int32_t Update(const Tensor& grad, float lr, Value* value) const override;
 };
 
 }  // namespace kraken
