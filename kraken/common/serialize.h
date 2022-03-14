@@ -196,6 +196,22 @@ inline bool Serialize::operator<<(const Tensor& v) {
 }
 
 template <>
+inline bool Serialize::operator<<(const std::vector<std::string>& v) {
+  uint64_t size = v.size();
+  if (((*this) << size) == false) {
+    return false;
+  }
+
+  for (auto& i : v) {
+    if (((*this) << i) == false) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+template <>
 inline bool Serialize::operator<<(const std::vector<Tensor>& v) {
   uint64_t size = v.size();
   if (((*this) << size) == false) {

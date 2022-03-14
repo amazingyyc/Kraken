@@ -18,8 +18,8 @@ namespace py {
 std::once_flag flag;
 Emitter emitter;
 
-void Initialize(const std::string& addrs) {
-  std::call_once(flag, [&addrs]() { emitter.Initialize(addrs); });
+void Initialize(const std::string& s_addr) {
+  std::call_once(flag, [&s_addr]() { emitter.Initialize(s_addr); });
 }
 
 void Stop() {

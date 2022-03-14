@@ -1,43 +1,45 @@
-// #pragma once
+#pragma once
 
-// #include <cinttypes>
-// #include <vector>
+#include <cinttypes>
+#include <vector>
 
-// #include "common/deserialize.h"
-// #include "common/serialize.h"
-// #include "t/tensor.h"
+#include "common/deserialize.h"
+#include "common/serialize.h"
+#include "t/tensor.h"
 
-// namespace kraken {
+namespace kraken {
 
-// struct PullSparseTableRequest {
-//   uint64_t model_id;
-//   uint64_t table_id;
+struct PullSparseTableRequest {
+  uint64_t router_version;
 
-//   std::vector<uint64_t> indices;
-// };
+  uint64_t table_id;
+  std::vector<uint64_t> sparse_ids;
+};
 
-// template <>
-// inline bool Serialize::operator<<(const PullSparseTableRequest& v) {
-//   return (*this) << v.model_id && (*this) << v.table_id && (*this) << v.indices;
-// }
+template <>
+inline bool Serialize::operator<<(const PullSparseTableRequest& v) {
+  return (*this) << v.router_version && (*this) << v.table_id &&
+         (*this) << v.sparse_ids;
+}
 
-// template <>
-// inline bool Deserialize::operator>>(PullSparseTableRequest& v) {
-//   return (*this) >> v.model_id && (*this) >> v.table_id && (*this) >> v.indices;
-// }
+template <>
+inline bool Deserialize::operator>>(PullSparseTableRequest& v) {
+  return (*this) >> v.router_version && (*this) >> v.table_id &&
+         (*this) >> v.sparse_ids;
+}
 
-// struct PullSparseTableResponse {
-//   std::vector<Tensor> vals;
-// };
+struct PullSparseTableResponse {
+  std::vector<Tensor> vals;
+};
 
-// template <>
-// inline bool Serialize::operator<<(const PullSparseTableResponse& v) {
-//   return (*this) << v.vals;
-// }
+template <>
+inline bool Serialize::operator<<(const PullSparseTableResponse& v) {
+  return (*this) << v.vals;
+}
 
-// template <>
-// inline bool Deserialize::operator>>(PullSparseTableResponse& v) {
-//   return (*this) >> v.vals;
-// }
+template <>
+inline bool Deserialize::operator>>(PullSparseTableResponse& v) {
+  return (*this) >> v.vals;
+}
 
-// }  // namespace kraken
+}  // namespace kraken

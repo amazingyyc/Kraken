@@ -7,7 +7,7 @@
 namespace kraken {
 
 struct TransferSparseValuesRequest {
-  uint64_t id;
+  uint64_t table_id;
 
   std::vector<uint64_t> sparse_ids;
   std::vector<Value> values;
@@ -15,13 +15,13 @@ struct TransferSparseValuesRequest {
 
 template <>
 inline bool Serialize::operator<<(const TransferSparseValuesRequest& v) {
-  return (*this) << v.id && (*this) << v.sparse_ids &&
+  return (*this) << v.table_id && (*this) << v.sparse_ids &&
          (*this) << v.values;
 }
 
 template <>
 inline bool Deserialize::operator>>(TransferSparseValuesRequest& v) {
-  return (*this) >> v.id && (*this) >> v.sparse_ids &&
+  return (*this) >> v.table_id && (*this) >> v.sparse_ids &&
          (*this) >> v.values;
 }
 

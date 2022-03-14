@@ -232,7 +232,6 @@ std::vector<Tensor> Emitter::CombinePullDenseTable(
   std::vector<Tensor> vals;
 
   auto error_code = CombinePullDenseTableImpl(table_ids, &vals);
-
   if (error_code == ErrorCode::kRouterVersionError) {
     UpdataRouter();
 
@@ -268,8 +267,10 @@ void Emitter::PushDenseTable(uint64_t table_id, const Tensor& grad) {
     // or get exception by other function. Even Push grad to Ps get fail it
     // still not affect the model (lost one step of gradient will not make the
     // DeepModel to be "wrong").
-    LOG_WARNING("PushDenseTable got reply error code:"
-                << ecode << ", msg:" << ErrorCode::Msg(ecode));
+    if (ecode != ErrorCode::kSuccess) {
+      LOG_WARNING("PushDenseTable got reply error code:"
+                  << ecode << ", msg:" << ErrorCode::Msg(ecode));
+    }
   };
 
   clients_.CallAsync<PushDenseTableRequest, PushDenseTableResponse>(

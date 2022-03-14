@@ -4,6 +4,8 @@
 #include "protocol/rpc_func_type.h"
 #include "protocol/try_combine_fetch_dense_table_prot.h"
 #include "protocol/try_fetch_dense_table_prot.h"
+#include "protocol/try_fetch_sparse_meta_data_prot.h"
+#include "protocol/try_fetch_sparse_values_prot.h"
 
 namespace kraken {
 
@@ -31,13 +33,8 @@ int32_t Proxy::TryFetchDenseTable(uint64_t table_id, std::string* name,
                                   Value* value) const {
   uint64_t node_id = router_.Hit(utils::Hash(table_id));
 
-  auto it = proxy_ids_.find(node_id);
-  if (it == proxy_ids_.end()) {
-    return ErrorCode::kProxyNodeIdNotExistError;
-  }
-
   TryFetchDenseTableRequest req;
-  req.id = table_id;
+  req.table_id = table_id;
   TryFetchDenseTableResponse reply;
 
   auto error_code = g_connecters_.Call(
@@ -53,23 +50,16 @@ int32_t Proxy::TryFetchDenseTable(uint64_t table_id, std::string* name,
 }
 
 int32_t Proxy::TryCombineFetchDenseTable(const std::vector<uint64_t>& table_ids,
+                                         std::vector<uint64_t>* exist_table_ids,
                                          std::vector<std::string>* names,
                                          std::vector<Value>* values) const {
   std::unordered_map<uint64_t, TryCombineFetchDenseTableRequest> reqs;
   reqs.reserve(table_ids.size());
 
-  std::vector<std::pair<uint64_t, size_t>> table_val_idx;
-  table_val_idx.resize(table_ids.size());
-
   for (size_t i = 0; i < table_ids.size(); ++i) {
     uint64_t node_id = router_.Hit(utils::Hash(table_ids[i]));
 
-    if (proxy_ids_.find(node_id) == proxy_ids_.end()) {
-      return ErrorCode::kProxyNodeIdNotExistError;
-    }
-
-    table_val_idx[i] = std::make_pair(node_id, reqs[node_id].ids.size());
-    reqs[node_id].ids.emplace_back(table_ids[i]);
+    reqs[node_id].table_ids.emplace_back(table_ids[i]);
   }
 
   std::unordered_map<uint64_t, TryCombineFetchDenseTableResponse> replies;
@@ -81,41 +71,80 @@ int32_t Proxy::TryCombineFetchDenseTable(const std::vector<uint64_t>& table_ids,
     return error_code;
   }
 
+  exist_table_ids->reserve(table_ids.size());
   names->reserve(table_ids.size());
   values->reserve(table_ids.size());
 
-  for (size_t i = 0; i < table_ids.size(); ++i) {
-    uint64_t node_id = table_val_idx[i].first;
-    size_t idx = table_val_idx[i].second;
-
-    names->emplace_back(replies[node_id].names.at(idx));
-    values->emplace_back(replies[node_id].values.at(idx));
+  for (const auto& [k, v] : replies) {
+    exist_table_ids->insert(exist_table_ids->begin(), v.exist_table_ids.begin(),
+                            v.exist_table_ids.end());
+    names->insert(names->begin(), v.names.begin(), v.names.end());
+    values->insert(values->begin(), v.values.begin(), v.values.end());
   }
 
   return ErrorCode::kSuccess;
 }
 
-// int32_t Proxy::FetchDenseTableValue(uint64_t model_id, uint64_t table_id,
-//                                     Table::Value* vals) {
-//   return ErrorCode::kSuccess;
-// }
+int32_t Proxy::TryFetchSparseMetaData(
+    uint64_t table_id, std::string* name, int64_t* dimension,
+    ElementType* element_type, InitializerType* init_type,
+    std::unordered_map<std::string, std::string>* init_conf) {
+  uint64_t node_id = router_.Hit(utils::Hash(table_id));
 
-// int32_t Proxy::FetchAcceptSparseIds(uint64_t target_node_id,
-//                                     const Router& new_router, uint64_t
-//                                     model_id, uint64_t table_id,
-//                                     std::vector<uint64_t>* sparse_ids) {
-//   return ErrorCode::kSuccess;
-// }
+  TryFetchSparseMetaDataRequest req;
+  req.table_id = table_id;
+  TryFetchSparseMetaDataResponse reply;
 
-// int32_t Proxy::FetchSparseTableValues(uint64_t model_id, uint64_t table_id,
-//                                       const std::vector<uint64_t>&
-//                                       sparse_ids, std::vector<Table::Value>*
-//                                       vals) {
-//   return ErrorCode::kSuccess;
-// }
+  auto error_code = g_connecters_.Call(
+      node_id, RPCFuncType::kTryFetchSparseMetaDataType, req, &reply);
+  if (error_code != ErrorCode::kSuccess) {
+    return error_code;
+  }
 
-// int32_t Proxy::DeleteRedundantData(const Router& new_router) {
-//   return ErrorCode::kSuccess;
-// }
+  *name = reply.name;
+  *dimension = reply.dimension;
+  *element_type = reply.element_type;
+  *init_type = reply.init_type;
+  *init_conf = reply.init_conf;
+
+  return ErrorCode::kSuccess;
+}
+
+int32_t Proxy::TryFetchSparseValues(uint64_t table_id,
+                                    const std::vector<uint64_t>& sparse_ids,
+                                    std::vector<uint64_t>* exist_sparse_ids,
+                                    std::vector<Value>* values) {
+  std::unordered_map<uint64_t, TryFetchSparseValuesRequest> reqs;
+
+  for (size_t i = 0; i < sparse_ids.size(); ++i) {
+    uint64_t node_id = router_.Hit(utils::Hash(table_id, sparse_ids[i]));
+
+    reqs[node_id].sparse_ids.emplace_back(sparse_ids[i]);
+  }
+
+  for (auto& [_, v] : reqs) {
+    v.table_id = table_id;
+  }
+
+  std::unordered_map<uint64_t, TryFetchSparseValuesResponse> replies;
+
+  auto error_code = g_connecters_.Call(RPCFuncType::kTryFetchSparseValuesType,
+                                       reqs, &replies);
+  if (error_code != ErrorCode::kSuccess) {
+    return error_code;
+  }
+
+  exist_sparse_ids->reserve(sparse_ids.size());
+  values->reserve(sparse_ids.size());
+
+  for (auto& [_, reply] : replies) {
+    exist_sparse_ids->insert(exist_sparse_ids->end(),
+                             reply.exist_sparse_ids.begin(),
+                             reply.exist_sparse_ids.end());
+    values->insert(values->end(), reply.values.begin(), reply.values.end());
+  }
+
+  return ErrorCode::kSuccess;
+}
 
 }  // namespace kraken

@@ -47,7 +47,6 @@ struct Compress {
 
     ARGUMENT_CHECK(serialize << reply_header, "Serialize reply header error!");
     if ((serialize << reply) == false) {
-      // return ErrorCode::kSerializeReplyError;
       return false;
     }
 
@@ -74,7 +73,6 @@ struct Compress {
     {
       Serialize serialize(&body_buf);
       if ((serialize << reply) == false) {
-        // return ErrorCode::kSerializeReplyError;
         return false;
       }
     }
@@ -83,7 +81,6 @@ struct Compress {
     {
       SnappySource source(body_buf.ptr(), body_buf.offset());
       if (snappy::Compress(&source, &sink) <= 0) {
-        // return ErrorCode::kSnappyCompressError;
         return false;
       }
     }

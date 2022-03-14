@@ -4,9 +4,9 @@
 
 #include "common/log.h"
 #include "protocol/create_dense_table_prot.h"
+#include "protocol/create_model_prot.h"
 #include "protocol/create_sparse_table_prot.h"
 #include "protocol/heartbeat_prot.h"
-#include "protocol/init_model_prot.h"
 #include "protocol/notify_node_join_prot.h"
 #include "protocol/notify_router_change_prot.h"
 #include "protocol/rpc_func_type.h"
@@ -168,15 +168,16 @@ int32_t Scheduler::InitModel(
       ids.emplace_back(v.id);
     }
 
-    InitModelRequest req;
+    CreateModelRequest req;
     req.name = name;
     req.optim_type = optim_type;
     req.optim_conf = optim_conf;
 
-    std::vector<InitModelResponse> replies;
+    std::vector<CreateModelResponse> replies;
 
     // We have to make sure the notify success.
-    RPC_CALL(connecter_.Call(RPCFuncType::kInitModelType, ids, req, &replies));
+    RPC_CALL(
+        connecter_.Call(RPCFuncType::kCreateModelType, ids, req, &replies));
   }
 
   LOG_INFO("Init model:" << name << ", optim_type:" << (int32_t)optim_type
@@ -216,7 +217,7 @@ int32_t Scheduler::RegisterDenseTable(std::string name, const Tensor& val,
   uint64_t node_id = router_.Hit(utils::Hash(real_id));
 
   CreateDenseTableRequest req;
-  req.id = real_id;
+  req.table_id = real_id;
   req.name = name;
   req.val = val;
 
@@ -283,7 +284,7 @@ int32_t Scheduler::RegisterSparseTable(
     }
 
     CreateSparseTableRequest req;
-    req.id = real_id;
+    req.table_id = real_id;
     req.name = name;
     req.dimension = dimension;
     req.element_type = element_type;

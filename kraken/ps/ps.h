@@ -61,12 +61,15 @@ private:
   void Transfer(uint64_t target_id);
 
   // Call this function must make sure the status is kWorker | kProxy.
-  // Caller must make sure thread-safe
   void TryFetchDenseTableFromProxy(uint64_t table_id);
 
-  // Caller must make sure thread-safe
   void TryCombineFetchDenseTableFromProxy(
       const std::vector<uint64_t>& table_ids);
+
+  void TryFetchSparseMetaDataFromProxy(uint64_t table_id);
+
+  void TryFetchSparseValuesFromProxy(uint64_t table_id,
+                                     const std::vector<uint64_t>& sparse_ids);
 
 public:
   void Start();
@@ -83,46 +86,60 @@ public:
   int32_t NotifyNodeJoin(uint64_t joined_id, const Router& old_router,
                          const Router& new_router);
 
-  // Call by other Ps node.
-  int32_t InitModel(
+  // Call by other Scheduler.
+  int32_t CreateModel(
       std::string name, OptimType optim_type,
       const std::unordered_map<std::string, std::string>& optim_conf);
 
-  // Call by other Ps node.
-  int32_t CreateDenseTable(uint64_t id, std::string name, const Tensor& val);
+  // Call by other Scheduler.
+  int32_t CreateDenseTable(uint64_t table_id, std::string name, const Tensor& val);
 
-  // Call by other Ps node.
+  // Call by other Scheduler.
   int32_t CreateSparseTable(
-      uint64_t id, std::string name, int64_t dimension,
+      uint64_t table_id, std::string name, int64_t dimension,
       ElementType element_type, InitializerType init_type,
       const std::unordered_map<std::string, std::string>& init_conf);
 
   // Call by other Ps node.
   // Another node transfer DenseTable to this node.
-  int32_t TransferDenseTable(uint64_t id, const std::string& name,
-                             const Value& value);
+  int32_t TransferDenseTable(uint64_t from_node_id, uint64_t table_id,
+                             const std::string& name, const Value& value);
 
   // Call by other Ps node.
   // Another node transfer SparseTableMetaData to this node.
   int32_t TransferSparseMetaData(
-      uint64_t id, std::string name, int64_t dimension,
+      uint64_t table_id, std::string name, int64_t dimension,
       ElementType element_type, InitializerType init_type,
       const std::unordered_map<std::string, std::string>& init_conf);
 
   // Call by other Ps node.
   // Another node transfer SparseTable Embedding to this node.
-  int32_t TransferSparseValues(uint64_t id,
+  int32_t TransferSparseValues(uint64_t table_id,
                                const std::vector<uint64_t>& sparse_ids,
                                const std::vector<Value>& values);
 
   // Call by other Ps node.
   // A node try to fetch DenseTable.
-  int32_t TryFetchDenseTable(uint64_t id, std::string* name, Value* value);
+  int32_t TryFetchDenseTable(uint64_t table_id, std::string* name,
+                             Value* value);
 
   // Call by other Ps node.
   int32_t TryCombineFetchDenseTable(const std::vector<uint64_t>& table_ids,
+                                    std::vector<uint64_t>* exist_table_ids,
                                     std::vector<std::string>* names,
                                     std::vector<Value>* values);
+
+  // Call by other Ps node.
+  int32_t TryFetchSparseMetaData(
+      uint64_t table_id, std::string* name, int64_t* dimension,
+      ElementType* element_type, InitializerType* init_type,
+      std::unordered_map<std::string, std::string>* init_conf);
+
+  // Call by other Ps node.
+  int32_t TryFetchSparseValues(uint64_t table_id,
+                               const std::vector<uint64_t>& sparse_ids,
+                               std::vector<uint64_t>* exist_sparse_ids,
+                               std::vector<Value>* values);
 
   //////////////////////////////////////////////////////////////////////////////////
   // For Worker.
@@ -139,6 +156,11 @@ public:
   // Call by Worker.
   int32_t PushDenseTable(uint64_t router_version, uint64_t table_id,
                          const Tensor& grad, float lr);
+
+  // Call by Worker.
+  int32_t PullSparseTable(uint64_t router_version, uint64_t table_id,
+                          const std::vector<uint64_t>& sparse_ids,
+                          std::vector<Tensor>* vals);
 };
 
 }  // namespace kraken

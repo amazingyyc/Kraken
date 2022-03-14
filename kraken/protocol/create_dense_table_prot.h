@@ -6,19 +6,19 @@
 namespace kraken {
 
 struct CreateDenseTableRequest {
-  uint64_t id;
+  uint64_t table_id;
   std::string name;
   Tensor val;
 };
 
 template <>
 inline bool Serialize::operator<<(const CreateDenseTableRequest& v) {
-  return (*this) << v.id && (*this) << v.name && (*this) << v.val;
+  return (*this) << v.table_id && (*this) << v.name && (*this) << v.val;
 }
 
 template <>
 inline bool Deserialize::operator>>(CreateDenseTableRequest& v) {
-  return (*this) >> v.id && (*this) >> v.name && (*this) >> v.val;
+  return (*this) >> v.table_id && (*this) >> v.name && (*this) >> v.val;
 }
 
 struct CreateDenseTableResponse {};

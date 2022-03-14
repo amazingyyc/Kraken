@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cstdlib>
+#include <cstring>
 #include <random>
 
 namespace kraken {
@@ -10,7 +11,7 @@ namespace kraken {
 template <typename Key /*must be comparable*/, typename Value>
 class SkipList {
 private:
-  constexpr static size_t kMaxHeight = 32;
+  constexpr static size_t kMaxHeight = 24;
   constexpr static int kBranching = 3;
 
 private:
@@ -53,6 +54,11 @@ public:
     }
 
     const Value& value() const {
+      assert(Valid());
+      return node_->value;
+    }
+
+    Value& value() {
       assert(Valid());
       return node_->value;
     }
@@ -104,7 +110,9 @@ private:
   Node* NewNode(size_t height) {
     assert(height > 0);
 
-    Node* node = (Node*)malloc(sizeof(Node) + height * sizeof(Node*));
+    void* ptr = malloc(sizeof(Node) + height * sizeof(Node*));
+
+    Node* node = new (ptr) Node();
 
     return node;
   }

@@ -15,20 +15,7 @@
 
 namespace kraken {
 
-namespace io {
-class CheckpointExecutor;
-class Checkpoint;
-}  // namespace io
-
-namespace watch {
-class Watcher;
-}
-
 class SparseTable : public Table {
-  friend class io::CheckpointExecutor;
-  friend class io::Checkpoint;
-  friend class watch::Watcher;
-
 private:
   // For sparse table this must be a matrix. shape is [N, dimension].
   // We donnot assign the N, so it means the matrix's row canbe increase
@@ -54,11 +41,11 @@ public:
 
   ParallelSkipList<uint64_t, Value>* vals();
 
-  int32_t Push(const std::vector<uint64_t>& indices,
-               const std::vector<Tensor>& grads, float lr) override;
-
-  int32_t Pull(const std::vector<uint64_t>& indices,
+  int32_t Pull(const std::vector<uint64_t>& sparse_ids,
                std::vector<Tensor>* vals) override;
+
+  int32_t Push(Optim* optim, const std::vector<uint64_t>& sparse_ids,
+               const std::vector<Tensor>& grads, float lr) override;
 };
 
 }  // namespace kraken

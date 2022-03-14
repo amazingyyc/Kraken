@@ -30,22 +30,19 @@ public:
                              Value* value) const;
 
   int32_t TryCombineFetchDenseTable(const std::vector<uint64_t>& table_ids,
+                                    std::vector<uint64_t>* exist_ids,
                                     std::vector<std::string>* names,
                                     std::vector<Value>* values) const;
 
-  // int32_t FetchDenseTableValue(uint64_t model_id, uint64_t table_id,
-  //                              Table::Value* vals);
+  int32_t TryFetchSparseMetaData(
+      uint64_t table_id, std::string* name, int64_t* dimension,
+      ElementType* element_type, InitializerType* init_type,
+      std::unordered_map<std::string, std::string>* init_conf);
 
-  // int32_t FetchAcceptSparseIds(uint64_t target_node_id, const Router&
-  // new_router,
-  //                              uint64_t model_id, uint64_t table_id,
-  //                              std::vector<uint64_t>* sparse_ids);
-
-  // int32_t FetchSparseTableValues(uint64_t model_id, uint64_t table_id,
-  //                                const std::vector<uint64_t>& sparse_ids,
-  //                                std::vector<Table::Value>* vals);
-
-  // int32_t DeleteRedundantData(const Router& new_router);
+  int32_t TryFetchSparseValues(uint64_t table_id,
+                               const std::vector<uint64_t>& sparse_ids,
+                               std::vector<uint64_t>* exist_sparse_ids,
+                               std::vector<Value>* values);
 };
 
 }  // namespace kraken

@@ -35,7 +35,7 @@ class Optimizer:
         self._name_param[name] = param
 
         if isinstance(param, SparseTable):
-          raise ValueError('Not support SparseTable.')
+          raise ValueError('Not support SparseTable for now.')
           # # Check whether the user has set a name.
           # real_name = name
           # if param.name() is not None:
@@ -66,10 +66,10 @@ class Optimizer:
           table_id = kraken_native.register_dense_table(name, param.data)
           self._name_table_id[name] = table_id
 
-          logging.info(f'Register DenseTable:[{name}], table id:[{table_id}].')
-
           # Register a hook func to send gradient to server.
           param.register_hook(self._create_dense_grad_hook(name, table_id))
+
+          logging.info(f'Register DenseTable:[{name}], table id:[{table_id}].')
 
   def _create_dense_grad_hook(self, name, table_id):
     logging.info(f'Create gradient hook for:[{name}], table_id:[{table_id}].')

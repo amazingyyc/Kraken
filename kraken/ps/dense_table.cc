@@ -42,17 +42,4 @@ int32_t DenseTable::Push(Optim* optim, const Tensor& grad, float lr) {
   return optim->Update(grad, lr, &val_);
 }
 
-int32_t DenseTable::PushPull(const Tensor& grad, float lr, Tensor* val) {
-  // std::unique_lock<std::shared_mutex> lock(mu_);
-
-  // int32_t ecode = optim_->Update(grad, lr, &val_.val, &val_.bag);
-  // if (ecode != ErrorCode::kSuccess) {
-  //   return ecode;
-  // }
-
-  // *val = val_.val.Clone();
-
-  return ErrorCode::kSuccess;
-}
-
 }  // namespace kraken

@@ -19,18 +19,21 @@
 // #include "protocol/save_check_point_prot.h"
 #include "protocol/combine_pull_dense_table_prot.h"
 #include "protocol/create_dense_table_prot.h"
+#include "protocol/create_model_prot.h"
 #include "protocol/create_sparse_table_prot.h"
 #include "protocol/heartbeat_prot.h"
-#include "protocol/init_model_prot.h"
 #include "protocol/notify_finish_transfer_prot.h"
 #include "protocol/notify_node_join_prot.h"
 #include "protocol/pull_dense_table_prot.h"
+#include "protocol/pull_sparse_table_prot.h"
 #include "protocol/push_dense_table_prot.h"
 #include "protocol/transfer_dense_table_prot.h"
 #include "protocol/transfer_sparse_meta_data_prot.h"
 #include "protocol/transfer_sparse_values_prot.h"
 #include "protocol/try_combine_fetch_dense_table_prot.h"
 #include "protocol/try_fetch_dense_table_prot.h"
+#include "protocol/try_fetch_sparse_meta_data_prot.h"
+#include "protocol/try_fetch_sparse_values_prot.h"
 #include "ps/ps.h"
 #include "rpc/station.h"
 
@@ -54,7 +57,7 @@ private:
   int32_t NotifyNodeJoin(const NotifyNodeJoinRequest& req,
                          NotifyNodeJoinResponse* rsp);
 
-  int32_t InitModel(const InitModelRequest& req, InitModelResponse* rsp);
+  int32_t CreateModel(const CreateModelRequest& req, CreateModelResponse* rsp);
 
   int32_t CreateDenseTable(const CreateDenseTableRequest& req,
                            CreateDenseTableResponse* rsp);
@@ -77,6 +80,12 @@ private:
   int32_t TryCombineFetchDenseTable(const TryCombineFetchDenseTableRequest& req,
                                     TryCombineFetchDenseTableResponse* rsp);
 
+  int32_t TryFetchSparseMetaData(const TryFetchSparseMetaDataRequest& req,
+                                 TryFetchSparseMetaDataResponse* rsp);
+
+  int32_t TryFetchSparseValues(const TryFetchSparseValuesRequest& req,
+                               TryFetchSparseValuesResponse* rsp);
+
   int32_t PullDenseTable(const PullDenseTableRequest& req,
                          PullDenseTableResponse* rsp);
 
@@ -85,6 +94,9 @@ private:
 
   int32_t PushDenseTable(const PushDenseTableRequest& req,
                          PushDenseTableResponse* rsp);
+
+  int32_t PullSparseTable(const PullSparseTableRequest& req,
+                          PullSparseTableResponse* rsp);
 
   void RegisterFuncs();
 

@@ -29,15 +29,12 @@ int32_t Table::Push(Optim* optim, const Tensor& grad, float lr) {
   return ErrorCode::kInterfaceUnImplementError;
 }
 
-int32_t Table::PushPull(const Tensor& grad, float lr, Tensor* val) {
-  return ErrorCode::kInterfaceUnImplementError;
-}
-
 int32_t Table::Pull(const std::vector<uint64_t>& indices,
                     std::vector<Tensor>* vals) {
   return ErrorCode::kInterfaceUnImplementError;
 }
-int32_t Table::Push(const std::vector<uint64_t>& indices,
+
+int32_t Table::Push(Optim* optim, const std::vector<uint64_t>& indices,
                     const std::vector<Tensor>& grads, float lr) {
   return ErrorCode::kInterfaceUnImplementError;
 }

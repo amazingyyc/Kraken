@@ -24,49 +24,65 @@ int32_t PsServer::NotifyNodeJoin(const NotifyNodeJoinRequest& req,
   return ps_.NotifyNodeJoin(req.joined_id, req.old_router, req.new_router);
 }
 
-int32_t PsServer::InitModel(const InitModelRequest& req,
-                            InitModelResponse* rsp) {
-  return ps_.InitModel(req.name, req.optim_type, req.optim_conf);
+int32_t PsServer::CreateModel(const CreateModelRequest& req,
+                              CreateModelResponse* rsp) {
+  return ps_.CreateModel(req.name, req.optim_type, req.optim_conf);
 }
 
 int32_t PsServer::CreateDenseTable(const CreateDenseTableRequest& req,
                                    CreateDenseTableResponse* rsp) {
-  return ps_.CreateDenseTable(req.id, req.name, req.val);
+  return ps_.CreateDenseTable(req.table_id, req.name, req.val);
 }
 
 int32_t PsServer::CreateSparseTable(const CreateSparseTableRequest& req,
                                     CreateSparseTableResponse* rsp) {
-  return ps_.CreateSparseTable(req.id, req.name, req.dimension,
+  return ps_.CreateSparseTable(req.table_id, req.name, req.dimension,
                                req.element_type, req.init_type, req.init_conf);
 }
 
 int32_t PsServer::TransferDenseTable(const TransferDenseTableRequest& req,
                                      TransferDenseTableResponse* rsp) {
-  return ps_.TransferDenseTable(req.id, req.name, req.value);
+  return ps_.TransferDenseTable(req.from_node_id, req.table_id, req.name,
+                                req.value);
 }
 
 int32_t PsServer::TransferSparseMetaData(
     const TransferSparseMetaDataRequest& req,
     TransferSparseMetaDataResponse* rsp) {
-  return ps_.TransferSparseMetaData(req.id, req.name, req.dimension,
+  return ps_.TransferSparseMetaData(req.table_id, req.name, req.dimension,
                                     req.element_type, req.init_type,
                                     req.init_conf);
 }
 
 int32_t PsServer::TransferSparseValues(const TransferSparseValuesRequest& req,
                                        TransferSparseValuesResponse* rsp) {
-  return ps_.TransferSparseValues(req.id, req.sparse_ids, req.values);
+  return ps_.TransferSparseValues(req.table_id, req.sparse_ids, req.values);
 }
 
 int32_t PsServer::TryFetchDenseTable(const TryFetchDenseTableRequest& req,
                                      TryFetchDenseTableResponse* rsp) {
-  return ps_.TryFetchDenseTable(req.id, &(rsp->name), &(rsp->value));
+  return ps_.TryFetchDenseTable(req.table_id, &(rsp->name), &(rsp->value));
 }
 
 int32_t PsServer::TryCombineFetchDenseTable(
     const TryCombineFetchDenseTableRequest& req,
     TryCombineFetchDenseTableResponse* rsp) {
-  return ps_.TryCombineFetchDenseTable(req.ids, &(rsp->names), &(rsp->values));
+  return ps_.TryCombineFetchDenseTable(req.table_ids, &(rsp->exist_table_ids),
+                                       &(rsp->names), &(rsp->values));
+}
+
+int32_t PsServer::TryFetchSparseMetaData(
+    const TryFetchSparseMetaDataRequest& req,
+    TryFetchSparseMetaDataResponse* rsp) {
+  return ps_.TryFetchSparseMetaData(req.table_id, &(rsp->name),
+                                    &(rsp->dimension), &(rsp->element_type),
+                                    &(rsp->init_type), &(rsp->init_conf));
+}
+
+int32_t PsServer::TryFetchSparseValues(const TryFetchSparseValuesRequest& req,
+                                       TryFetchSparseValuesResponse* rsp) {
+  return ps_.TryFetchSparseValues(req.table_id, req.sparse_ids,
+                                  &(rsp->exist_sparse_ids), &(rsp->values));
 }
 
 int32_t PsServer::PullDenseTable(const PullDenseTableRequest& req,
@@ -85,6 +101,12 @@ int32_t PsServer::PushDenseTable(const PushDenseTableRequest& req,
   return ps_.PushDenseTable(req.router_version, req.table_id, req.grad, req.lr);
 }
 
+int32_t PsServer::PullSparseTable(const PullSparseTableRequest& req,
+                                  PullSparseTableResponse* rsp) {
+  return ps_.PullSparseTable(req.router_version, req.table_id, req.sparse_ids,
+                             &(rsp->vals));
+}
+
 void PsServer::RegisterFuncs() {
   using namespace std::placeholders;
 
@@ -95,7 +117,7 @@ void PsServer::RegisterFuncs() {
   REGISTER_FUNC(Heartbeat, Heartbeat);
   REGISTER_FUNC(NotifyFinishTransfer, NotifyFinishTransfer);
   REGISTER_FUNC(NotifyNodeJoin, NotifyNodeJoin);
-  REGISTER_FUNC(InitModel, InitModel);
+  REGISTER_FUNC(CreateModel, CreateModel);
   REGISTER_FUNC(CreateDenseTable, CreateDenseTable);
   REGISTER_FUNC(CreateSparseTable, CreateSparseTable);
   REGISTER_FUNC(TransferDenseTable, TransferDenseTable);
@@ -103,9 +125,12 @@ void PsServer::RegisterFuncs() {
   REGISTER_FUNC(TransferSparseValues, TransferSparseValues);
   REGISTER_FUNC(TryFetchDenseTable, TryFetchDenseTable);
   REGISTER_FUNC(TryCombineFetchDenseTable, TryCombineFetchDenseTable);
+  REGISTER_FUNC(TryFetchSparseMetaData, TryFetchSparseMetaData);
+  REGISTER_FUNC(TryFetchSparseValues, TryFetchSparseValues);
   REGISTER_FUNC(PullDenseTable, PullDenseTable);
   REGISTER_FUNC(CombinePullDenseTable, CombinePullDenseTable);
   REGISTER_FUNC(PushDenseTable, PushDenseTable);
+  REGISTER_FUNC(PullSparseTable, PullSparseTable);
 }
 
 void PsServer::Start() {

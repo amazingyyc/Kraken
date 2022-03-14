@@ -273,6 +273,23 @@ inline bool Deserialize::operator>>(Tensor& v) {
 }
 
 template <>
+inline bool Deserialize::operator>>(std::vector<std::string>& v) {
+  uint64_t size;
+  if (((*this) >> size) == false) {
+    return false;
+  }
+
+  v.resize(size);
+  for (uint64_t i = 0; i < size; ++i) {
+    if (((*this) >> v[i]) == false) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+template <>
 inline bool Deserialize::operator>>(std::vector<Tensor>& v) {
   uint64_t size;
   if (((*this) >> size) == false) {

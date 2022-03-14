@@ -7,7 +7,7 @@
 namespace kraken {
 
 struct TransferSparseMetaDataRequest {
-  uint64_t id;
+  uint64_t table_id;
   std::string name;
 
   int64_t dimension;
@@ -19,14 +19,14 @@ struct TransferSparseMetaDataRequest {
 
 template <>
 inline bool Serialize::operator<<(const TransferSparseMetaDataRequest& v) {
-  return (*this) << v.id && (*this) << v.name && (*this) << v.dimension &&
+  return (*this) << v.table_id && (*this) << v.name && (*this) << v.dimension &&
          (*this) << v.element_type && (*this) << v.init_type &&
          (*this) << v.init_conf;
 }
 
 template <>
 inline bool Deserialize::operator>>(TransferSparseMetaDataRequest& v) {
-  return (*this) >> v.id && (*this) >> v.name && (*this) >> v.dimension &&
+  return (*this) >> v.table_id && (*this) >> v.name && (*this) >> v.dimension &&
          (*this) >> v.element_type && (*this) >> v.init_type &&
          (*this) >> v.init_conf;
 }

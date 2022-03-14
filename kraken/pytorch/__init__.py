@@ -20,14 +20,14 @@ from kraken_native import push_dense_table
 # from kraken_native import save_check_point
 
 # from .embedding import Embedding
-# from .lr import ConstantLR
-# from .optim import Adagrad
-# from .optim import Adam
-# from .optim import RMSprop
-# from .optim import SGD
+from .lr import ConstantLR
+from .optim import Adagrad
+from .optim import Adam
+from .optim import RMSprop
+from .optim import SGD
 # from .initializer import ConstantInitializer
 # from .initializer import UniformInitializer
 # from .initializer import NormalInitializer
 # from .initializer import XavierUniformInitializer
 # from .initializer import XavierNormalInitializer
-# from .optimizer import Optimizer
+from .optimizer import Optimizer

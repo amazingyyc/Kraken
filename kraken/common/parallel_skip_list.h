@@ -90,6 +90,10 @@ public:
     return UniqueHandler(lockers_[slot], skip_lists_[slot]);
   }
 
+  size_t HitSlot(const Key& key) const {
+    return hash_(key) % SlotCount;
+  }
+
   SharedHandler SharedSkipListHandler(size_t slot) {
     assert(slot < SlotCount);
 
@@ -116,6 +120,25 @@ public:
 
     std::unique_lock<std::shared_mutex> _(lockers_[slot]);
     return skip_lists_[slot].Insert(key, std::move(value));
+  }
+
+  void Insert(const std::vector<Key>& keys, const std::vector<Value>& values) {
+    assert(keys.size() == values.size());
+
+    std::unordered_map<size_t /*slot*/, std::vector<size_t>> slot_idx_map;
+    slot_idx_map.reserve(SlotCount);
+
+    for (size_t i = 0; i < keys.size(); ++i) {
+      slot_idx_map[hash_(keys[i]) % SlotCount].emplace_back(i);
+    }
+
+    for (const auto& [slot, v] : slot_idx_map) {
+      std::unique_lock<std::shared_mutex> _(lockers_[slot]);
+
+      for (auto i : v) {
+        skip_lists_[slot].Insert(keys[i], values[i]);
+      }
+    }
   }
 
   bool Remove(const Key& key) {

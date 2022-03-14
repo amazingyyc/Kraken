@@ -30,63 +30,79 @@ ParallelSkipList<uint64_t, Value>* SparseTable::vals() {
   return &vals_;
 }
 
-int32_t SparseTable::Push(const std::vector<uint64_t>& indices,
-                          const std::vector<Tensor>& grads, float lr) {
-  // if (indices.size() != grads.size()) {
-  //   return ErrorCode::kPushSparseTableParameterError;
-  // }
+int32_t SparseTable::Pull(const std::vector<uint64_t>& sparse_ids,
+                          std::vector<Tensor>* vals) {
+  // At here the id maybe not exist in this table. If not exist create a new
+  // one.
+  vals->resize(sparse_ids.size());
 
-  // Optim* l_optim = optim_;
-  // for (size_t i = 0; i < indices.size(); ++i) {
-  //   uint64_t sparse_id = indices[i];
+  std::unordered_map<size_t, std::vector<size_t>> slot_idx_map;
+  slot_idx_map.reserve(vals_.slot_count());
 
-  //   int32_t ecode;
-  //   bool exist =
-  //       vals_.update_fn(sparse_id, [l_optim, &grads, i, lr, &ecode](Value& v)
-  //       {
-  //         ecode = l_optim->Update(grads[i], lr, &v.val, &v.bag);
-  //       });
+  for (size_t i = 0; i < sparse_ids.size(); ++i) {
+    slot_idx_map[vals_.HitSlot(sparse_ids[i])].emplace_back(i);
+  }
 
-  //   if (exist == false) {
-  //     return ErrorCode::kSparseTableIdNotExistError;
-  //   }
+  for (auto& [slot, v] : slot_idx_map) {
+    // Lock the slot.
+    auto h = vals_.UniqueSkipListHandler(slot);
 
-  //   if (ecode != ErrorCode::kSuccess) {
-  //     return ecode;
-  //   }
-  // }
+    for (auto i : v) {
+      uint64_t sparse_id = sparse_ids[i];
+
+      auto it = h.skip_list.Find(sparse_id);
+
+      if (it.Valid()) {
+        // Exist.
+        (*vals)[i] = it.value().val.Clone();
+      } else {
+        // Not exist create a new embedding.
+        Tensor t = Tensor::Dense({dimension_}, element_type_);
+        initializer_->Initialize(&t);
+
+        // for result.
+        (*vals)[i] = t.Clone();
+
+        Value v;
+        v.val = t;
+
+        h.skip_list.Insert(sparse_id, v);
+      }
+    }
+  }
 
   return ErrorCode::kSuccess;
 }
 
-int32_t SparseTable::Pull(const std::vector<uint64_t>& indices,
-                          std::vector<Tensor>* vals) {
-  // // At here the id maybe not exist in this table. If not exist create a new
-  // // vector.
-  // vals->resize(indices.size());
+int32_t SparseTable::Push(Optim* optim, const std::vector<uint64_t>& sparse_ids,
+                          const std::vector<Tensor>& grads, float lr) {
+  assert(sparse_ids.size() == grads.size());
 
-  // for (size_t i = 0; i < indices.size(); ++i) {
-  //   uint64_t sparse_id = indices[i];
+  std::unordered_map<size_t, std::vector<size_t>> slot_idx_map;
+  slot_idx_map.reserve(vals_.slot_count());
 
-  //   bool exist = vals_.find_fn(
-  //       sparse_id, [vals, i](const Value& v) { (*vals)[i] = v.val.Clone();
-  //       });
+  for (size_t i = 0; i < sparse_ids.size(); ++i) {
+    slot_idx_map[vals_.HitSlot(sparse_ids[i])].emplace_back(i);
+  }
 
-  //   if (exist == false) {
-  //     // can not find, insert a new one.
-  //     Tensor t = Tensor::Dense({dimension_}, element_type_);
-  //     initializer_->Initialize(&t);
+  for (auto& [slot, v] : slot_idx_map) {
+    // Lock the slot.
+    auto h = vals_.UniqueSkipListHandler(slot);
 
-  //     // for result.
-  //     (*vals)[i] = t.Clone();
+    for (auto i : v) {
+      uint64_t sparse_id = sparse_ids[i];
 
-  //     Value v;
-  //     v.val = t;
-  //     v.bag = Bag();
+      auto it = h.skip_list.Find(sparse_id);
+      if (it.Valid() == false) {
+        return ErrorCode::kSparseTableIdNotExistError;
+      }
 
-  //     vals_.insert(sparse_id, v);
-  //   }
-  // }
+      int32_t error_code = optim->Update(grads[i], lr, &(it.value()));
+      if (error_code != ErrorCode::kSuccess) {
+        return error_code;
+      }
+    }
+  }
 
   return ErrorCode::kSuccess;
 }

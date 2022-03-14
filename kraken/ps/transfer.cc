@@ -21,12 +21,13 @@ Transfer::~Transfer() {
   connecter_.Stop();
 }
 
-int32_t Transfer::TransferDenseTable(uint64_t id, const std::string& name,
-                                     Value& val) {
+int32_t Transfer::TransferDenseTable(uint64_t from_node_id, uint64_t table_id,
+                                     const std::string& name, Value& val) {
   uint32_t try_n = try_num_;
 
   TransferDenseTableRequest req;
-  req.id = id;
+  req.from_node_id = from_node_id;
+  req.table_id = table_id;
   req.name = name;
   req.value = val;
 
@@ -46,13 +47,13 @@ int32_t Transfer::TransferDenseTable(uint64_t id, const std::string& name,
 }
 
 int32_t Transfer::TransferSparseMetaData(
-    uint64_t id, std::string name, int64_t dimension, ElementType element_type,
-    InitializerType init_type,
+    uint64_t table_id, std::string name, int64_t dimension,
+    ElementType element_type, InitializerType init_type,
     const std::unordered_map<std::string, std::string>& init_conf) {
   uint32_t try_n = try_num_;
 
   TransferSparseMetaDataRequest req;
-  req.id = id;
+  req.table_id = table_id;
   req.name = name;
   req.dimension = dimension;
   req.element_type = element_type;
@@ -74,13 +75,13 @@ int32_t Transfer::TransferSparseMetaData(
   return error_code;
 }
 
-int32_t Transfer::TransferSparseValues(uint64_t id,
+int32_t Transfer::TransferSparseValues(uint64_t table_id,
                                        const std::vector<uint64_t>& sparse_ids,
                                        const std::vector<Value>& vals) {
   uint32_t try_n = try_num_;
 
   TransferSparseValuesRequest req;
-  req.id = id;
+  req.table_id = table_id;
   req.sparse_ids = sparse_ids;
   req.values = vals;
   TransferSparseValuesResponse reply;
