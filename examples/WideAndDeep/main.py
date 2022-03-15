@@ -11,7 +11,7 @@ from model import WideDeep, WideDeepLoader
 import kraken.pytorch as kk
 
 # initialize Kraken
-kk.initialize(addrs='localhost:50000')
+kk.initialize('127.0.0.1:50000')
 
 path = 'data/adult_data.csv'
 
@@ -97,9 +97,10 @@ for epoch in range(n_epochs):
 
     end_t = time.clock()
 
-    print('Cost {:0,.2f} Epoch {} of {}, Loss: {}, accuracy: {}'.format((end_t - start_t) * 1000, epoch + 1, n_epochs,
-                                                                        round(loss.item(), 3),
-                                                                        round(correct / total, 4)))
+    if i % 1000 == 0:
+      print('Cost {:0,.2f} Epoch {} of {}, Loss: {}, accuracy: {}'.format((end_t - start_t) * 1000, epoch + 1, n_epochs,
+                                                                          round(loss.item(), 3),
+                                                                          round(correct / total, 4)))
 
 # Stop it
 kk.stop()

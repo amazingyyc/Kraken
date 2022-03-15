@@ -86,7 +86,7 @@ void Ps::TryFetchSparseMetaDataFromProxy(uint64_t table_id) {
         Initializer::Create(init_type, init_conf);
     if (initializer == nullptr) {
       LOG_ERROR("TryFetchSparseTableFromProxy get unsupport initialize type:"
-                << (int32_t)init_type);
+                << init_type);
       return;
     }
 
@@ -388,6 +388,74 @@ int32_t Ps::PullSparseTable(uint64_t router_version, uint64_t table_id,
     }
 
     return it.value()->Pull(sparse_ids, vals);
+  }
+}
+
+int32_t Ps::PushSparseTable(uint64_t router_version, uint64_t table_id,
+                            const std::vector<uint64_t>& sparse_ids,
+                            const std::vector<Tensor>& grads, float lr) {
+  std::shared_lock<std::shared_mutex> l(mu_);
+
+  if (!(status_ & NodeStatus::kWork)) {
+    return ErrorCode::kNodeStatusError;
+  }
+
+  // Check whether Route to wrong node.
+  if (router_version != router_.version()) {
+    return ErrorCode::kRouterVersionError;
+  }
+
+  if (status_ & NodeStatus::kProxy) {
+    std::shared_lock<std::shared_mutex> ll(model_mu_);
+
+    auto it = tables_.Find(table_id);
+    if (it.Valid() == false) {
+      ll.unlock();
+      TryFetchSparseMetaDataFromProxy(table_id);
+      ll.lock();
+
+      // Find again.
+      it = tables_.Find(table_id);
+    }
+
+    if (it.Valid() == false || it.value()->type() != TableType::kSparse) {
+      return ErrorCode::kTableNotExistError;
+    }
+
+    SparseTable* table = (SparseTable*)it.value().get();
+
+    std::vector<uint64_t> not_exist_ids;
+    not_exist_ids.reserve(sparse_ids.size());
+
+    for (auto sparse_id : sparse_ids) {
+      if (table->vals()->Contains(sparse_id) == false) {
+        not_exist_ids.emplace_back(sparse_id);
+      }
+    }
+
+    if (not_exist_ids.empty() == false) {
+      ll.unlock();
+      TryFetchSparseValuesFromProxy(table_id, not_exist_ids);
+      ll.lock();
+
+      // At here we release the locker so the it maybe become invalid.
+      // We need try to find it agagin.
+      it = tables_.Find(table_id);
+      if (it.Valid() == false || it.value()->type() != TableType::kSparse) {
+        return ErrorCode::kTableNotExistError;
+      }
+    }
+
+    return it.value()->Push(optim_.get(), sparse_ids, grads, lr);
+  } else {
+    std::shared_lock<std::shared_mutex> ll(model_mu_);
+
+    auto it = tables_.Find(table_id);
+    if (it.Valid() == false) {
+      return ErrorCode::kTableNotExistError;
+    }
+
+    return it.value()->Push(optim_.get(), sparse_ids, grads, lr);
   }
 }
 

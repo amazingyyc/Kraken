@@ -1,22 +1,5 @@
 #pragma once
 
-// #include "protocol/apply_dense_table_prot.h"
-// #include "protocol/apply_model_prot.h"
-// #include "protocol/apply_sparse_table_prot.h"
-// #include "protocol/apply_table_id_prot.h"
-// #include "protocol/combine_pull_dense_table_prot.h"
-// #include "protocol/combine_pull_sparse_table_prot.h"
-// #include "protocol/pull_dense_table_prot.h"
-// #include "protocol/pull_sparse_table_prot.h"
-// #include "protocol/push_dense_table_prot.h"
-// #include "protocol/push_pull_dense_table_prot.h"
-// #include "protocol/push_sparse_table_prot.h"
-// #include "protocol/register_dense_table_info_prot.h"
-// #include "protocol/register_dense_table_prot.h"
-// #include "protocol/register_model_prot.h"
-// #include "protocol/register_sparse_table_info_prot.h"
-// #include "protocol/register_sparse_table_prot.h"
-// #include "protocol/save_check_point_prot.h"
 #include "protocol/combine_pull_dense_table_prot.h"
 #include "protocol/create_dense_table_prot.h"
 #include "protocol/create_model_prot.h"
@@ -27,6 +10,7 @@
 #include "protocol/pull_dense_table_prot.h"
 #include "protocol/pull_sparse_table_prot.h"
 #include "protocol/push_dense_table_prot.h"
+#include "protocol/push_sparse_table_prot.h"
 #include "protocol/transfer_dense_table_prot.h"
 #include "protocol/transfer_sparse_meta_data_prot.h"
 #include "protocol/transfer_sparse_values_prot.h"
@@ -97,6 +81,9 @@ private:
 
   int32_t PullSparseTable(const PullSparseTableRequest& req,
                           PullSparseTableResponse* rsp);
+
+  int32_t PushSparseTable(const PushSparseTableRequest& req,
+                          PushSparseTableResponse* rsp);
 
   void RegisterFuncs();
 

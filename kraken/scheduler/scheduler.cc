@@ -13,8 +13,7 @@
 
 namespace kraken {
 
-Scheduler::Scheduler(CompressType compress_type)
-    : connecter_(compress_type), model_init_(false) {
+Scheduler::Scheduler() : connecter_(CompressType::kNo), model_init_(false) {
 }
 
 Scheduler::~Scheduler() {
@@ -113,24 +112,6 @@ int32_t Scheduler::TryJoin(const std::string& addr, bool* allow,
         connecter_.Call(RPCFuncType::kNotifyNodeJoinType, ids, req, &replies));
   }
 
-  // Notity the worker the router is change.
-  {
-    // NotifyNodeJoinRequest
-    std::vector<uint64_t> ids;
-    for (const auto& [k, v] : nodes_) {
-      if (v.type == NodeType::kWorker) {
-        ids.emplace_back(v.id);
-      }
-    }
-
-    NotifyRouterChangeRequest req;
-    req.old_router = *old_router;
-    req.new_router = *new_router;
-    std::vector<NotifyRouterChangeResponse> replies;
-
-    connecter_.Call(RPCFuncType::kNotifyRouterChangeType, ids, req, &replies);
-  }
-
   return ErrorCode::kSuccess;
 }
 
@@ -180,7 +161,7 @@ int32_t Scheduler::InitModel(
         connecter_.Call(RPCFuncType::kCreateModelType, ids, req, &replies));
   }
 
-  LOG_INFO("Init model:" << name << ", optim_type:" << (int32_t)optim_type
+  LOG_INFO("Init model:" << name << ", optim_type:" << optim_type
                          << ", optim_conf:" << optim_conf);
 
   return ErrorCode::kSuccess;
@@ -312,9 +293,8 @@ int32_t Scheduler::RegisterSparseTable(
 
   LOG_INFO("Register SparseTable:"
            << name << ", id:" << real_id << ", dimension:" << dimension
-           << ", ElementType:" << element_type.Name()
-           << ", init_type:" << (int32_t)init_type
-           << ", init_conf:" << init_conf << ", in all Ps.");
+           << ", ElementType:" << element_type.Name() << ", init_type:"
+           << init_type << ", init_conf:" << init_conf << ", in all Ps.");
 
   return ErrorCode::kSuccess;
 }

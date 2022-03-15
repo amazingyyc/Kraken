@@ -6,17 +6,17 @@
 namespace kraken {
 
 struct NotifyFinishTransferRequest {
-  uint64_t node_id;
+  uint64_t from_node_id;
 };
 
 template <>
 inline bool Serialize::operator<<(const NotifyFinishTransferRequest& v) {
-  return (*this) << v.node_id;
+  return (*this) << v.from_node_id;
 }
 
 template <>
 inline bool Deserialize::operator>>(NotifyFinishTransferRequest& v) {
-  return (*this) >> v.node_id;
+  return (*this) >> v.from_node_id;
 }
 
 struct NotifyFinishTransferResponse {};

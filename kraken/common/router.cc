@@ -176,7 +176,7 @@ std::string Router::Str() const {
 
   oss << "Version:" << version_ << ", Nodes:[";
   for (const auto& [_, v] : nodes_) {
-    oss << "(id:" << v.id << ", name:" << v.name << ", vnode_list:";
+    oss << "id:" << v.id << ", name:" << v.name << ", vnode_list:";
     for (auto vn : v.vnode_list) {
       oss << vn << ", ";
     }

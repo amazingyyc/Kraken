@@ -16,7 +16,7 @@ int32_t PsServer::Heartbeat(const HeartbeatRequest& req,
 
 int32_t PsServer::NotifyFinishTransfer(const NotifyFinishTransferRequest& req,
                                        NotifyFinishTransferResponse* rsp) {
-  return ps_.NotifyFinishTransfer(req.node_id);
+  return ps_.NotifyFinishTransfer(req.from_node_id);
 }
 
 int32_t PsServer::NotifyNodeJoin(const NotifyNodeJoinRequest& req,
@@ -49,14 +49,15 @@ int32_t PsServer::TransferDenseTable(const TransferDenseTableRequest& req,
 int32_t PsServer::TransferSparseMetaData(
     const TransferSparseMetaDataRequest& req,
     TransferSparseMetaDataResponse* rsp) {
-  return ps_.TransferSparseMetaData(req.table_id, req.name, req.dimension,
-                                    req.element_type, req.init_type,
-                                    req.init_conf);
+  return ps_.TransferSparseMetaData(req.from_node_id, req.table_id, req.name,
+                                    req.dimension, req.element_type,
+                                    req.init_type, req.init_conf);
 }
 
 int32_t PsServer::TransferSparseValues(const TransferSparseValuesRequest& req,
                                        TransferSparseValuesResponse* rsp) {
-  return ps_.TransferSparseValues(req.table_id, req.sparse_ids, req.values);
+  return ps_.TransferSparseValues(req.from_node_id, req.table_id,
+                                  req.sparse_ids, req.values);
 }
 
 int32_t PsServer::TryFetchDenseTable(const TryFetchDenseTableRequest& req,
@@ -107,6 +108,12 @@ int32_t PsServer::PullSparseTable(const PullSparseTableRequest& req,
                              &(rsp->vals));
 }
 
+int32_t PsServer::PushSparseTable(const PushSparseTableRequest& req,
+                                  PushSparseTableResponse* rsp) {
+  return ps_.PushSparseTable(req.router_version, req.table_id, req.sparse_ids,
+                             req.grads, req.lr);
+}
+
 void PsServer::RegisterFuncs() {
   using namespace std::placeholders;
 
@@ -131,6 +138,7 @@ void PsServer::RegisterFuncs() {
   REGISTER_FUNC(CombinePullDenseTable, CombinePullDenseTable);
   REGISTER_FUNC(PushDenseTable, PushDenseTable);
   REGISTER_FUNC(PullSparseTable, PullSparseTable);
+  REGISTER_FUNC(PushSparseTable, PushSparseTable);
 }
 
 void PsServer::Start() {

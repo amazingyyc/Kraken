@@ -90,7 +90,7 @@ public:
     return UniqueHandler(lockers_[slot], skip_lists_[slot]);
   }
 
-  size_t HitSlot(const Key& key) const {
+  inline size_t HitSlot(const Key& key) const {
     return hash_(key) % SlotCount;
   }
 

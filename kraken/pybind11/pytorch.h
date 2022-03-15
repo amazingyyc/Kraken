@@ -33,16 +33,14 @@ std::vector<torch::Tensor> CombinePullDenseTable(
 
 void PushDenseTable(uint64_t table_id, torch::Tensor grad);
 
-// torch::Tensor PushPullDenseTable(uint64_t table_id, torch::Tensor grad);
+torch::Tensor PullSparseTable(uint64_t table_id, torch::Tensor indices);
 
-// torch::Tensor PullSparseTable(uint64_t table_id, torch::Tensor indices);
+void PushSparseTable(uint64_t table_id, torch::Tensor indices,
+                     torch::Tensor grads);
 
 // std::vector<torch::Tensor> CombinePullSparseTable(
 //     const std::vector<uint64_t>& table_ids,
 //     const std::vector<torch::Tensor>& indices);
-
-// void PushSparseTable(uint64_t table_id, torch::Tensor indices,
-//                      torch::Tensor grads);
 
 // void SaveCheckPoint();
 

@@ -47,12 +47,13 @@ int32_t Transfer::TransferDenseTable(uint64_t from_node_id, uint64_t table_id,
 }
 
 int32_t Transfer::TransferSparseMetaData(
-    uint64_t table_id, std::string name, int64_t dimension,
-    ElementType element_type, InitializerType init_type,
+    uint64_t from_node_id, uint64_t table_id, std::string name,
+    int64_t dimension, ElementType element_type, InitializerType init_type,
     const std::unordered_map<std::string, std::string>& init_conf) {
   uint32_t try_n = try_num_;
 
   TransferSparseMetaDataRequest req;
+  req.from_node_id = from_node_id;
   req.table_id = table_id;
   req.name = name;
   req.dimension = dimension;
@@ -75,12 +76,17 @@ int32_t Transfer::TransferSparseMetaData(
   return error_code;
 }
 
-int32_t Transfer::TransferSparseValues(uint64_t table_id,
+int32_t Transfer::TransferSparseValues(uint64_t from_node_id, uint64_t table_id,
                                        const std::vector<uint64_t>& sparse_ids,
                                        const std::vector<Value>& vals) {
+  if (sparse_ids.empty()) {
+    return ErrorCode::kSuccess;
+  }
+
   uint32_t try_n = try_num_;
 
   TransferSparseValuesRequest req;
+  req.from_node_id = from_node_id;
   req.table_id = table_id;
   req.sparse_ids = sparse_ids;
   req.values = vals;
@@ -99,11 +105,11 @@ int32_t Transfer::TransferSparseValues(uint64_t table_id,
   return error_code;
 }
 
-int32_t Transfer::NotifyFinishTransfer(uint64_t node_id) {
+int32_t Transfer::NotifyFinishTransfer(uint64_t from_node_id) {
   uint32_t try_n = try_num_;
 
   NotifyFinishTransferRequest req;
-  req.node_id = node_id;
+  req.from_node_id = from_node_id;
   NotifyFinishTransferResponse reply;
 
   int32_t error_code = ErrorCode::kSuccess;

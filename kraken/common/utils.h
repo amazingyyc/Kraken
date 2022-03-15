@@ -41,13 +41,8 @@ inline uint64_t Hash(uint64_t v) {
   return v;
 }
 
-// (TODO) change a hash function.
 inline uint64_t Hash(uint64_t v1, uint64_t v2) {
-  uint64_t seed = 0;
-  seed ^= v1 + 0x9e3779b9;
-  seed ^= v2 + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-
-  return seed;
+  return Hash(v1) ^ Hash(v2);
 }
 
 template <typename T>

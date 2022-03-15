@@ -46,10 +46,13 @@ protected:
 protected:
   void UpdataRouter();
 
-  int32_t PullDenseTableImpl(uint64_t table_id, Tensor *val);
+  int32_t PullDenseTableImpl(uint64_t table_id, Tensor* val);
 
   int32_t CombinePullDenseTableImpl(const std::vector<uint64_t>& table_ids,
                                     std::vector<Tensor>* vals);
+
+  int32_t PullSparseTableImpl(uint64_t table_id, const Tensor& indices,
+                              Tensor* val);
 
 public:
   void Initialize(const std::string& s_addr);
@@ -75,6 +78,11 @@ public:
       const std::vector<uint64_t>& table_ids);
 
   void PushDenseTable(uint64_t table_id, const Tensor& grad);
+
+  Tensor PullSparseTable(uint64_t table_id, const Tensor& indices);
+
+  void PushSparseTable(uint64_t table_id, const Tensor& indices,
+                       const Tensor& grads);
 };
 
 }  // namespace kraken

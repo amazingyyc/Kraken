@@ -35,33 +35,32 @@ class Optimizer:
         self._name_param[name] = param
 
         if isinstance(param, SparseTable):
-          raise ValueError('Not support SparseTable for now.')
-          # # Check whether the user has set a name.
-          # real_name = name
-          # if param.name() is not None:
-          #   real_name = param.name()
+          # Check whether the user has set a name.
+          real_name = name
+          if param.name() is not None:
+            real_name = param.name()
 
-          # dimension = param.dimension()
-          # dtype = param.dtype()
-          # initializer = param.initializer()
+          dimension = param.dimension()
+          dtype = param.dtype()
+          initializer = param.initializer()
 
-          # table_id = kraken_native.register_sparse_table(name=real_name,
-          #                                                dimension=dimension,
-          #                                                dtype=dtype,
-          #                                                init_type=initializer.type(),
-          #                                                init_conf=initializer.conf())
+          table_id = kraken_native.register_sparse_table(name=real_name,
+                                                         dimension=dimension,
+                                                         dtype=dtype,
+                                                         init_type=initializer.type(),
+                                                         init_conf=initializer.conf())
 
-          # param.set_table_id(table_id)
-          # param.set_name(real_name)
+          param.set_table_id(table_id)
+          param.set_name(real_name)
 
-          # self._name_table_id[name] = table_id
+          self._name_table_id[name] = table_id
 
-          # logging.info(
-          #     f'Register SparseTable:[{name}], ' \
-          #     f'table id:[{table_id}], ' \
-          #     f'dimension:[{param.dimension()}], ' \
-          #     f'dtype:[{param.dtype()}].'
-          # )
+          logging.info(
+              f'Register SparseTable:[{name}], ' \
+              f'table id:[{table_id}], ' \
+              f'dimension:[{param.dimension()}], ' \
+              f'dtype:[{param.dtype()}].'
+          )
         else:
           table_id = kraken_native.register_dense_table(name, param.data)
           self._name_table_id[name] = table_id
@@ -70,6 +69,23 @@ class Optimizer:
           param.register_hook(self._create_dense_grad_hook(name, table_id))
 
           logging.info(f'Register DenseTable:[{name}], table id:[{table_id}].')
+
+    # When finish register SpareTable/DenseTable in Ps we need pull DenseTable at beginning.
+    # make sure the the Model is same as stored in Ps.
+    dense_params = []
+    dense_table_ids = []
+
+    for name, param in self._name_param.items():
+      if not isinstance(param, SparseTable):
+        dense_params.append(param)
+        dense_table_ids.append(self._name_table_id[name])
+
+    dense_table_datas = kraken_native.combine_pull_dense_table(dense_table_ids)
+
+    assert len(dense_params) == len(dense_table_datas)
+
+    for i in range(len(dense_params)):
+      dense_params[i].data = dense_table_datas[i]
 
   def _create_dense_grad_hook(self, name, table_id):
     logging.info(f'Create gradient hook for:[{name}], table_id:[{table_id}].')

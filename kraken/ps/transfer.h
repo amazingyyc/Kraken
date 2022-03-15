@@ -28,11 +28,11 @@ public:
                              const std::string& name, Value& val);
 
   int32_t TransferSparseMetaData(
-      uint64_t table_id, std::string name, int64_t dimension,
-      ElementType element_type, InitializerType init_type,
+      uint64_t from_node_id, uint64_t table_id, std::string name,
+      int64_t dimension, ElementType element_type, InitializerType init_type,
       const std::unordered_map<std::string, std::string>& init_conf);
 
-  int32_t TransferSparseValues(uint64_t table_id,
+  int32_t TransferSparseValues(uint64_t from_node_id, uint64_t table_id,
                                const std::vector<uint64_t>& sparse_ids,
                                const std::vector<Value>& vals);
 

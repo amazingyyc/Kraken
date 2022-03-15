@@ -123,48 +123,17 @@ public:
   }
 
   template <typename ReqType, typename ReplyType>
-  int32_t Call(const std::vector<uint64_t>& node_ids, uint32_t rpc_type,
-               const std::vector<ReqType>& reqs,
-               std::vector<ReplyType>* replies,
-               int64_t timeout_ms = 5000) const {
-    assert(node_ids.size() == reqs.size());
+  void CallAsync(
+      uint32_t rpc_type, const std::unordered_map<uint64_t, ReqType>& reqs,
+      std::unordered_map<uint64_t, std::function<void(int32_t, ReplyType&)>>&
+          callbacks,
+      int64_t timeout_ms = 5000) const {
+    for (const auto& [node_id, req] : reqs) {
+      auto it = connecters_.find(node_id);
 
-    if (node_ids.empty()) {
-      return ErrorCode::kSuccess;
+      it->second->CallAsync(rpc_type, req, std::move(callbacks[node_id]),
+                            timeout_ms);
     }
-
-    size_t count = node_ids.size();
-
-    ThreadBarrier barrier(count);
-
-    std::vector<int32_t> error_codes;
-    error_codes.resize(count);
-
-    replies->resize(count);
-
-    for (size_t i = 0; i < count; ++i) {
-      auto callback = [&error_codes, replies, i, &barrier](int32_t r_error_code,
-                                                           ReplyType& r_reply) {
-        error_codes[i] = r_error_code;
-        (*replies)[i] = std::move(r_reply);
-
-        barrier.Release();
-      };
-
-      auto it = connecters_.find(node_ids[i]);
-      it->second->CallAsync<ReqType, ReplyType>(
-          rpc_type, reqs[i], std::move(callback), timeout_ms);
-    }
-
-    barrier.Wait();
-
-    for (size_t i = 0; i < count; ++i) {
-      if (error_codes[i] != ErrorCode::kSuccess) {
-        return error_codes[i];
-      }
-    }
-
-    return ErrorCode::kSuccess;
   }
 
   // The caller must make sure the node_id is Added.

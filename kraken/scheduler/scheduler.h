@@ -25,7 +25,7 @@ private:
   ModelMetaData model_mdata_;
 
 public:
-  Scheduler(CompressType compress_type);
+  Scheduler();
 
   ~Scheduler();
 

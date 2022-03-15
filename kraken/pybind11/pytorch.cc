@@ -108,88 +108,50 @@ void PushDenseTable(uint64_t table_id, torch::Tensor grad) {
   emitter.PushDenseTable(table_id, kgrad);
 }
 
-// std::vector<torch::Tensor> CombinePullDenseTable(
-//     const std::vector<uint64_t>& table_ids) {
-//   std::vector<Tensor> kvals = worker.CombinePullDenseTable(table_ids);
-//   std::vector<torch::Tensor> vals;
+torch::Tensor PullSparseTable(uint64_t table_id, torch::Tensor indices) {
+  ARGUMENT_CHECK(!indices.is_cuda(),
+                 "PullSparseTable need torch::Tensor is CPU.");
 
-//   for (auto& kv : kvals) {
-//     torch::IntArrayRef sizes = ShapeToTorchSizes(kv.shape());
-//     torch::Dtype dtype = ElementTypeToTorchDType(kv.element_type());
+  torch::Tensor cindices = indices;
+  if (!indices.is_contiguous()) {
+    cindices = indices.contiguous();
+  }
 
-//     torch::Tensor v = torch::zeros(sizes, dtype);
+  Tensor kindices = TorchTensorToTensor(cindices);
 
-//     memcpy(v.data_ptr(), kv.Ptr(), kv.NumBytes());
+  // The sparse embedding.
+  Tensor kval = emitter.PullSparseTable(table_id, kindices);
 
-//     vals.emplace_back(v);
-//   }
+  torch::IntArrayRef sizes = ShapeToTorchSizes(kval.shape());
+  torch::Dtype dtype = ElementTypeToTorchDType(kval.element_type());
+  torch::Tensor val = torch::zeros(sizes, dtype);
 
-//   return vals;
-// }
+  // copy memory.
+  memcpy(val.data_ptr(), kval.Ptr(), kval.NumBytes());
 
-// void PushDenseTable(uint64_t table_id, torch::Tensor grad) {
-//   ARGUMENT_CHECK(!grad.is_cuda(), "PushDenseTable need torch::Tensor is
-//   CPU.");
+  return val;
+}
 
-//   // Convert to contiguous tensor.
-//   torch::Tensor cgrad = grad;
-//   if (!grad.is_contiguous()) {
-//     cgrad = grad.contiguous();
-//   }
+void PushSparseTable(uint64_t table_id, torch::Tensor indices,
+                     torch::Tensor grads) {
+  ARGUMENT_CHECK(!indices.is_cuda() && !grads.is_cuda(),
+                 "PushSparseTable need torch::Tensor is CPU.");
 
-//   Tensor kgrad = TorchTensorToTensor(cgrad);
+  torch::Tensor cindices = indices;
+  if (!cindices.is_contiguous()) {
+    cindices = indices.contiguous();
+  }
 
-//   worker.PushDenseTable(table_id, kgrad);
-// }
+  torch::Tensor cgrads = grads;
+  if (!cgrads.is_contiguous()) {
+    cgrads = grads.contiguous();
+  }
 
-// torch::Tensor PushPullDenseTable(uint64_t table_id, torch::Tensor grad) {
-//   ARGUMENT_CHECK(!grad.is_cuda(), "PushDenseTable need torch::Tensor is
-//   CPU.");
+  Tensor kindices = TorchTensorToTensor(cindices);
+  Tensor kgrads = TorchTensorToTensor(cgrads);
 
-//   // Convert to contiguous tensor.
-//   torch::Tensor cgrad = grad;
-//   if (!grad.is_contiguous()) {
-//     cgrad = grad.contiguous();
-//   }
-
-//   Tensor kgrad = TorchTensorToTensor(cgrad);
-
-//   Tensor kval = worker.PushPullDenseTable(table_id, kgrad);
-
-//   torch::IntArrayRef sizes = ShapeToTorchSizes(kval.shape());
-//   torch::Dtype dtype = ElementTypeToTorchDType(kval.element_type());
-
-//   torch::Tensor val = torch::zeros(sizes, dtype);
-
-//   // Copy memory.
-//   memcpy(val.data_ptr(), kval.Ptr(), kval.NumBytes());
-
-//   return val;
-// }
-
-// torch::Tensor PullSparseTable(uint64_t table_id, torch::Tensor indices) {
-//   ARGUMENT_CHECK(!indices.is_cuda(),
-//                  "PullSparseTable need torch::Tensor is CPU.");
-
-//   torch::Tensor cindices = indices;
-//   if (!indices.is_contiguous()) {
-//     cindices = indices.contiguous();
-//   }
-
-//   Tensor kindices = TorchTensorToTensor(cindices);
-
-//   // The sparse embedding.
-//   Tensor kval = worker.PullSparseTable(table_id, kindices);
-
-//   torch::IntArrayRef sizes = ShapeToTorchSizes(kval.shape());
-//   torch::Dtype dtype = ElementTypeToTorchDType(kval.element_type());
-//   torch::Tensor val = torch::zeros(sizes, dtype);
-
-//   // copy memory.
-//   memcpy(val.data_ptr(), kval.Ptr(), kval.NumBytes());
-
-//   return val;
-// }
+  emitter.PushSparseTable(table_id, kindices, kgrads);
+}
 
 // std::vector<torch::Tensor> CombinePullSparseTable(
 //     const std::vector<uint64_t>& table_ids,
@@ -223,27 +185,6 @@ void PushDenseTable(uint64_t table_id, torch::Tensor grad) {
 //   }
 
 //   return vals;
-// }
-
-// void PushSparseTable(uint64_t table_id, torch::Tensor indices,
-//                      torch::Tensor grads) {
-//   ARGUMENT_CHECK(!indices.is_cuda() && !grads.is_cuda(),
-//                  "PushSparseTable need torch::Tensor is CPU.");
-
-//   torch::Tensor cindices = indices;
-//   if (!cindices.is_contiguous()) {
-//     cindices = indices.contiguous();
-//   }
-
-//   torch::Tensor cgrads = grads;
-//   if (!cgrads.is_contiguous()) {
-//     cgrads = grads.contiguous();
-//   }
-
-//   Tensor kindices = TorchTensorToTensor(cindices);
-//   Tensor kgrads = TorchTensorToTensor(cgrads);
-
-//   worker.PushSparseTable(table_id, kindices, kgrads);
 // }
 
 // void SaveCheckPoint() {

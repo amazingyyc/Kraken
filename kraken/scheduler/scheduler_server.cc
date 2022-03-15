@@ -5,8 +5,7 @@
 
 namespace kraken {
 
-SchedulerServer::SchedulerServer(uint32_t port)
-    : station_(port), scheduler_(CompressType::kNo) {
+SchedulerServer::SchedulerServer(uint32_t port) : station_(port), scheduler_() {
 }
 
 int32_t SchedulerServer::TryJoin(const TryJoinRequest& req,

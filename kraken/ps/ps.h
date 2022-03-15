@@ -54,6 +54,20 @@ public:
   ~Ps() = default;
 
 private:
+  inline const char* NodeStatusStr(uint32_t status) const {
+    if (status == NodeStatus::kInit) {
+      return "kInit";
+    } else if (status == NodeStatus::kWork) {
+      return "kWork";
+    } else if (status == (NodeStatus::kWork | NodeStatus::kProxy)) {
+      return "kWork&kProxy";
+    } else if (status == (NodeStatus::kWork | NodeStatus::kTransfer)) {
+      return "kWork&kTransfer";
+    } else {
+      return "unKnow";
+    }
+  }
+
   // Clean tables_ the not belong to this node.
   void Clean();
 
@@ -92,7 +106,8 @@ public:
       const std::unordered_map<std::string, std::string>& optim_conf);
 
   // Call by other Scheduler.
-  int32_t CreateDenseTable(uint64_t table_id, std::string name, const Tensor& val);
+  int32_t CreateDenseTable(uint64_t table_id, std::string name,
+                           const Tensor& val);
 
   // Call by other Scheduler.
   int32_t CreateSparseTable(
@@ -108,13 +123,13 @@ public:
   // Call by other Ps node.
   // Another node transfer SparseTableMetaData to this node.
   int32_t TransferSparseMetaData(
-      uint64_t table_id, std::string name, int64_t dimension,
-      ElementType element_type, InitializerType init_type,
+      uint64_t from_node_id, uint64_t table_id, std::string name,
+      int64_t dimension, ElementType element_type, InitializerType init_type,
       const std::unordered_map<std::string, std::string>& init_conf);
 
   // Call by other Ps node.
   // Another node transfer SparseTable Embedding to this node.
-  int32_t TransferSparseValues(uint64_t table_id,
+  int32_t TransferSparseValues(uint64_t from_node_id, uint64_t table_id,
                                const std::vector<uint64_t>& sparse_ids,
                                const std::vector<Value>& values);
 
@@ -161,6 +176,11 @@ public:
   int32_t PullSparseTable(uint64_t router_version, uint64_t table_id,
                           const std::vector<uint64_t>& sparse_ids,
                           std::vector<Tensor>* vals);
+
+  // Call by Worker.
+  int32_t PushSparseTable(uint64_t router_version, uint64_t table_id,
+                          const std::vector<uint64_t>& sparse_ids,
+                          const std::vector<Tensor>& grads, float lr);
 };
 
 }  // namespace kraken
