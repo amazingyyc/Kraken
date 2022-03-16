@@ -56,8 +56,8 @@ void Station::HandleError(uint64_t timestamp, int32_t error_code,
   ZMQ_CALL(zmq_msg_send(&replyid, socket, ZMQ_SNDMORE));
   ZMQ_CALL(zmq_msg_send(&reply, socket, 0));
 
-  ZMQ_CALL(zmq_msg_close(&replyid));
-  ZMQ_CALL(zmq_msg_close(&reply));
+  // ZMQ_CALL(zmq_msg_close(&replyid));
+  // ZMQ_CALL(zmq_msg_close(&reply));
 }
 
 void Station::HandleMsg(zmq_msg_t& identity, zmq_msg_t& msg, void* socket) {
@@ -105,8 +105,8 @@ void Station::HandleMsg(zmq_msg_t& identity, zmq_msg_t& msg, void* socket) {
   ZMQ_CALL(zmq_msg_send(&replyid, socket, ZMQ_SNDMORE));
   ZMQ_CALL(zmq_msg_send(&reply, socket, 0));
 
-  ZMQ_CALL(zmq_msg_close(&replyid));
-  ZMQ_CALL(zmq_msg_close(&reply));
+  // ZMQ_CALL(zmq_msg_close(&replyid));
+  // ZMQ_CALL(zmq_msg_close(&reply));
 }
 
 void Station::Run(void* zmp_context) {

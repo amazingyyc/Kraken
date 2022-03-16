@@ -153,7 +153,7 @@ int32_t CombineConnecter::SendMsg(uint64_t id, uint64_t timestamp,
   // zero copy.
   ZMQ_CALL(zmq_msg_init_data(&zmq_msg, ptr, offset, zmq_free, nullptr));
   ZMQ_CALL(zmq_msg_send(&zmq_msg, sender, 0));
-  ZMQ_CALL(zmq_msg_close(&zmq_msg));
+  // ZMQ_CALL(zmq_msg_close(&zmq_msg));
 
   return ErrorCode::kSuccess;
 }

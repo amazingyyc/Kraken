@@ -6,14 +6,14 @@
 #include "protocol/register_dense_table_prot.h"
 #include "protocol/register_sparse_table_prot.h"
 #include "protocol/try_join_prot.h"
-#include "rpc/simple_station.h"
+#include "rpc/sync_station.h"
 #include "scheduler/scheduler.h"
 
 namespace kraken {
 
 class SchedulerServer {
 private:
-  SimpleStation station_;
+  SyncStation station_;
   Scheduler scheduler_;
 
 public:

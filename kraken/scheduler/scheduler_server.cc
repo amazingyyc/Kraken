@@ -61,13 +61,10 @@ void SchedulerServer::Start() {
   RegisterFuncs();
 
   scheduler_.Start();
-
   station_.Start();
-  station_.Wait();
 }
 
 void SchedulerServer::Stop() {
-  station_.Stop();
   scheduler_.Stop();
 }
 

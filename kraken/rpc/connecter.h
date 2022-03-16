@@ -29,36 +29,6 @@ protected:
       return e1.when > e2.when;
     }
   };
-
-  // template <typename ReplyType>
-  // int32_t NoUnCompress(const char* body, size_t body_len, ReplyType* reply) {
-  //   MemReader reader(body, body_len);
-  //   Deserialize deserialize(&reader);
-  //   if ((deserialize >> (*reply)) == false) {
-  //     return ErrorCode::kDeserializeReplyError;
-  //   }
-
-  //   return ErrorCode::kSuccess;
-  // }
-
-  // template <typename ReplyType>
-  // int32_t SnappyUnCompress(const char* body, size_t body_len,
-  //                          ReplyType* reply) {
-  //   SnappySource source(body, body_len);
-  //   SnappySink sink;
-
-  //   if (snappy::Uncompress(&source, &sink) == false) {
-  //     return ErrorCode::kSnappyUncompressError;
-  //   }
-
-  //   MemReader reader(sink.ptr(), sink.offset());
-  //   Deserialize deserialize(&reader);
-  //   if ((deserialize >> (*reply)) == false) {
-  //     return ErrorCode::kDeserializeReplyError;
-  //   }
-
-  //   return ErrorCode::kSuccess;
-  // }
 };
 
 }  // namespace kraken

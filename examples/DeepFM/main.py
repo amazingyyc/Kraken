@@ -23,7 +23,7 @@ feature_sizes = [int(x) for x in feature_sizes]
 print(feature_sizes)
 
 # initialize Kraken
-kk.initialize('localhost:50000')
+kk.initialize('127.0.0.1:50000')
 
 model = DeepFM(feature_sizes, use_cuda=False)
 # optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=0.0)

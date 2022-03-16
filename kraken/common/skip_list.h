@@ -40,10 +40,11 @@ public:
     Node* prev_[kMaxHeight];
     Node* node_;
 
-  public:
+  private:
     SeekIterator(const SkipList* list) : list_(list), node_(nullptr) {
     }
 
+  public:
     bool Valid() const {
       return node_ != nullptr;
     }
@@ -63,16 +64,20 @@ public:
       return node_->value;
     }
 
-    void SeekGreaterOrEqual(const Key& target) {
-      node_ = list_->FindGreaterOrEqual(target, prev_);
-    }
+    // Becareful call Next the caller must make sure not modify the List (like
+    // Insert/Remove). Or the Iterator will be undefined behavior.
+    void Next() {
+      assert(Valid());
 
-    void Seek(const Key& target) {
-      node_ = list_->FindGreaterOrEqual(target, prev_);
+      Node* next = node_->Next(0);
 
-      if (node_ == nullptr || node_->key != target) {
-        node_ = nullptr;
+      for (size_t i = 0; i < list_->max_height_; ++i) {
+        if (prev_[i]->Next(i) == node_) {
+          prev_[i] = node_;
+        }
       }
+
+      node_ = next;
     }
   };
 
@@ -98,7 +103,7 @@ public:
   ~SkipList() {
     Clear();
 
-    free(header_);
+    DeleteNode(header_);
   }
 
   SkipList(const SkipList&) = delete;
@@ -107,14 +112,18 @@ public:
   SkipList& operator=(const SkipList&&) = delete;
 
 private:
-  Node* NewNode(size_t height) {
+  inline Node* NewNode(size_t height) {
     assert(height > 0);
 
     void* ptr = malloc(sizeof(Node) + height * sizeof(Node*));
-
     Node* node = new (ptr) Node();
 
     return node;
+  }
+
+  inline void DeleteNode(Node* x) {
+    x->~Node();
+    free(x);
   }
 
   size_t RandomHeight() {
@@ -196,12 +205,25 @@ private:
   }
 
 public:
+  // O(n)
+  size_t Size() const {
+    size_t size = 0;
+
+    Node* x = header_->Next(0);
+    while (x != nullptr) {
+      size += 1;
+      x = x->Next(0);
+    }
+
+    return size;
+  }
+
   void Clear() {
     while (header_->Next(0) != nullptr) {
       Node* node = header_->Next(0);
       header_->SetNext(0, node->Next(0));
 
-      free(node);
+      DeleteNode(node);
     }
 
     for (size_t i = 0; i < kMaxHeight; ++i) {
@@ -269,26 +291,6 @@ public:
     return true;
   }
 
-  bool Remove(const Key& key) {
-    Node* prev[kMaxHeight];
-    Node* x = FindGreaterOrEqual(key, &prev);
-
-    if (x == nullptr || x->key != key) {
-      return false;
-    }
-
-    for (size_t i = 0; i < max_height_; ++i) {
-      if (prev[i]->Next(i) == x) {
-        prev[i]->SetNext(x->Next(i));
-        x->SetNext(i, nullptr);
-      }
-    }
-
-    free(x);
-
-    return true;
-  }
-
   bool Contains(const Key& key) const {
     Node* x = FindGreaterOrEqual(key, nullptr);
 
@@ -299,30 +301,51 @@ public:
     }
   }
 
+  SeekIterator Begin() const {
+    SeekIterator it(this);
+    it.node_ = header_->Next(0);
+
+    for (size_t i = 0; i < max_height_; ++i) {
+      it.prev_[i] = header_;
+    }
+
+    return it;
+  }
+
   SeekIterator Find(const Key& key) const {
     SeekIterator it(this);
-    it.Seek(key);
+    it.node_ = FindGreaterOrEqual(key, it.prev_);
+
+    if (it.node_ == nullptr || it.node_->key != key) {
+      it.node_ = nullptr;
+    }
 
     return it;
   }
 
   SeekIterator FindGreaterOrEqual(const Key& key) const {
     SeekIterator it(this);
-    it.SeekGreaterOrEqual(key);
+    it.node_ = FindGreaterOrEqual(key, it.prev_);
 
     return it;
   }
 
-  // Becareful when call this function the user must make sure the SkipList not
-  // modified after get the SeekIterator(it).
-  // And after call this function the SeekIterator will become invalid.
-  bool Remove(const SeekIterator& it) {
+  // Remove a node and return the next Iterator.
+  // Becareful when get the SeekIterator the user cannot modify the List
+  // (Insert/Remove) or will let the list be Undefined behavior.
+  SeekIterator Remove(const SeekIterator& it) {
     if (it.Valid() == false) {
-      return false;
+      throw std::runtime_error("Invalid SeekIterator.");
+    }
+
+    SeekIterator n_it(this);
+    n_it.node_ = it.node_->Next(0);
+
+    for (size_t i = 0; i < max_height_; ++i) {
+      n_it.prev_[i] = it.prev_[i];
     }
 
     Node* x = it.node_;
-
     for (size_t i = 0; i < max_height_; ++i) {
       if (it.prev_[i]->Next(i) == x) {
         it.prev_[i]->SetNext(i, x->Next(i));
@@ -330,9 +353,9 @@ public:
       }
     }
 
-    free(x);
+    DeleteNode(x);
 
-    return true;
+    return n_it;
   }
 };
 

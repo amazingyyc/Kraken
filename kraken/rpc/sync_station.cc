@@ -1,15 +1,14 @@
-#include "rpc/simple_station.h"
+#include "rpc/sync_station.h"
 
 #include "common/log.h"
 
 namespace kraken {
 
-SimpleStation::SimpleStation(uint32_t port)
-    : port_(port), started_(false), stop_(false) {
+SyncStation::SyncStation(uint32_t port) : port_(port) {
 }
 
-void SimpleStation::HandleError(uint64_t timestamp, int32_t error_code,
-                                zmq_msg_t& identity, void* socket) {
+void SyncStation::HandleError(uint64_t timestamp, int32_t error_code,
+                              zmq_msg_t& identity, void* socket) {
   ReplyHeader reply_header;
   reply_header.timestamp = timestamp;
   reply_header.error_code = error_code;
@@ -42,12 +41,11 @@ void SimpleStation::HandleError(uint64_t timestamp, int32_t error_code,
   ZMQ_CALL(zmq_msg_send(&replyid, socket, ZMQ_SNDMORE));
   ZMQ_CALL(zmq_msg_send(&reply, socket, 0));
 
-  ZMQ_CALL(zmq_msg_close(&replyid));
-  ZMQ_CALL(zmq_msg_close(&reply));
+  // ZMQ_CALL(zmq_msg_close(&replyid));
+  // ZMQ_CALL(zmq_msg_close(&reply));
 }
 
-void SimpleStation::HandleMsg(zmq_msg_t& identity, zmq_msg_t& msg,
-                              void* socket) {
+void SyncStation::HandleMsg(zmq_msg_t& identity, zmq_msg_t& msg, void* socket) {
   size_t req_size = zmq_msg_size(&msg);
   const char* req_data = (const char*)zmq_msg_data(&msg);
 
@@ -92,11 +90,11 @@ void SimpleStation::HandleMsg(zmq_msg_t& identity, zmq_msg_t& msg,
   ZMQ_CALL(zmq_msg_send(&replyid, socket, ZMQ_SNDMORE));
   ZMQ_CALL(zmq_msg_send(&reply, socket, 0));
 
-  ZMQ_CALL(zmq_msg_close(&replyid));
-  ZMQ_CALL(zmq_msg_close(&reply));
+  // ZMQ_CALL(zmq_msg_close(&replyid));
+  // ZMQ_CALL(zmq_msg_close(&reply));
 }
 
-void SimpleStation::Run() {
+void SyncStation::Run() {
   zmq_context_ = zmq_init(1);
   ARGUMENT_CHECK(zmq_context_ != nullptr, "zmq_init return nullptr, error:"
                                               << zmq_strerror(zmq_errno()));
@@ -108,10 +106,9 @@ void SimpleStation::Run() {
   std::string addr = "tcp://*:" + std::to_string(port_);
   ZMQ_CALL(zmq_bind(zmq_scoket_, addr.c_str()));
 
-  started_.store(true);
-  LOG_INFO("SimpleStation start at port:" << port_);
+  LOG_INFO("SyncStation start at port:" << port_);
 
-  while (stop_.load() == false) {
+  while (true) {
     zmq_msg_t identity;
     zmq_msg_t msg;
 
@@ -127,6 +124,7 @@ void SimpleStation::Run() {
     ZMQ_CALL(zmq_msg_close(&msg));
   }
 
+  // Never be called.
   ZMQ_CALL(zmq_close(zmq_scoket_));
   zmq_scoket_ = nullptr;
 
@@ -134,24 +132,8 @@ void SimpleStation::Run() {
   zmq_context_ = nullptr;
 }
 
-void SimpleStation::Start() {
-  worker_ = std::thread(&SimpleStation::Run, this);
-
-  // Wait start finish.
-  while (started_.load() == false) {
-  }
-}
-
-void SimpleStation::Wait() {
-  worker_.join();
-}
-
-void SimpleStation::Stop() {
-  stop_.store(true);
-
-  if (worker_.joinable()) {
-    worker_.join();
-  }
+void SyncStation::Start() {
+  Run();
 }
 
 }  // namespace kraken

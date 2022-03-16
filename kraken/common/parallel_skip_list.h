@@ -10,7 +10,7 @@
 namespace kraken {
 
 template <typename Key, typename Value, typename KeyHash = std::hash<Key>,
-          size_t SlotCount = 16>
+          size_t SlotCount = 8>
 class ParallelSkipList {
 public:
   class UniqueHandler {

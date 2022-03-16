@@ -40,36 +40,21 @@ void Ps::Clean() {
 
   // Clean DenseTable.
   {
-    // For DenseTable the table num is not huge. so we will lock it only once.
+    // The table num is not huge. so we will lock it only once.
     std::unique_lock<std::shared_mutex> _(model_mu_);
 
-    uint64_t table_id = 0;
+    auto it = tables_.Begin();
+    while (it.Valid()) {
+      if (it.value()->type() != TableType::kDense ||
+          router.Hit(utils::Hash(it.key())) == node_id) {
+        it.Next();
+      } else {
+        LOG_INFO("Clean DensTable:[" << it.value()->name() << "], id:["
+                                     << it.key() << "]");
 
-    do {
-      auto it = tables_.FindGreaterOrEqual(table_id);
-
-      if (it.Valid() == false) {
-        break;
+        it = tables_.Remove(it);
       }
-
-      if (it.value()->type() != TableType::kDense) {
-        table_id = it.key() + 1;
-        continue;
-      }
-
-      if (router.Hit(utils::Hash(it.key())) == node_id) {
-        table_id = it.key() + 1;
-        continue;
-      }
-
-      LOG_INFO("Clean DensTable:[" << it.value()->name() << "], id:["
-                                   << it.key() << "]");
-
-      // Becareful we have update the table_id before Remove when call Remove
-      // the 'it' will become invalid.
-      table_id = it.key() + 1;
-      tables_.Remove(it);
-    } while (true);
+    }
   }
 
   // Clean SparseTable.
@@ -90,10 +75,8 @@ void Ps::Clean() {
         continue;
       }
 
-      // Hit a new SparseTable update.
-      if (table_id != it.key()) {
-        table_id = it.key();
-      }
+      // Update.
+      table_id = it.key();
 
       SparseTable* table = (SparseTable*)it.value().get();
       auto* parallel_vals = table->vals();
@@ -101,23 +84,15 @@ void Ps::Clean() {
       size_t remove_c = 0;
 
       for (size_t slot = 0; slot < parallel_vals->slot_count(); ++slot) {
-        auto skip_list_h = parallel_vals->UniqueSkipListHandler(slot);
+        auto h = parallel_vals->UniqueSkipListHandler(slot);
 
-        uint64_t sparse_id = 0;
-
-        while (true) {
-          auto sit = skip_list_h.skip_list.FindGreaterOrEqual(sparse_id);
-          if (sit.Valid() == false) {
-            break;
-          }
-
-          // Must update sparse_id before call Remove or the 'it' will be
-          // invalid.
-          sparse_id = sit.key() + 1;
-
+        auto sit = h.skip_list.Begin();
+        while (sit.Valid()) {
           if (router.Hit(utils::Hash(it.key(), sit.key())) != node_id) {
-            skip_list_h.skip_list.Remove(sit);
+            sit = h.skip_list.Remove(sit);
             remove_c++;
+          } else {
+            sit.Next();
           }
         }
       }
@@ -171,12 +146,8 @@ void Ps::Transfer(uint64_t target_id) {
           break;
         }
 
-        if (it.value()->type() != TableType::kDense) {
-          table_id_offset = it.key() + 1;
-          continue;
-        }
-
-        if (router.Hit(utils::Hash(it.key())) != target_id) {
+        if (it.value()->type() != TableType::kDense ||
+            router.Hit(utils::Hash(it.key())) != target_id) {
           table_id_offset = it.key() + 1;
           continue;
         }
@@ -195,10 +166,10 @@ void Ps::Transfer(uint64_t target_id) {
         table_id_offset = it.key() + 1;
       }
 
-      RPC_CALL(transfer.TransferDenseTable(node_id, table_id, name, val));
-
       // At here the mutex for tables_ has been released. So when
       // send data we will not block other thread to modify it.
+      RPC_CALL(transfer.TransferDenseTable(node_id, table_id, name, val));
+
       LOG_INFO("Transfer DenseTable:[" << name << "], id:[" << table_id
                                        << "] to node:[" << target_id << "]");
     }
@@ -239,7 +210,8 @@ void Ps::Transfer(uint64_t target_id) {
         init_type = table->initializer()->type();
         init_conf = table->initializer()->conf();
 
-        table_id_offset += 1;
+        // Jump to next SparseTable.
+        table_id_offset = it.key() + 1;
       }
 
       RPC_CALL(transfer.TransferSparseMetaData(node_id, table_id, name,
@@ -258,17 +230,18 @@ void Ps::Transfer(uint64_t target_id) {
     uint64_t sparse_id_offset = 0;
 
     const size_t step = 1024;
+
     uint64_t table_id = 0;
 
     std::vector<uint64_t> sparse_ids;
     sparse_ids.reserve(step);
 
-    std::vector<Value> vals;
-    vals.reserve(step);
+    std::vector<Value> sparse_vals;
+    sparse_vals.reserve(step);
 
     while (true) {
       sparse_ids.clear();
-      vals.clear();
+      sparse_vals.clear();
 
       {
         std::shared_lock<std::shared_mutex> _(model_mu_);
@@ -309,29 +282,29 @@ void Ps::Transfer(uint64_t target_id) {
         // Store the real table id.
         table_id = it.key();
 
-        auto skip_list_h = parallel_vals->SharedSkipListHandler(slot_id_offset);
-        for (size_t i = 0; i < step; ++i) {
-          auto sit = skip_list_h.skip_list.FindGreaterOrEqual(sparse_id_offset);
+        auto h = parallel_vals->SharedSkipListHandler(slot_id_offset);
+        auto sit = h.skip_list.FindGreaterOrEqual(sparse_id_offset);
 
-          // Jump to next slot.
-          if (sit.Valid() == false) {
-            slot_id_offset++;
-            sparse_id_offset = 0;
-            break;
-          }
-
-          if (router.Hit(utils::Hash(table_id, sit.key())) == target_id) {
+        while (sparse_ids.size() < step && sit.Valid()) {
+          if (router.Hit(utils::Hash(it.key(), sit.key())) == target_id) {
             sparse_ids.emplace_back(sit.key());
-            vals.emplace_back(sit.value());
+            sparse_vals.emplace_back(sit.value());
           }
 
-          sparse_id_offset = sit.key() + 1;
+          sit.Next();
+        }
+
+        if (sit.Valid() == false) {
+          slot_id_offset++;
+          sparse_id_offset = 0;
+        } else {
+          sparse_id_offset = sit.key();
         }
       }
 
       if (sparse_ids.empty() == false) {
-        RPC_CALL(
-            transfer.TransferSparseValues(node_id, table_id, sparse_ids, vals));
+        RPC_CALL(transfer.TransferSparseValues(node_id, table_id, sparse_ids,
+                                               sparse_vals));
 
         LOG_INFO("Transfer SparseValues of SparseTable:["
                  << table_id << "] to node:[" << target_id << "], count:["
@@ -674,8 +647,7 @@ int32_t Ps::TransferDenseTable(uint64_t from_node_id, uint64_t table_id,
   std::unique_lock<std::shared_mutex> ll(model_mu_);
 
   // If exist just return success.
-  auto it = tables_.Find(table_id);
-  if (it.Valid()) {
+  if (tables_.Contains(table_id)) {
     LOG_INFO("Transfered DenseTable:" << table_id << " from node:"
                                       << from_node_id << " already exist!");
     return ErrorCode::kSuccess;
@@ -702,8 +674,7 @@ int32_t Ps::TransferSparseMetaData(
   std::unique_lock<std::shared_mutex> ll(model_mu_);
 
   // If exist just return success.
-  auto it = tables_.Find(table_id);
-  if (it.Valid()) {
+  if (tables_.Contains(table_id)) {
     return ErrorCode::kSuccess;
   }
 

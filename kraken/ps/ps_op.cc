@@ -14,7 +14,6 @@ void Ps::TryFetchDenseTableFromProxy(uint64_t table_id) {
   Value value;
 
   auto error_code = proxy_->TryFetchDenseTable(table_id, &name, &value);
-
   if (error_code == ErrorCode::kSuccess) {
     std::unique_lock<std::shared_mutex> ll(model_mu_);
 
@@ -70,9 +69,7 @@ void Ps::TryFetchSparseMetaDataFromProxy(uint64_t table_id) {
   if (error_code == ErrorCode::kSuccess) {
     std::unique_lock<std::shared_mutex> ll(model_mu_);
 
-    auto it = tables_.Find(table_id);
-    if (it.Valid()) {
-      // Already exist just skip it.
+    if (tables_.Contains(table_id)) {
       return;
     }
 
@@ -137,14 +134,8 @@ int32_t Ps::PullDenseTable(uint64_t router_version, uint64_t table_id,
     return ErrorCode::kNodeStatusError;
   }
 
-  if (router_.Hit(utils::Hash(table_id)) != node_id_) {
-    // We need check the router version it not equal to current router we need
-    // tell the worker to update the router.
-    if (router_version != router_.version()) {
-      return ErrorCode::kRouterVersionError;
-    }
-
-    return ErrorCode::kRouteWrongNodeError;
+  if (router_version != router_.version()) {
+    return ErrorCode::kRouterVersionError;
   }
 
   if (status_ & NodeStatus::kProxy) {
@@ -192,14 +183,8 @@ int32_t Ps::CombinePullDenseTable(uint64_t router_version,
     return ErrorCode::kNodeStatusError;
   }
 
-  for (auto table_id : table_ids) {
-    if (router_.Hit(utils::Hash(table_id)) != node_id_) {
-      if (router_version != router_.version()) {
-        return ErrorCode::kRouterVersionError;
-      }
-
-      return ErrorCode::kRouteWrongNodeError;
-    }
+  if (router_version != router_.version()) {
+    return ErrorCode::kRouterVersionError;
   }
 
   if (status_ & NodeStatus::kProxy) {

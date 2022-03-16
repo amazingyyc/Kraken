@@ -82,14 +82,14 @@ void IndepConnecter::Run() {
 
     // zmq socket get message.
     if (items[0].revents & ZMQ_POLLIN) {
-      zmq_msg_t msg;
+      zmq_msg_t reply;
 
-      ZMQ_CALL(zmq_msg_init(&msg));
-      ZMQ_CALL(zmq_msg_recv(&msg, zsocket, 0));
+      ZMQ_CALL(zmq_msg_init(&reply));
+      ZMQ_CALL(zmq_msg_recv(&reply, zsocket, 0));
 
-      HandleReply(msg);
+      HandleReply(reply);
 
-      ZMQ_CALL(zmq_msg_close(&msg));
+      ZMQ_CALL(zmq_msg_close(&reply));
     }
 
     // Send message.
@@ -143,6 +143,8 @@ void IndepConnecter::Run() {
           }
 
           sink.TransferForZMQ(&ptr, &capacity, &offset, &zmq_free);
+        } else {
+          RUNTIME_ERROR("Unsupport CompressType:" << (int32_t)compress_type_);
         }
 
         // send by socket.
@@ -151,7 +153,13 @@ void IndepConnecter::Run() {
         // zero copy.
         ZMQ_CALL(zmq_msg_init_data(&zmq_msg, ptr, offset, zmq_free, nullptr));
         ZMQ_CALL(zmq_msg_send(&zmq_msg, zsocket, 0));
-        ZMQ_CALL(zmq_msg_close(&zmq_msg));
+        // ref: http://api.zeromq.org/4-1:zmq-msg-send
+        // A successful invocation of zmq_msg_send() does not indicate that the
+        // message has been transmitted to the network, only that it has been
+        // queued on the socket and ØMQ has assumed responsibility for the
+        // message. You do not need to call zmq_msg_close() after a successful
+        // zmq_msg_send().
+        // ZMQ_CALL(zmq_msg_close(&zmq_msg));
 
         // put callback into map.
         if (task.z_callback) {

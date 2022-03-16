@@ -18,30 +18,25 @@
 
 namespace kraken {
 
-// Liek Station but only 1 thread to handle request.
-class SimpleStation {
+// Like Station but it's sync.
+class SyncStation {
 private:
   using FUNC = std::function<int32_t(const RequestHeader&, const char*, size_t,
                                      ZMQBuffer*)>;
 
   uint32_t port_;
 
-  std::thread worker_;
-
   // zmp content
   void* zmq_context_;
   void* zmq_scoket_;
-
-  std::atomic_bool started_;
-  std::atomic_bool stop_;
 
   // register funcs.
   std::unordered_map<uint32_t, FUNC> funcs_;
 
 public:
-  SimpleStation(uint32_t port);
+  SyncStation(uint32_t port);
 
-  ~SimpleStation() = default;
+  ~SyncStation() = default;
 
 private:
   void Run();
@@ -56,10 +51,6 @@ public:
   void RegisterFunc(
       uint32_t type,
       std::function<int32_t(const RequestType&, ReplyType*)>&& callback) {
-    ARGUMENT_CHECK(!started_.load(),
-                   "The server has been started, must call register_func "
-                   "before start.");
-
     auto func = [this, callback{std::move(callback)}](
                     const RequestHeader& req_header, const char* body,
                     size_t body_len, ZMQBuffer* z_buf) -> int32_t {
@@ -111,10 +102,6 @@ public:
   }
 
   void Start();
-
-  void Wait();
-
-  void Stop();
 };
 
 }  // namespace kraken
