@@ -38,14 +38,11 @@ PYBIND11_MODULE(kraken_native, m) {
       .value("kDefault", EmitterType::kDefault)
       .value("kDCT", EmitterType::kDCT);
 
-  m.def("initialize", &Initialize, pybind11::arg("addrs"),
-        pybind11::arg("emitter_type") = EmitterType::kDefault,
-        pybind11::arg("compress_type") = CompressType::kNo,
-        pybind11::arg("life_span") = 1000, pybind11::arg("eta") = 0.75);
+  m.def("initialize", &Initialize, pybind11::arg("s_addr"));
 
   m.def("stop", &Stop);
 
-  m.def("register_model", &RegisterModel, pybind11::arg("model_name"),
+  m.def("init_model", &InitModel, pybind11::arg("model_name"),
         pybind11::arg("optim_type"),
         pybind11::arg("optim_conf") =
             std::unordered_map<std::string, std::string>());
@@ -67,9 +64,6 @@ PYBIND11_MODULE(kraken_native, m) {
   m.def("push_dense_table", &PushDenseTable, pybind11::arg("table_id"),
         pybind11::arg("grad"));
 
-  m.def("push_pull_dense_table", &PushPullDenseTable, pybind11::arg("table_id"),
-        pybind11::arg("grad"));
-
   m.def("pull_sparse_table", &PullSparseTable, pybind11::arg("table_id"),
         pybind11::arg("indices"));
 
@@ -77,9 +71,11 @@ PYBIND11_MODULE(kraken_native, m) {
         pybind11::arg("table_ids"), pybind11::arg("indices"));
 
   m.def("push_sparse_table", &PushSparseTable, pybind11::arg("table_id"),
-        pybind11::arg("indices"), pybind11::arg("grads"));
+        pybind11::arg("indices"), pybind11::arg("grad"));
 
-  m.def("save_check_point", &SaveCheckPoint);
+  m.def("combine_push_sparse_table", &CombinePushSparseTable,
+        pybind11::arg("table_ids"), pybind11::arg("indices"),
+        pybind11::arg("grads"));
 }
 
 }  // namespace py

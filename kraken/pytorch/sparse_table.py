@@ -14,9 +14,9 @@ class SparseTable(torch.nn.Parameter):
     self = super(SparseTable, cls).__new__(cls)
     self._dimension = dimension
     self._dtype = dtype
-    self._table_id = None
     self._initializer = initializer
     self._name = name
+    self._table_id = None
 
     return self
 
@@ -26,17 +26,17 @@ class SparseTable(torch.nn.Parameter):
   def dtype(self):
     return self._dtype
 
-  def table_id(self):
-    return self._table_id
-
   def initializer(self):
     return self._initializer
 
   def name(self):
     return self._name
 
-  def set_table_id(self, table_id: int):
-    self._table_id = table_id
+  def table_id(self):
+    return self._table_id
 
   def set_name(self, name: str):
     self._name = name
+
+  def set_table_id(self, table_id: int):
+    self._table_id = table_id

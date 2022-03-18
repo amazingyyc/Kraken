@@ -20,8 +20,7 @@ RMSprop::RMSprop(bool has_weight_decay, float weight_decay, bool has_momentum,
       centered_(centered) {
 }
 
-int32_t RMSprop::Update(const Tensor& grad, float lr, Tensor* val,
-                        Bag* bag) const {
+int32_t RMSprop::Update(const Tensor& grad, float lr, Value* value) const {
   // Grad maybe Coo tensor.
   Tensor grad_t = grad;
   if (grad_t.IsCoo()) {
@@ -32,47 +31,47 @@ int32_t RMSprop::Update(const Tensor& grad, float lr, Tensor* val,
     grad_t = grad_t.ToDense();
   }
 
-  if (grad_t.Size() != val->Size() ||
-      grad_t.element_type() != val->element_type()) {
+  if (grad_t.Size() != value->val.Size() ||
+      grad_t.element_type() != value->val.element_type()) {
     return ErrorCode::kGradientUnCompatibleError;
   }
 
   if (has_weight_decay_) {
-    grad_t += weight_decay_ * (*val);
+    grad_t += weight_decay_ * value->val;
   }
 
-  if (bag->state.find(StateType::kSquareAverage) == bag->state.end()) {
-    bag->state.emplace(StateType::kSquareAverage, grad_t.Like().Zero());
+  if (value->states.find(StateType::kSquareAverage) == value->states.end()) {
+    value->states.emplace(StateType::kSquareAverage, grad_t.Like().Zero());
   }
 
-  Tensor vt = bag->state[StateType::kSquareAverage];
+  Tensor vt = value->states[StateType::kSquareAverage];
   vt = alpha_ * vt + (1.0 - alpha_) * grad_t.Square();
 
   // Update
-  bag->state[StateType::kSquareAverage] = vt;
+  value->states[StateType::kSquareAverage] = vt;
 
   if (centered_) {
-    if (bag->state.find(StateType::kGAve) == bag->state.end()) {
-      bag->state.emplace(StateType::kGAve, grad_t.Like().Zero());
+    if (value->states.find(StateType::kGAve) == value->states.end()) {
+      value->states.emplace(StateType::kGAve, grad_t.Like().Zero());
     }
 
-    Tensor& gave = bag->state[StateType::kGAve];
+    Tensor& gave = value->states[StateType::kGAve];
     gave = gave * alpha_ + (1.0 - alpha_) * grad_t;
 
     vt = vt - gave.Square();
   }
 
   if (has_momentum_) {
-    if (bag->state.find(StateType::kMomentumBuffer) == bag->state.end()) {
-      bag->state.emplace(StateType::kMomentumBuffer, grad_t.Like().Zero());
+    if (value->states.find(StateType::kMomentumBuffer) == value->states.end()) {
+      value->states.emplace(StateType::kMomentumBuffer, grad_t.Like().Zero());
     }
 
-    Tensor& bt = bag->state[StateType::kMomentumBuffer];
+    Tensor& bt = value->states[StateType::kMomentumBuffer];
     bt = bt * momentum_ + grad_t / (vt.Sqrt() + eps_);
 
-    (*val) -= (lr * bt);
+    (value->val) -= (lr * bt);
   } else {
-    (*val) -= (lr * grad_t / (vt.Sqrt() + eps_));
+    (value->val) -= (lr * grad_t / (vt.Sqrt() + eps_));
   }
 
   return ErrorCode::kSuccess;

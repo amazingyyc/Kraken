@@ -13,21 +13,22 @@ struct ErrorCode {
   static constexpr int32_t kDeserializeRequestError = 4;
   static constexpr int32_t kDeserializeReplyError = 5;
   static constexpr int32_t kUnSupportOptimTypeError = 6;
-  static constexpr int32_t kTableTypeUnCompatibleError = 7;
-  static constexpr int32_t kDenseTableUnCompatibleError = 8;
-  static constexpr int32_t kSparseDimensionError = 9;
-  static constexpr int32_t kSparseTableUnCompatibleError = 10;
-  static constexpr int32_t kUnRegisterModelError = 11;
-  static constexpr int32_t kUnRegisterTableError = 12;
-  static constexpr int32_t kInterfaceUnImplementError = 13;
-  static constexpr int32_t kGradientUnCompatibleError = 14;
-  static constexpr int32_t kSparseTableIdError = 15;
-  static constexpr int32_t kSparseTableIdNotExistError = 16;
-  static constexpr int32_t kPushSparseTableParameterError = 17;
-  static constexpr int32_t kUnSupportInitializerTypeError = 18;
-  static constexpr int32_t kUnSupportCompressTypeError = 19;
-  static constexpr int32_t kSnappyUncompressError = 20;
-  static constexpr int32_t kSnappyCompressError = 21;
+  static constexpr int32_t kDenseTableUnCompatibleError = 7;
+  static constexpr int32_t kSparseDimensionError = 8;
+  static constexpr int32_t kSparseTableUnCompatibleError = 9;
+  static constexpr int32_t kInterfaceUnImplementError = 10;
+  static constexpr int32_t kGradientUnCompatibleError = 11;
+  static constexpr int32_t kSparseIdNotExistError = 12;
+  static constexpr int32_t kUnSupportInitializerTypeError = 13;
+  static constexpr int32_t kUnSupportCompressTypeError = 14;
+  static constexpr int32_t kSocketNotExistError = 15;
+  static constexpr int32_t kNodeStatusError = 16;
+  static constexpr int32_t kTimeoutError = 17;
+  static constexpr int32_t kUnSupportEventError = 18;
+  static constexpr int32_t kModelNotInitializedError = 19;
+  static constexpr int32_t kConnectNodeError = 20;
+  static constexpr int32_t kTableNotExistError = 21;
+  static constexpr int32_t kRouterVersionError = 22;
 
   static const char* Msg(int32_t code) {
     switch (code) {
@@ -47,36 +48,38 @@ struct ErrorCode {
         return "Deserialize reply error";
       case ErrorCode::kUnSupportOptimTypeError:
         return "UnSupport optim type";
-      case ErrorCode::kTableTypeUnCompatibleError:
-        return "Uncompatible table type";
       case ErrorCode::kDenseTableUnCompatibleError:
         return "Uncompatible Dense table";
       case ErrorCode::kSparseDimensionError:
         return "Sparse Dimension error";
       case ErrorCode::kSparseTableUnCompatibleError:
         return "SparseTable Uncompatible Error";
-      case ErrorCode::kUnRegisterModelError:
-        return "Unregister model";
-      case ErrorCode::kUnRegisterTableError:
-        return "Unregister table";
       case ErrorCode::kInterfaceUnImplementError:
-        return "Unimplement interface";
+        return "UnImplement Interface";
       case ErrorCode::kGradientUnCompatibleError:
         return "Uncompatible gradient";
-      case ErrorCode::kSparseTableIdError:
-        return "Sparse id error";
-      case ErrorCode::kSparseTableIdNotExistError:
-        return "Sparse table id not exist";
-      case ErrorCode::kPushSparseTableParameterError:
-        return "Push sparse table parameter error";
+      case ErrorCode::kSparseIdNotExistError:
+        return "SparseId not exist";
       case ErrorCode::kUnSupportInitializerTypeError:
         return "UnSupport initializer type";
       case ErrorCode::kUnSupportCompressTypeError:
         return "UnSupportCompress type";
-      case ErrorCode::kSnappyUncompressError:
-        return "Snappy Uncompress error";
-      case ErrorCode::kSnappyCompressError:
-        return "Snappy Compress Error";
+      case ErrorCode::kSocketNotExistError:
+        return "Socket not exist";
+      case ErrorCode::kNodeStatusError:
+        return "NodeStatus error";
+      case ErrorCode::kTimeoutError:
+        return "Timeout error";
+      case ErrorCode::kUnSupportEventError:
+        return "UnSupport event";
+      case ErrorCode::kModelNotInitializedError:
+        return "Model not initialized";
+      case ErrorCode::kConnectNodeError:
+        return "Connect node error";
+      case ErrorCode::kTableNotExistError:
+        return "Table not exist";
+      case ErrorCode::kRouterVersionError:
+        return "Router version error";
       default:
         return "Unrecognized error";
     }

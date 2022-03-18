@@ -9,7 +9,8 @@
 namespace kraken {
 
 struct PushDenseTableRequest {
-  uint64_t model_id;
+  uint64_t router_version;
+
   uint64_t table_id;
 
   Tensor grad;
@@ -18,14 +19,14 @@ struct PushDenseTableRequest {
 
 template <>
 inline bool Serialize::operator<<(const PushDenseTableRequest& v) {
-  return (*this) << v.model_id && (*this) << v.table_id && (*this) << v.grad &&
-         (*this) << v.lr;
+  return (*this) << v.router_version && (*this) << v.table_id &&
+         (*this) << v.grad && (*this) << v.lr;
 }
 
 template <>
 inline bool Deserialize::operator>>(PushDenseTableRequest& v) {
-  return (*this) >> v.model_id && (*this) >> v.table_id && (*this) >> v.grad &&
-         (*this) >> v.lr;
+  return (*this) >> v.router_version && (*this) >> v.table_id &&
+         (*this) >> v.grad && (*this) >> v.lr;
 }
 
 struct PushDenseTableResponse {

@@ -11,119 +11,35 @@
 namespace kraken {
 
 struct CombinePullSparseTableRequest {
-  uint64_t model_id;
+  uint64_t router_version;
 
-  // <TableId, Indices> map.
-  std::unordered_map<uint64_t, std::vector<uint64_t>> indices;
+  // <TableId, SparseId> map.
+  std::unordered_map<uint64_t, std::vector<uint64_t>> table_sparse_ids;
 };
 
 template <>
-inline bool Serialize::operator<<(
-    const std::unordered_map<uint64_t, std::vector<uint64_t>>& v) {
-  uint64_t size = v.size();
-  if (((*this) << size) == false) {
-    return false;
-  }
-
-  for (const auto& [key, val] : v) {
-    if (((*this) << key) == false || ((*this) << val) == false) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-template <>
 inline bool Serialize::operator<<(const CombinePullSparseTableRequest& v) {
-  return (*this) << v.model_id && (*this) << v.indices;
-}
-
-template <>
-inline bool Deserialize::operator>>(
-    std::unordered_map<uint64_t, std::vector<uint64_t>>& v) {
-  v.clear();
-
-  uint64_t size;
-  if (((*this) >> size) == false) {
-    return false;
-  }
-
-  v.reserve(size);
-  for (uint64_t i = 0; i < size; ++i) {
-    uint64_t key;
-    std::vector<uint64_t> value;
-
-    if (((*this) >> key) == false || ((*this) >> value) == false) {
-      return false;
-    }
-
-    v.emplace(key, std::move(value));
-  }
-
-  return true;
+  return (*this) << v.router_version && (*this) << v.table_sparse_ids;
 }
 
 template <>
 inline bool Deserialize::operator>>(CombinePullSparseTableRequest& v) {
-  return (*this) >> v.model_id && (*this) >> v.indices;
+  return (*this) >> v.router_version && (*this) >> v.table_sparse_ids;
 }
 
 struct CombinePullSparseTableResponse {
-  // <TableId, Val> map.
-  std::unordered_map<uint64_t, std::vector<Tensor>> vals;
+  // <TableId, Vals> map.
+  std::unordered_map<uint64_t, std::vector<Tensor>> table_vals;
 };
 
 template <>
-inline bool Serialize::operator<<(
-    const std::unordered_map<uint64_t, std::vector<Tensor>>& v) {
-  uint64_t size = v.size();
-  if (((*this) << size) == false) {
-    return false;
-  }
-
-  for (const auto& [key, val] : v) {
-    if (((*this) << key) == false || ((*this) << val) == false) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-template <>
 inline bool Serialize::operator<<(const CombinePullSparseTableResponse& v) {
-  return (*this) << v.vals;
-}
-
-template <>
-inline bool Deserialize::operator>>(
-    std::unordered_map<uint64_t, std::vector<Tensor>>& v) {
-  v.clear();
-
-  uint64_t size;
-  if (((*this) >> size) == false) {
-    return false;
-  }
-
-  v.reserve(size);
-  for (uint64_t i = 0; i < size; ++i) {
-    uint64_t key;
-    std::vector<Tensor> value;
-
-    if (((*this) >> key) == false || ((*this) >> value) == false) {
-      return false;
-    }
-
-    v.emplace(key, std::move(value));
-  }
-
-  return true;
+  return (*this) << v.table_vals;
 }
 
 template <>
 inline bool Deserialize::operator>>(CombinePullSparseTableResponse& v) {
-  return (*this) >> v.vals;
+  return (*this) >> v.table_vals;
 }
 
 }  // namespace kraken

@@ -5,10 +5,9 @@
 #include <unordered_map>
 #include <vector>
 
+#include "common/info.h"
 #include "common/iwriter.h"
-#include "ps/initializer/initializer.h"
-#include "ps/optim/optim.h"
-#include "ps/table.h"
+#include "common/router.h"
 #include "rpc/protocol.h"
 #include "t/coo_tensor_impl.h"
 #include "t/element_type.h"
@@ -197,6 +196,22 @@ inline bool Serialize::operator<<(const Tensor& v) {
 }
 
 template <>
+inline bool Serialize::operator<<(const std::vector<std::string>& v) {
+  uint64_t size = v.size();
+  if (((*this) << size) == false) {
+    return false;
+  }
+
+  for (auto& i : v) {
+    if (((*this) << i) == false) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+template <>
 inline bool Serialize::operator<<(const std::vector<Tensor>& v) {
   uint64_t size = v.size();
   if (((*this) << size) == false) {
@@ -281,13 +296,138 @@ inline bool Serialize::operator<<(
 }
 
 template <>
-inline bool Serialize::operator<<(const Bag& v) {
-  return ((*this) << v.state) && ((*this) << v.state_i);
+inline bool Serialize::operator<<(const Value& v) {
+  return ((*this) << v.val) && ((*this) << v.states) && ((*this) << v.states_i);
 }
 
 template <>
-inline bool Serialize::operator<<(const Table::Value& v) {
-  return ((*this) << v.val) && ((*this) << v.bag);
+inline bool Serialize::operator<<(const std::vector<Value>& v) {
+  uint64_t size = v.size();
+  if (((*this) << size) == false) {
+    return false;
+  }
+
+  for (auto& i : v) {
+    if (((*this) << i) == false) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+template <>
+inline bool Serialize::operator<<(const TableMetaData& v) {
+  return ((*this) << v.id) && ((*this) << v.name) &&
+         ((*this) << v.table_type) && ((*this) << v.element_type) &&
+         ((*this) << v.shape) && ((*this) << v.dimension) &&
+         ((*this) << v.init_type) && ((*this) << v.init_conf);
+}
+
+template <>
+inline bool Serialize::operator<<(
+    const std::unordered_map<uint64_t, TableMetaData>& v) {
+  uint64_t size = v.size();
+  if (((*this) << size) == false) {
+    return false;
+  }
+
+  for (const auto& [key, val] : v) {
+    if (((*this) << key) == false || ((*this) << val) == false) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+template <>
+inline bool Serialize::operator<<(const ModelMetaData& v) {
+  return ((*this) << v.name) && ((*this) << v.optim_type) &&
+         ((*this) << v.optim_conf) && ((*this) << v.table_mdatas);
+}
+
+template <>
+inline bool Serialize::operator<<(const Router::Node& v) {
+  return ((*this) << v.id) && ((*this) << v.name) && ((*this) << v.vnode_list);
+}
+
+template <>
+inline bool Serialize::operator<<(const Router::VirtualNode& v) {
+  return ((*this) << v.hash_v) && ((*this) << v.node_id) && ((*this) << v.name);
+}
+
+template <>
+inline bool Serialize::operator<<(const std::map<uint64_t, Router::Node>& v) {
+  uint64_t size = v.size();
+  if (((*this) << size) == false) {
+    return false;
+  }
+
+  for (const auto& [key, val] : v) {
+    if (((*this) << key) == false || ((*this) << val) == false) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+template <>
+inline bool Serialize::operator<<(
+    const std::map<uint64_t, Router::VirtualNode>& v) {
+  uint64_t size = v.size();
+  if (((*this) << size) == false) {
+    return false;
+  }
+
+  for (const auto& [key, val] : v) {
+    if (((*this) << key) == false || ((*this) << val) == false) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+template <>
+inline bool Serialize::operator<<(const Router& v) {
+  return (*this) << v.version() && (*this) << v.nodes() &&
+         (*this) << v.vnodes();
+}
+
+template <>
+inline bool Serialize::operator<<(
+    const std::unordered_map<uint64_t, std::vector<uint64_t>>& v) {
+  uint64_t size = v.size();
+  if (((*this) << size) == false) {
+    return false;
+  }
+
+  for (const auto& [key, val] : v) {
+    if (((*this) << key) == false || ((*this) << val) == false) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+template <>
+inline bool Serialize::operator<<(
+    const std::unordered_map<uint64_t, std::vector<Tensor>>& v) {
+  uint64_t size = v.size();
+  if (((*this) << size) == false) {
+    return false;
+  }
+
+  for (const auto& [key, val] : v) {
+    if (((*this) << key) == false || ((*this) << val) == false) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 }  // namespace kraken

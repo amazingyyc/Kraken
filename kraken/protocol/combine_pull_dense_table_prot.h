@@ -10,19 +10,19 @@
 namespace kraken {
 
 struct CombinePullDenseTableRequest {
-  uint64_t model_id;
+  uint64_t router_version;
 
   std::vector<uint64_t> table_ids;
 };
 
 template <>
 inline bool Serialize::operator<<(const CombinePullDenseTableRequest& v) {
-  return (*this) << v.model_id && (*this) << v.table_ids;
+  return (*this) << v.router_version && (*this) << v.table_ids;
 }
 
 template <>
 inline bool Deserialize::operator>>(CombinePullDenseTableRequest& v) {
-  return (*this) >> v.model_id && (*this) >> v.table_ids;
+  return (*this) >> v.router_version && (*this) >> v.table_ids;
 }
 
 struct CombinePullDenseTableResponse {

@@ -1,5 +1,6 @@
 #include "ps/optim/optim.h"
 
+#include "common/utils.h"
 #include "ps/optim/adagrad.h"
 #include "ps/optim/adam.h"
 #include "ps/optim/rmsprop.h"
@@ -8,6 +9,10 @@
 namespace kraken {
 
 Optim::Optim(OptimType optim_type) : optim_type_(optim_type) {
+}
+
+OptimType Optim::optim_type() const {
+  return optim_type_;
 }
 
 std::unique_ptr<Optim> Optim::Create(

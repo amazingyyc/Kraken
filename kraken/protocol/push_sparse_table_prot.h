@@ -9,10 +9,10 @@
 namespace kraken {
 
 struct PushSparseTableRequest {
-  uint64_t model_id;
+  uint64_t router_version;
   uint64_t table_id;
 
-  std::vector<uint64_t> indices;
+  std::vector<uint64_t> sparse_ids;
   std::vector<Tensor> grads;
 
   float lr;
@@ -20,14 +20,14 @@ struct PushSparseTableRequest {
 
 template <>
 inline bool Serialize::operator<<(const PushSparseTableRequest& v) {
-  return (*this) << v.model_id && (*this) << v.table_id &&
-         (*this) << v.indices && (*this) << v.grads && (*this) << v.lr;
+  return (*this) << v.router_version && (*this) << v.table_id &&
+         (*this) << v.sparse_ids && (*this) << v.grads && (*this) << v.lr;
 }
 
 template <>
 inline bool Deserialize::operator>>(PushSparseTableRequest& v) {
-  return (*this) >> v.model_id && (*this) >> v.table_id &&
-         (*this) >> v.indices && (*this) >> v.grads && (*this) >> v.lr;
+  return (*this) >> v.router_version && (*this) >> v.table_id &&
+         (*this) >> v.sparse_ids && (*this) >> v.grads && (*this) >> v.lr;
 }
 
 struct PushSparseTableResponse {

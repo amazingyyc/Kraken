@@ -157,31 +157,27 @@ target_link_libraries(
   ${PYTORCH_LIBRARY_PREFIX_PATH}/libtorch_python.so)
 
 # ##############################################################################
-# kraken watcher
-add_library(
-  kraken_watcher SHARED
-  ${KRAKEN_HEAD_FILES} ${KRAKEN_SRC_FILES} ${KRAKEN_WATCHER_HEAD_FILES}
-  ${KRAKEN_WATCHER_SRC_FILES})
+# kraken watcher add_library( kraken_watcher SHARED ${KRAKEN_HEAD_FILES}
+# ${KRAKEN_SRC_FILES} ${KRAKEN_WATCHER_HEAD_FILES} ${KRAKEN_WATCHER_SRC_FILES})
 
-# remove lib prefix for kraken_watcher
-set_target_properties(kraken_watcher PROPERTIES PREFIX "")
-target_include_directories(kraken_watcher PUBLIC ${PYTHON_INCLUDE_DIRS})
-target_link_libraries(
-  kraken_watcher
-  stdc++fs
-  libzmq-static
-  snappy
-  libcuckoo
-  pybind11_headers
-  ${PYTHON_LIBRARIES}
-  ${TORCH_LIBRARIES}
-  ${PYTORCH_LIBRARY_PREFIX_PATH}/libtorch_python.so)
+# # remove lib prefix for kraken_watcher set_target_properties(kraken_watcher
+# PROPERTIES PREFIX "") target_include_directories(kraken_watcher PUBLIC
+# ${PYTHON_INCLUDE_DIRS}) target_link_libraries( kraken_watcher stdc++fs
+# libzmq-static snappy libcuckoo pybind11_headers ${PYTHON_LIBRARIES}
+# ${TORCH_LIBRARIES} ${PYTORCH_LIBRARY_PREFIX_PATH}/libtorch_python.so)
 
 # ##############################################################################
-# kraken_server executable
-add_executable(kraken_server kraken/executable/kraken_server_main.cc
-                             ${KRAKEN_HEAD_FILES} ${KRAKEN_SRC_FILES})
-target_link_libraries(kraken_server stdc++fs libzmq-static snappy libcuckoo
+# ps_server executable
+add_executable(ps_server kraken/executable/ps_server_main.cc
+                         ${KRAKEN_HEAD_FILES} ${KRAKEN_SRC_FILES})
+target_link_libraries(ps_server stdc++fs libzmq-static snappy libcuckoo
+                      gflags)
+
+# ##############################################################################
+# ps_server executable
+add_executable(scheduler_server kraken/executable/scheduler_server_main.cc
+                         ${KRAKEN_HEAD_FILES} ${KRAKEN_SRC_FILES})
+target_link_libraries(scheduler_server stdc++fs libzmq-static snappy libcuckoo
                       gflags)
 
 # ##############################################################################

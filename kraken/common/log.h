@@ -5,11 +5,14 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 
+#include "common/info.h"
 #include "common/utils.h"
 
 namespace kraken {
 namespace log {
+
 extern uint32_t LOG_LEVEL;
 
 class Logger {
@@ -32,6 +35,53 @@ inline Logger& Logger::operator<<(
     const std::unordered_map<std::string, std::string>& map) {
   for (const auto& [k, v] : map) {
     oss_ << "[" << k << ", " << v << "], ";
+  }
+
+  return *this;
+}
+
+template <>
+inline Logger& Logger::operator<<(const std::unordered_set<uint64_t>& set) {
+  oss_ << "[";
+  for (auto v : set) {
+    oss_ << v << ", ";
+  }
+  oss_ << "]";
+
+  return *this;
+}
+
+template <>
+inline Logger& Logger::operator<<(const OptimType& optim_type) {
+  if (optim_type == OptimType::kAdagrad) {
+    oss_ << "kAdagrad";
+  } else if (optim_type == OptimType::kAdam) {
+    oss_ << "kAdam";
+  } else if (optim_type == OptimType::kRMSprop) {
+    oss_ << "kRMSprop";
+  } else if (optim_type == OptimType::kSGD) {
+    oss_ << "kSGD";
+  } else {
+    oss_ << "UnKnow";
+  }
+
+  return *this;
+}
+
+template <>
+inline Logger& Logger::operator<<(const InitializerType& init_type) {
+  if (init_type == InitializerType::kConstant) {
+    oss_ << "kConstant";
+  } else if (init_type == InitializerType::kUniform) {
+    oss_ << "kUniform";
+  } else if (init_type == InitializerType::kNormal) {
+    oss_ << "kNormal";
+  } else if (init_type == InitializerType::kXavierUniform) {
+    oss_ << "kXavierUniform";
+  } else if (init_type == InitializerType::kXavierNormal) {
+    oss_ << "kXavierNormal";
+  } else {
+    oss_ << "UnKnow";
   }
 
   return *this;

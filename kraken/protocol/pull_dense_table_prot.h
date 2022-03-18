@@ -9,18 +9,18 @@
 namespace kraken {
 
 struct PullDenseTableRequest {
-  uint64_t model_id;
+  uint64_t router_version;
   uint64_t table_id;
 };
 
 template <>
 inline bool Serialize::operator<<(const PullDenseTableRequest& v) {
-  return (*this) << v.model_id && (*this) << v.table_id;
+  return (*this) << v.router_version && (*this) << v.table_id;
 }
 
 template <>
 inline bool Deserialize::operator>>(PullDenseTableRequest& v) {
-  return (*this) >> v.model_id && (*this) >> v.table_id;
+  return (*this) >> v.router_version && (*this) >> v.table_id;
 }
 
 struct PullDenseTableResponse {

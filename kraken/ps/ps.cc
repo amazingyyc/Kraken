@@ -1,472 +1,842 @@
 #include "ps/ps.h"
 
+#include <thread>
+
 #include "common/error_code.h"
 #include "common/exception.h"
+#include "common/info.h"
 #include "common/log.h"
-#include "ps/initializer/initializer.h"
-#include "ps/optim/optim.h"
-#include "rpc/protocol.h"
+#include "protocol/fetch_model_meta_data_prot.h"
+#include "protocol/rpc_func_type.h"
+#include "protocol/try_join_prot.h"
+#include "ps/dense_table.h"
+#include "ps/sparse_table.h"
+#include "ps/transfer.h"
+#include "rpc/indep_connecter.h"
 
 namespace kraken {
 
-Ps::Ps(size_t shard_num, size_t shard_id, const std::string& save_dir,
-       size_t max_save_count)
-    : shard_num_(shard_num),
-      shard_id_(shard_id),
-      checkpoint_executor_(save_dir, max_save_count) {
+Ps::Ps(const std::string& addr, const std::string& s_addr)
+    : task_que_(1),
+      addr_(addr),
+      s_addr_(s_addr),
+      status_(NodeStatus::kInit),
+      node_id_(0),
+      model_init_(false) {
 }
 
-size_t Ps::shard_num() const {
-  return shard_num_;
-}
+void Ps::Clean() {
+  LOG_INFO("Begin to clean old data.");
 
-size_t Ps::shard_id() const {
-  return shard_id_;
-}
+  uint64_t node_id;
+  Router router;
 
-void Ps::Load(const std::string& load_dir) {
-  ARGUMENT_CHECK(checkpoint_executor_.Load(this, load_dir),
-                 "Load model from:" << load_dir << " error!");
-}
+  // Copy to local.
+  {
+    std::shared_lock<std::shared_mutex> _(mu_);
+    node_id = node_id_;
+    router = router_;
+  }
 
-void Ps::Stop() {
-  checkpoint_executor_.Stop();
-}
+  // Clean DenseTable.
+  {
+    // The table num is not huge. so we will lock it only once.
+    std::unique_lock<std::shared_mutex> _(model_mu_);
 
-int32_t Ps::ApplyModel(
-    const std::string& name, OptimType optim_type,
-    const std::unordered_map<std::string, std::string>& optim_conf,
-    uint64_t* model_id) {
-  std::unique_lock<std::shared_mutex> lock(mu_);
+    auto it = tables_.Begin();
+    while (it.Valid()) {
+      if (it.value()->type() != TableType::kDense ||
+          router.Hit(utils::Hash(it.key())) == node_id) {
+        it.Next();
+      } else {
+        LOG_INFO("Clean DensTable:[" << it.value()->name() << "], id:["
+                                     << it.key() << "]");
 
-  for (const auto& [k, v] : model_infos_) {
-    if (v.name == name) {
-      // (TODO) check OptimType.
-      *model_id = k;
-
-      LOG_INFO("Apply model:" << name << ", OptimType:" << (int32_t)optim_type
-                              << ", OptimConf:" << optim_conf
-                              << ", already exist, id:" << *model_id);
-
-      return ErrorCode::kSuccess;
+        it = tables_.Remove(it);
+      }
     }
   }
 
-  uint64_t id = model_infos_.size();
-  while (model_infos_.find(id) != model_infos_.end()) {
-    id++;
-  }
+  // Clean SparseTable.
+  {
+    uint64_t table_id = 0;
 
-  *model_id = id;
+    while (true) {
+      std::shared_lock<std::shared_mutex> _(model_mu_);
 
-  // Create a new one.
-  ModelInfo model_info;
-  model_info.id = id;
-  model_info.name = name;
-  model_info.optim_type = optim_type;
-  model_info.optim_conf = optim_conf;
-
-  model_infos_.emplace(id, std::move(model_info));
-
-  LOG_INFO("Applied model:" << name << ", id:" << id
-                            << ", OptimType:" << (int32_t)optim_type
-                            << ", OptimConf:" << optim_conf);
-
-  return ErrorCode::kSuccess;
-}
-
-int32_t Ps::ApplyDenseTable(uint64_t model_id, const std::string& name,
-                            const Shape& shape, ElementType element_type,
-                            uint64_t* table_id) {
-  std::unique_lock<std::shared_mutex> lock(mu_);
-
-  auto it = model_infos_.find(model_id);
-  if (it == model_infos_.end()) {
-    LOG_ERROR("Can't find model:" << model_id);
-    return ErrorCode::kUnRegisterModelError;
-  }
-
-  ModelInfo& model_info = it->second;
-
-  for (const auto& [k, v] : model_info.table_infos) {
-    if (v.name == name) {
-      if (v.table_type != TableType::kDense || v.shape != shape ||
-          v.element_type != element_type) {
-        return ErrorCode::kDenseTableUnCompatibleError;
+      auto it = tables_.FindGreaterOrEqual(table_id);
+      if (it.Valid() == false) {
+        break;
       }
 
-      *table_id = k;
-
-      LOG_INFO("Apply DenseTable:" << name << ", shape:" << shape.Str()
-                                   << ", ElementType" << element_type.Name()
-                                   << ", already exist, id:" << k);
-
-      return ErrorCode::kSuccess;
-    }
-  }
-
-  uint64_t id = model_info.table_infos.size();
-  while (model_info.table_infos.find(id) != model_info.table_infos.end()) {
-    id++;
-  }
-
-  *table_id = id;
-
-  TableInfo table_info;
-  table_info.id = id;
-  table_info.name = name;
-  table_info.table_type = TableType::kDense;
-  table_info.element_type = element_type;
-  table_info.shape = shape;
-
-  model_info.table_infos.emplace(id, std::move(table_info));
-
-  LOG_INFO("Applied DenseTable:" << name << ", id:" << id
-                                 << ", shape:" << shape.Str()
-                                 << ", ElementType:" << element_type.Name());
-
-  return ErrorCode::kSuccess;
-}
-
-int32_t Ps::ApplySparseTable(
-    uint64_t model_id, const std::string& name, int64_t dimension,
-    ElementType element_type, InitializerType init_type,
-    const std::unordered_map<std::string, std::string>& init_conf,
-    uint64_t* table_id) {
-  std::unique_lock<std::shared_mutex> lock(mu_);
-
-  auto it = model_infos_.find(model_id);
-  if (it == model_infos_.end()) {
-    LOG_ERROR("Can't find model:" << model_id);
-    return ErrorCode::kUnRegisterModelError;
-  }
-
-  ModelInfo& model_info = it->second;
-
-  for (const auto& [k, v] : model_info.table_infos) {
-    if (v.name == name) {
-      if (v.table_type != TableType::kSparse || v.dimension != dimension ||
-          v.element_type != element_type || v.init_type != init_type) {
-        return ErrorCode::kSparseTableUnCompatibleError;
+      if (it.value()->type() != TableType::kSparse) {
+        // Jump to next SparseTable.
+        table_id = it.key() + 1;
+        continue;
       }
 
-      *table_id = k;
+      // Update.
+      table_id = it.key();
 
-      LOG_INFO("Apply SparseTable:" << name << ", dimension:" << dimension
-                                    << ", ElementType:" << element_type.Name()
-                                    << ", InitType:" << (int32_t)init_type
-                                    << ", InitConf:" << init_conf
-                                    << ", already exist, id:" << k);
+      SparseTable* table = (SparseTable*)it.value().get();
+      auto* parallel_vals = table->vals();
 
-      return ErrorCode::kSuccess;
+      size_t remove_c = 0;
+
+      for (size_t slot = 0; slot < parallel_vals->slot_count(); ++slot) {
+        auto h = parallel_vals->UniqueSkipListHandler(slot);
+
+        auto sit = h.skip_list.Begin();
+        while (sit.Valid()) {
+          if (router.Hit(utils::Hash(it.key(), sit.key())) != node_id) {
+            sit = h.skip_list.Remove(sit);
+            remove_c++;
+          } else {
+            sit.Next();
+          }
+        }
+      }
+
+      LOG_INFO("Clean SparseValues from SparseTable:["
+               << table_id << "], count:[" << remove_c << "]");
+
+      table_id = it.key() + 1;
     }
   }
 
-  uint64_t id = model_info.table_infos.size();
-  while (model_info.table_infos.find(id) != model_info.table_infos.end()) {
-    id++;
+  LOG_INFO("Finish clean old data.");
+}
+
+// Transfer data to new node.
+void Ps::Transfer(uint64_t target_id) {
+  LOG_INFO("Begin to transfer data to node:[" << target_id << "]");
+
+  Router router;
+  uint64_t node_id;
+
+  // Copy to local.
+  {
+    std::shared_lock<std::shared_mutex> _(mu_);
+    router = router_;
+    node_id = node_id_;
   }
 
-  *table_id = id;
+  Router::Node target_node;
+  ARGUMENT_CHECK(router.node(target_id, &target_node),
+                 "Router not include node:" << target_id);
 
-  TableInfo table_info;
-  table_info.id = id;
-  table_info.name = name;
-  table_info.table_type = TableType::kSparse;
-  table_info.element_type = element_type;
-  table_info.dimension = dimension;
-  table_info.init_type = init_type;
-  table_info.init_conf = init_conf;
+  // Create a connecter.
+  kraken::Transfer transfer(target_node.id, target_node.name,
+                            CompressType::kSnappy);
 
-  model_info.table_infos.emplace(id, std::move(table_info));
+  // Transfer DenseTable.
+  {
+    uint64_t table_id_offset = 0;
 
-  LOG_INFO("Applied SparseTable:" << name << ", id:" << id
-                                  << ", dimension:" << dimension
-                                  << ", ElementType:" << element_type.Name()
-                                  << ", InitType:" << (int32_t)init_type
-                                  << ", InitConf:" << init_conf);
+    uint64_t table_id = 0;
+    std::string name;
+    Value val;
+
+    while (true) {
+      {
+        std::shared_lock<std::shared_mutex> _(model_mu_);
+
+        auto it = tables_.FindGreaterOrEqual(table_id_offset);
+        if (it.Valid() == false) {
+          break;
+        }
+
+        if (it.value()->type() != TableType::kDense ||
+            router.Hit(utils::Hash(it.key())) != target_id) {
+          table_id_offset = it.key() + 1;
+          continue;
+        }
+
+        // Send to target Node. If the DenseTable need send to target Node. It
+        // means it's not belong to this Node, So it Ok use shared locker.
+        DenseTable* table = (DenseTable*)it.value().get();
+
+        // If a dense table need transfer to other node it means it will never
+        // modify on this node. So shallow copy is OK.
+        auto l = table->shared_handler();
+        table_id = table->id();
+        name = table->name();
+        val = table->val();
+
+        table_id_offset = it.key() + 1;
+      }
+
+      // At here the mutex for tables_ has been released. So when
+      // send data we will not block other thread to modify it.
+      RPC_CALL(transfer.TransferDenseTable(node_id, table_id, name, val));
+
+      LOG_INFO("Transfer DenseTable:[" << name << "], id:[" << table_id
+                                       << "] to node:[" << target_id << "]");
+    }
+  }
+
+  // Transfer SparseTable MetaData.
+  {
+    uint64_t table_id_offset = 0;
+
+    uint64_t table_id;
+    std::string name;
+    int64_t dimension;
+    ElementType element_type;
+    InitializerType init_type;
+    std::unordered_map<std::string, std::string> init_conf;
+
+    while (true) {
+      {
+        std::shared_lock<std::shared_mutex> _(model_mu_);
+
+        auto it = tables_.FindGreaterOrEqual(table_id_offset);
+        if (it.Valid() == false) {
+          break;
+        }
+
+        if (it.value()->type() != TableType::kSparse) {
+          table_id_offset = it.key() + 1;
+          continue;
+        }
+
+        SparseTable* table = (SparseTable*)it.value().get();
+
+        // Copy.
+        table_id = table->id();
+        name = table->name();
+        dimension = table->dimension();
+        element_type = table->element_type();
+        init_type = table->initializer()->type();
+        init_conf = table->initializer()->conf();
+
+        // Jump to next SparseTable.
+        table_id_offset = it.key() + 1;
+      }
+
+      RPC_CALL(transfer.TransferSparseMetaData(node_id, table_id, name,
+                                               dimension, element_type,
+                                               init_type, init_conf));
+
+      LOG_INFO("Transfer SparseTable:[" << table_id << "] MetaData to node:["
+                                        << target_id << "]");
+    }
+  }
+
+  // Transfer SparseTable.
+  {
+    uint64_t table_id_offset = 0;
+    size_t slot_id_offset = 0;
+    uint64_t sparse_id_offset = 0;
+
+    const size_t step = 1024;
+
+    uint64_t table_id = 0;
+
+    std::vector<uint64_t> sparse_ids;
+    sparse_ids.reserve(step);
+
+    std::vector<Value> sparse_vals;
+    sparse_vals.reserve(step);
+
+    while (true) {
+      sparse_ids.clear();
+      sparse_vals.clear();
+
+      {
+        std::shared_lock<std::shared_mutex> _(model_mu_);
+
+        auto it = tables_.FindGreaterOrEqual(table_id_offset);
+        if (it.Valid() == false) {
+          break;
+        }
+
+        if (it.value()->type() != TableType::kSparse) {
+          // Jump to next SparseTable.
+          table_id_offset = it.key() + 1;
+          slot_id_offset = 0;
+          sparse_id_offset = 0;
+
+          continue;
+        }
+
+        // Hit a new SparseTable update.
+        if (table_id_offset != it.key()) {
+          table_id_offset = it.key();
+          slot_id_offset = 0;
+          sparse_id_offset = 0;
+        }
+
+        SparseTable* table = (SparseTable*)it.value().get();
+        auto* parallel_vals = table->vals();
+
+        // Jump to next SparseTable.
+        if (slot_id_offset >= parallel_vals->slot_count()) {
+          table_id_offset = it.key() + 1;
+          slot_id_offset = 0;
+          sparse_id_offset = 0;
+
+          continue;
+        }
+
+        // Store the real table id.
+        table_id = it.key();
+
+        auto h = parallel_vals->SharedSkipListHandler(slot_id_offset);
+        auto sit = h.skip_list.FindGreaterOrEqual(sparse_id_offset);
+
+        while (sparse_ids.size() < step && sit.Valid()) {
+          if (router.Hit(utils::Hash(it.key(), sit.key())) == target_id) {
+            sparse_ids.emplace_back(sit.key());
+            sparse_vals.emplace_back(sit.value());
+          }
+
+          sit.Next();
+        }
+
+        if (sit.Valid() == false) {
+          slot_id_offset++;
+          sparse_id_offset = 0;
+        } else {
+          sparse_id_offset = sit.key();
+        }
+      }
+
+      if (sparse_ids.empty() == false) {
+        RPC_CALL(transfer.TransferSparseValues(node_id, table_id, sparse_ids,
+                                               sparse_vals));
+
+        LOG_INFO("Transfer SparseValues of SparseTable:["
+                 << table_id << "] to node:[" << target_id << "], count:["
+                 << sparse_ids.size() << "]");
+      }
+    }
+  }
+
+  LOG_INFO("Finish transfer data to node:[" << target_id << "]");
+
+  // Clean the data that not belong to this Node.
+  Clean();
+
+  // Notify the target node that we already finish trasfer.
+  RPC_CALL(transfer.NotifyFinishTransfer(node_id));
+
+  std::unique_lock<std::shared_mutex> _(mu_);
+  status_ = status_ & (~NodeStatus::kTransfer);
+
+  LOG_INFO("Finish transfer/clean, status become:[" << NodeStatusStr(status_)
+                                                    << "]");
+}
+
+void Ps::Start() {
+  // The Ps start.
+  // 1: Connect to scheduler.
+  // 2: Get old_router and new_router. Status become: kWork & kProxy.
+  // 3: Response/Proxy worker request.
+  // 4: Wait Proxy Node finish transfer data. Status become to: kWork.
+
+  // Try to join the Cluster. Maybe join fail (a node is join/leave will
+  // let other node join fail).
+  // We have to lock the mutex avoid some other thread change the status.
+  std::unique_lock<std::shared_mutex> lock(mu_);
+
+  // Connect to scheduler.
+  LOG_INFO("Try connect to scheduler:[" << s_addr_ << "]");
+  IndepConnecter s_connecter(s_addr_, CompressType::kNo);
+  s_connecter.Start();
+
+  bool allow = false;
+  int64_t sleep_s = 10;
+  do {
+    LOG_INFO("Try to join in cluster.");
+
+    TryJoinRequest req;
+    req.addr = addr_;
+    TryJoinResponse reply;
+
+    RPC_CALL(s_connecter.Call(RPCFuncType::kTryJoinType, req, &reply));
+
+    allow = reply.allow;
+
+    if (allow) {
+      node_id_ = reply.node_id;
+      old_router_ = reply.old_router;
+      router_ = reply.new_router;
+    } else {
+      LOG_INFO("Joint fail will sleep:" << sleep_s << "s");
+
+      // Sleep.
+      std::this_thread::sleep_for(std::chrono::seconds(sleep_s));
+      sleep_s += sleep_s / 2;
+    }
+  } while (allow == false);
+
+  LOG_INFO("Join cluster success.");
+  LOG_INFO("Old router:" << old_router_.Str());
+  LOG_INFO("New router:" << router_.Str());
+
+  // Fetch ModelMetaData and init model.
+  {
+    FetchModelMetaDataRequest req;
+    FetchModelMetaDataResponse reply;
+
+    RPC_CALL(
+        s_connecter.Call(RPCFuncType::kFetchModelMetaDataType, req, &reply));
+
+    if (reply.model_init) {
+      // Init the model.
+      std::unique_lock<std::shared_mutex> _(model_mu_);
+
+      optim_ = Optim::Create(reply.model_mdata.optim_type,
+                             reply.model_mdata.optim_conf);
+      ARGUMENT_CHECK(optim_ != nullptr, "Unsupport Optim type.");
+
+      model_name_ = reply.model_mdata.name;
+      model_init_ = true;
+
+      LOG_INFO("Init Model, optim_type:"
+               << (uint32_t)reply.model_mdata.optim_type
+               << ", optim conf:" << reply.model_mdata.optim_conf);
+    } else {
+      LOG_INFO("Model not initialized.")
+    }
+  }
+
+  // For now This node has been join the cluster success.
+  // So this node will proxy the new request and wait other Node finish transfer
+  // data.
+  if (router_.nodes().size() == 1) {
+    // means this is the first node in this cluster.
+    // So we donot need to create proxy.
+    status_ = NodeStatus::kWork;
+
+    LOG_INFO("I'm the first node, status:[" << NodeStatusStr(status_) << "]");
+  } else {
+    Router::Node cur_node;
+    ARGUMENT_CHECK(router_.node(node_id_, &cur_node),
+                   "Router not include node:" << node_id_);
+
+    // Try to create proxy.
+    std::unordered_set<uint64_t> proxy_ids;
+    for (auto hash : cur_node.vnode_list) {
+      uint64_t hit_node_id = old_router_.Hit(hash);
+      if (hit_node_id != node_id_) {
+        proxy_ids.emplace(hit_node_id);
+      }
+    }
+
+    proxy_.reset(new Proxy(proxy_ids, old_router_, CompressType::kSnappy));
+
+    // Store event wait proxy node finish transfer.
+    events_[EventType::kProxyFinishTransfer] = proxy_ids;
+
+    status_ = NodeStatus::kWork | NodeStatus::kProxy;
+
+    LOG_INFO("Will proxy nodes:" << proxy_ids << ", status:["
+                                 << NodeStatusStr(status_) << "]");
+  }
+
+  s_connecter.Stop();
+  LOG_INFO("Disconnect from scheduler.");
+}
+
+int32_t Ps::Heartbeat(uint32_t* status) {
+  std::shared_lock<std::shared_mutex> _(mu_);
+
+  *status = status_;
 
   return ErrorCode::kSuccess;
 }
 
-int32_t Ps::RegisterModel(
-    uint64_t id, const std::string& name, OptimType optim_type,
+int32_t Ps::NotifyFinishTransfer(uint64_t node_id) {
+  std::unique_lock<std::shared_mutex> _(mu_);
+
+  LOG_INFO("Got notificaion from node:[" << node_id << "] finish transfer.");
+
+  if (!(status_ & NodeStatus::kProxy)) {
+    return ErrorCode::kNodeStatusError;
+  }
+
+  if (events_.find(EventType::kProxyFinishTransfer) == events_.end()) {
+    return ErrorCode::kUnSupportEventError;
+  }
+
+  if (events_[EventType::kProxyFinishTransfer].find(node_id) ==
+      events_[EventType::kProxyFinishTransfer].end()) {
+    return ErrorCode::kUnSupportEventError;
+  }
+
+  events_[EventType::kProxyFinishTransfer].erase(node_id);
+
+  if (events_[EventType::kProxyFinishTransfer].empty()) {
+    events_.erase(EventType::kProxyFinishTransfer);
+
+    // Change status.
+    proxy_.reset();
+    status_ = status_ & (~NodeStatus::kProxy);
+
+    LOG_INFO("All node finish transfer data, stop proxy, status become:["
+             << NodeStatusStr(status_) << "]");
+  }
+
+  return ErrorCode::kSuccess;
+}
+
+int32_t Ps::NotifyNodeJoin(uint64_t joined_id, const Router& old_router,
+                           const Router& new_router) {
+  std::unique_lock<std::shared_mutex> _(mu_);
+
+  // A node is allowed to join must need all node status is kWork.
+  if (status_ != NodeStatus::kWork) {
+    LOG_INFO("Status is not kWork, So not allowed join new node.");
+    return ErrorCode::kNodeStatusError;
+  }
+
+  LOG_INFO("Got notification: node:" << joined_id
+                                     << " join in, status:" << status_);
+  LOG_INFO("Old router:" << old_router.Str());
+  LOG_INFO("New router:" << new_router.Str());
+
+  ARGUMENT_CHECK(old_router == router_, "The router is error!");
+
+  old_router_ = old_router;
+  router_ = new_router;
+
+  Router::Node node;
+  Router::Node target_node;
+
+  ARGUMENT_CHECK(router_.node(node_id_, &node),
+                 "Cannot find node:" << node_id_);
+  ARGUMENT_CHECK(router_.node(joined_id, &target_node),
+                 "Cannot find node:" << joined_id);
+
+  // Check whether we need transfer the data to the new node or not.
+  bool need_transfer = false;
+  for (auto h : target_node.vnode_list) {
+    if (node_id_ == old_router_.Hit(h)) {
+      need_transfer = true;
+      break;
+    }
+  }
+
+  if (need_transfer) {
+    // Modify status.
+    status_ = NodeStatus::kWork | NodeStatus::kTransfer;
+
+    // Async task to transfer data.
+    auto task = [this, joined_id] { this->Transfer(joined_id); };
+
+    task_que_.Enque(std::move(task));
+
+    LOG_INFO("Affect me will transfer data to node:["
+             << joined_id << "], status:[" << NodeStatusStr(status_) << "]");
+  } else {
+    LOG_INFO("New node not affect me, status:[" << NodeStatusStr(status_)
+                                                << "]");
+  }
+
+  return ErrorCode::kSuccess;
+}
+
+int32_t Ps::CreateModel(
+    std::string name, OptimType optim_type,
     const std::unordered_map<std::string, std::string>& optim_conf) {
-  std::unique_lock<std::shared_mutex> lock(mu_);
-
-  // Try to insert ModelInfo.
-  {
-    auto it = model_infos_.find(id);
-    if (it == model_infos_.end()) {
-      ModelInfo model_info;
-      model_info.id = id;
-      model_info.name = name;
-      model_info.optim_type = optim_type;
-      model_info.optim_conf = optim_conf;
-
-      model_infos_.emplace(id, std::move(model_info));
-
-      LOG_INFO("Register ModelInfo:" << name << ", id" << id
-                                     << ", OptimType:" << (int32_t)optim_type
-                                     << ", OptimConf:" << optim_conf);
-    } else {
-      LOG_INFO("Register ModelInfo:"
-               << name << ", OptimType:" << (int32_t)optim_type
-               << ", OptimConf:" << optim_conf << ", already exist, id:" << id);
-    }
+  // Check status.
+  std::shared_lock<std::shared_mutex> l(mu_);
+  if (!(status_ & NodeStatus::kWork)) {
+    return ErrorCode::kNodeStatusError;
   }
 
-  {
-    auto it = models_.find(id);
-    if (it == models_.end()) {
-      std::unique_ptr<Optim> optim = Optim::Create(optim_type, optim_conf);
-      if (optim == nullptr) {
-        return ErrorCode::kUnSupportOptimTypeError;
-      }
+  std::unique_lock<std::shared_mutex> ll(model_mu_);
 
-      std::unique_ptr<Model> model(new Model(id, name, std::move(optim)));
-      models_.emplace(id, std::move(model));
-
-      LOG_INFO("Register model:" << name << ", id:" << id
-                                 << ", OptimType:" << (int32_t)optim_type
-                                 << ", OptimConf:" << optim_conf);
-    } else {
-      LOG_INFO("Registerd model:"
-               << name << ", OptimType:" << (int32_t)optim_type
-               << ", OptimConf:" << optim_conf << ", already exist, id:" << id);
-    }
-  }
-
-  return ErrorCode::kSuccess;
-}
-
-int32_t Ps::RegisterDenseTableInfo(uint64_t model_id, uint64_t id,
-                                   const std::string& name, const Shape& shape,
-                                   ElementType element_type) {
-  std::unique_lock<std::shared_mutex> lock(mu_);
-
-  auto it = model_infos_.find(model_id);
-  if (it == model_infos_.end()) {
-    return ErrorCode::kUnRegisterModelError;
-  }
-
-  auto& model_info = it->second;
-
-  auto tit = model_info.table_infos.find(id);
-  if (tit != model_info.table_infos.end()) {
-    if (model_info.table_infos[id].name != name ||
-        model_info.table_infos[id].table_type != TableType::kDense ||
-        model_info.table_infos[id].shape != shape ||
-        model_info.table_infos[id].element_type != element_type) {
-      return ErrorCode::kDenseTableUnCompatibleError;
-    }
-
-    LOG_INFO("Register DenseTableInfo:"
-             << name << ", shape:" << shape.Str() << ", ElementType"
-             << element_type.Name() << ", already exist, id:" << id);
-
+  if (model_init_) {
+    // (TODO) check model config.
+    LOG_INFO("Model:" << model_name_ << " already initied!");
     return ErrorCode::kSuccess;
   }
 
-  TableInfo table_info;
-  table_info.id = id;
-  table_info.name = name;
-  table_info.table_type = TableType::kDense;
-  table_info.element_type = element_type;
-  table_info.shape = shape;
+  optim_ = Optim::Create(optim_type, optim_conf);
+  if (optim_ == nullptr) {
+    return ErrorCode::kUnSupportOptimTypeError;
+  }
 
-  model_info.table_infos.emplace(id, std::move(table_info));
+  model_name_ = name;
+  model_init_ = true;
 
-  LOG_INFO("Register DenseTableInfo:"
-           << name << ", id:" << id << ", shape:" << shape.Str()
-           << ", ElementType:" << element_type.Name());
+  LOG_INFO("Create model:" << name << ", optim_type:" << optim_type
+                           << ", optim_conf:" << optim_conf);
 
   return ErrorCode::kSuccess;
 }
 
-int32_t Ps::RegisterDenseTable(uint64_t model_id, uint64_t id,
-                               const std::string& name, const Tensor& var) {
-  std::shared_lock<std::shared_mutex> lock(mu_);
-
-  auto it = models_.find(model_id);
-  if (it == models_.end()) {
-    return ErrorCode::kUnRegisterModelError;
+int32_t Ps::CreateDenseTable(uint64_t table_id, std::string name,
+                             const Tensor& val) {
+  std::shared_lock<std::shared_mutex> l(mu_);
+  if (!(status_ & NodeStatus::kWork)) {
+    return ErrorCode::kNodeStatusError;
   }
 
-  return it->second->RegisterDenseTable(id, name, var);
+  std::unique_lock<std::shared_mutex> ll(model_mu_);
+
+  auto it = tables_.Find(table_id);
+  if (it.Valid()) {
+    // (TODO) check DenseTabel conf.
+    LOG_INFO("DenseTable:" << name << " already created!");
+    return ErrorCode::kSuccess;
+  }
+
+  std::unique_ptr<DenseTable> table(new DenseTable(table_id, name, val));
+
+  tables_.Insert(table_id, std::move(table));
+
+  LOG_INFO("Create DenseTable:["
+           << name << "], id:[" << table_id << "], ElementType:["
+           << val.element_type().Name() << "], shape:[" << val.shape().Str()
+           << "]");
+
+  return ErrorCode::kSuccess;
 }
 
-int32_t Ps::RegisterSparseTable(
-    uint64_t model_id, uint64_t id, const std::string& name, int64_t dimension,
+int32_t Ps::CreateSparseTable(
+    uint64_t table_id, std::string name, int64_t dimension,
     ElementType element_type, InitializerType init_type,
     const std::unordered_map<std::string, std::string>& init_conf) {
-  std::shared_lock<std::shared_mutex> lock(mu_);
-
-  {
-    // Insert TableInfo.
-    auto it = model_infos_.find(model_id);
-    if (it == model_infos_.end()) {
-      return ErrorCode::kUnRegisterModelError;
-    }
-
-    auto& model_info = it->second;
-
-    auto tit = model_info.table_infos.find(id);
-    if (tit != model_info.table_infos.end()) {
-      if (model_info.table_infos[id].name != name ||
-          model_info.table_infos[id].table_type != TableType::kSparse ||
-          model_info.table_infos[id].element_type != element_type ||
-          model_info.table_infos[id].dimension != dimension ||
-          model_info.table_infos[id].init_type != init_type) {
-        return ErrorCode::kSparseTableUnCompatibleError;
-      }
-
-      LOG_INFO("Register SparseTableInfo:"
-               << name << ", dimension:" << dimension << ", ElementType:"
-               << element_type.Name() << ", InitType:" << (int32_t)init_type
-               << ", InitConf:" << init_conf << ", already exist, id:" << id);
-
-    } else {
-      TableInfo table_info;
-      table_info.id = id;
-      table_info.name = name;
-      table_info.table_type = TableType::kSparse;
-      table_info.element_type = element_type;
-      table_info.dimension = dimension;
-      table_info.init_type = init_type;
-      table_info.init_conf = init_conf;
-
-      model_info.table_infos.emplace(id, std::move(table_info));
-
-      LOG_INFO("Apply SparseTableInfo:"
-               << name << ", id:" << id << ", dimension:" << dimension
-               << ", ElementType:" << element_type.Name() << ", InitType:"
-               << (int32_t)init_type << ", InitConf:" << init_conf);
-    }
+  std::shared_lock<std::shared_mutex> l(mu_);
+  if (!(status_ & NodeStatus::kWork)) {
+    return ErrorCode::kNodeStatusError;
   }
 
-  {
-    // Insert SparseTable.
-    std::unique_ptr<Initializer> initializer =
-        Initializer::Create(init_type, init_conf);
+  std::unique_lock<std::shared_mutex> ll(model_mu_);
 
-    if (initializer == nullptr) {
-      return ErrorCode::kUnSupportInitializerTypeError;
+  if (dimension <= 0) {
+    return ErrorCode::kSparseDimensionError;
+  }
+
+  auto it = tables_.Find(table_id);
+  if (it.Valid()) {
+    // (TODO) check SparseTable conf.
+    LOG_INFO("SparseTable:" << name << " already created!");
+    return ErrorCode::kSuccess;
+  }
+
+  std::unique_ptr<Initializer> initializer =
+      Initializer::Create(init_type, init_conf);
+  if (initializer == nullptr) {
+    return ErrorCode::kUnSupportInitializerTypeError;
+  }
+
+  std::unique_ptr<SparseTable> table(new SparseTable(
+      table_id, name, dimension, element_type, std::move(initializer)));
+
+  tables_.Insert(table_id, std::move(table));
+
+  LOG_INFO("Create SparseTable:["
+           << name << "], id:[" << table_id << "], dimension:[" << dimension
+           << "], ElementType:[" << element_type.Name() << "], init_type:["
+           << init_type << "], init_conf:[" << init_conf << "]");
+
+  return ErrorCode::kSuccess;
+}
+
+int32_t Ps::TransferDenseTable(uint64_t from_node_id, uint64_t table_id,
+                               const std::string& name, const Value& value) {
+  std::shared_lock<std::shared_mutex> l(mu_);
+  if (status_ != (NodeStatus::kWork | NodeStatus::kProxy)) {
+    return ErrorCode::kNodeStatusError;
+  }
+
+  std::unique_lock<std::shared_mutex> ll(model_mu_);
+
+  // If exist just return success.
+  if (tables_.Contains(table_id)) {
+    LOG_INFO("Transfered DenseTable:" << table_id << " from node:"
+                                      << from_node_id << " already exist!");
+    return ErrorCode::kSuccess;
+  }
+
+  std::unique_ptr<DenseTable> table(new DenseTable(table_id, name, value));
+  tables_.Insert(table_id, std::move(table));
+
+  LOG_INFO("Get Transfered DenseTable:[" << table_id << "] from node:["
+                                         << from_node_id << "]");
+
+  return ErrorCode::kSuccess;
+}
+
+int32_t Ps::TransferSparseMetaData(
+    uint64_t from_node_id, uint64_t table_id, std::string name,
+    int64_t dimension, ElementType element_type, InitializerType init_type,
+    const std::unordered_map<std::string, std::string>& init_conf) {
+  std::shared_lock<std::shared_mutex> l(mu_);
+  if (status_ != (NodeStatus::kWork | NodeStatus::kProxy)) {
+    return ErrorCode::kNodeStatusError;
+  }
+
+  std::unique_lock<std::shared_mutex> ll(model_mu_);
+
+  // If exist just return success.
+  if (tables_.Contains(table_id)) {
+    return ErrorCode::kSuccess;
+  }
+
+  if (dimension <= 0) {
+    return ErrorCode::kSparseDimensionError;
+  }
+
+  std::unique_ptr<Initializer> initializer =
+      Initializer::Create(init_type, init_conf);
+  if (initializer == nullptr) {
+    return ErrorCode::kUnSupportInitializerTypeError;
+  }
+
+  std::unique_ptr<SparseTable> table(new SparseTable(
+      table_id, name, dimension, element_type, std::move(initializer)));
+
+  tables_.Insert(table_id, std::move(table));
+
+  LOG_INFO("Get Transfered SparseTableMetaData:[" << table_id << "] from node:["
+                                                  << from_node_id << "]");
+
+  return ErrorCode::kSuccess;
+}
+
+int32_t Ps::TransferSparseValues(uint64_t from_node_id, uint64_t table_id,
+                                 const std::vector<uint64_t>& sparse_ids,
+                                 const std::vector<Value>& values) {
+  assert(sparse_ids.size() == values.size());
+
+  std::shared_lock<std::shared_mutex> l(mu_);
+  if (status_ != (NodeStatus::kWork | NodeStatus::kProxy)) {
+    return ErrorCode::kNodeStatusError;
+  }
+
+  std::shared_lock<std::shared_mutex> ll(model_mu_);
+
+  auto it = tables_.Find(table_id);
+  if (it.Valid() == false || it.value()->type() != TableType::kSparse) {
+    return ErrorCode::kTableNotExistError;
+  }
+
+  SparseTable* table = (SparseTable*)it.value().get();
+  table->vals()->Insert(sparse_ids, values);
+
+  LOG_INFO("Get Transfered SparseValues of SparseTable:["
+           << table_id << "], count:[" << sparse_ids.size() << "], from node:["
+           << from_node_id << "]");
+
+  return ErrorCode::kSuccess;
+}
+
+int32_t Ps::TryFetchDenseTable(uint64_t table_id, std::string* name,
+                               Value* value) {
+  std::shared_lock<std::shared_mutex> ll(model_mu_);
+
+  auto it = tables_.Find(table_id);
+  if (it.Valid() == false || it.value()->type() != TableType::kDense) {
+    return ErrorCode::kTableNotExistError;
+  }
+
+  DenseTable* table = (DenseTable*)it.value().get();
+
+  auto h = table->shared_handler();
+
+  *name = table->name();
+  *value = table->val().Clone();  // must clone
+
+  return ErrorCode::kSuccess;
+}
+
+int32_t Ps::TryCombineFetchDenseTable(const std::vector<uint64_t>& table_ids,
+                                      std::vector<uint64_t>* exist_table_ids,
+                                      std::vector<std::string>* names,
+                                      std::vector<Value>* values) {
+  std::shared_lock<std::shared_mutex> ll(model_mu_);
+
+  size_t count = table_ids.size();
+
+  exist_table_ids->reserve(count);
+  names->reserve(count);
+  values->reserve(count);
+
+  for (size_t i = 0; i < count; ++i) {
+    auto it = tables_.Find(table_ids[i]);
+    if (it.Valid() == false || it.value()->type() != TableType::kDense) {
+      continue;
     }
 
-    auto it = models_.find(model_id);
-    if (it == models_.end()) {
-      return ErrorCode::kUnRegisterModelError;
-    }
+    DenseTable* table = (DenseTable*)it.value().get();
 
-    auto ecode = it->second->RegisterSparseTable(
-        id, name, dimension, element_type, std::move(initializer));
+    auto h = table->shared_handler();
 
-    if (ecode != ErrorCode::kSuccess) {
-      return ecode;
-    }
+    exist_table_ids->emplace_back(table_ids[i]);
+    names->emplace_back(table->name());
+    values->emplace_back(table->val().Clone());  // must clone
   }
 
   return ErrorCode::kSuccess;
 }
 
-int32_t Ps::PullDenseTable(uint64_t model_id, uint64_t table_id, Tensor* val) {
-  std::shared_lock<std::shared_mutex> lock(mu_);
+int32_t Ps::TryFetchSparseMetaData(
+    uint64_t table_id, std::string* name, int64_t* dimension,
+    ElementType* element_type, InitializerType* init_type,
+    std::unordered_map<std::string, std::string>* init_conf) {
+  std::shared_lock<std::shared_mutex> ll(model_mu_);
 
-  auto it = models_.find(model_id);
-  if (it == models_.end()) {
-    return ErrorCode::kUnRegisterModelError;
+  auto it = tables_.Find(table_id);
+  if (it.Valid() == false || it.value()->type() != TableType::kSparse) {
+    return ErrorCode::kTableNotExistError;
   }
 
-  return it->second->PullDenseTable(table_id, val);
+  SparseTable* table = (SparseTable*)it.value().get();
+
+  *name = table->name();
+  *dimension = table->dimension();
+  *element_type = table->element_type();
+  *init_type = table->initializer()->type();
+  *init_conf = table->initializer()->conf();
+
+  return ErrorCode::kSuccess;
 }
 
-int32_t Ps::CombinePullDenseTable(uint64_t model_id,
-                                  const std::vector<uint64_t>& table_ids,
-                                  std::vector<Tensor>* vals) {
-  std::shared_lock<std::shared_mutex> lock(mu_);
+int32_t Ps::TryFetchSparseValues(uint64_t table_id,
+                                 const std::vector<uint64_t>& sparse_ids,
+                                 std::vector<uint64_t>* exist_sparse_ids,
+                                 std::vector<Value>* values) {
+  std::shared_lock<std::shared_mutex> ll(model_mu_);
 
-  auto it = models_.find(model_id);
-  if (it == models_.end()) {
-    return ErrorCode::kUnRegisterModelError;
+  auto it = tables_.Find(table_id);
+  if (it.Valid() == false || it.value()->type() != TableType::kSparse) {
+    return ErrorCode::kTableNotExistError;
   }
 
-  return it->second->CombinePullDenseTable(table_ids, vals);
-}
+  SparseTable* table = (SparseTable*)it.value().get();
 
-int32_t Ps::PushPullDenseTable(uint64_t model_id, uint64_t table_id,
-                               const Tensor& grad, float lr, Tensor* val) {
-  std::shared_lock<std::shared_mutex> lock(mu_);
+  exist_sparse_ids->reserve(sparse_ids.size());
+  values->reserve(sparse_ids.size());
 
-  auto it = models_.find(model_id);
-  if (it == models_.end()) {
-    return ErrorCode::kUnRegisterModelError;
+  auto* parallel_vals = table->vals();
+
+  std::unordered_map<size_t, std::vector<size_t>> slot_idx_map;
+  slot_idx_map.reserve(parallel_vals->slot_count());
+
+  for (size_t i = 0; i < sparse_ids.size(); ++i) {
+    slot_idx_map[parallel_vals->HitSlot(sparse_ids[i])].emplace_back(
+        sparse_ids[i]);
   }
 
-  return it->second->PushPullDenseTable(table_id, grad, lr, val);
-}
+  for (auto& [slot, v] : slot_idx_map) {
+    // Lock the slot.
+    auto h = parallel_vals->UniqueSkipListHandler(slot);
 
-int32_t Ps::PushDenseTable(uint64_t model_id, uint64_t table_id,
-                           const Tensor& grad, float lr) {
-  std::shared_lock<std::shared_mutex> lock(mu_);
+    for (auto sparse_id : v) {
+      auto it = h.skip_list.Find(sparse_id);
 
-  auto it = models_.find(model_id);
-  if (it == models_.end()) {
-    return ErrorCode::kUnRegisterModelError;
-  }
-
-  return it->second->PushDenseTable(table_id, grad, lr);
-}
-
-int32_t Ps::PullSparseTable(uint64_t model_id, uint64_t table_id,
-                            const std::vector<uint64_t>& indices,
-                            std::vector<Tensor>* vals) {
-  std::shared_lock<std::shared_mutex> lock(mu_);
-
-  auto it = models_.find(model_id);
-  if (it == models_.end()) {
-    return ErrorCode::kUnRegisterModelError;
-  }
-
-  return it->second->PullSparseTable(table_id, indices, vals);
-}
-
-int32_t Ps::CombinePullSparseTable(
-    uint64_t model_id,
-    const std::unordered_map<uint64_t, std::vector<uint64_t>>& indices,
-    std::unordered_map<uint64_t, std::vector<Tensor>>* vals) {
-  std::shared_lock<std::shared_mutex> lock(mu_);
-
-  auto it = models_.find(model_id);
-  if (it == models_.end()) {
-    return ErrorCode::kUnRegisterModelError;
-  }
-
-  return it->second->CombinePullSparseTable(indices, vals);
-}
-
-int32_t Ps::PushSparseTable(uint64_t model_id, uint64_t table_id,
-                            const std::vector<uint64_t>& indices,
-                            const std::vector<Tensor>& grads, float lr) {
-  std::shared_lock<std::shared_mutex> lock(mu_);
-
-  auto it = models_.find(model_id);
-  if (it == models_.end()) {
-    return ErrorCode::kUnRegisterModelError;
-  }
-
-  return it->second->PushSparseTable(table_id, indices, grads, lr);
-}
-
-int32_t Ps::SaveCheckPoint(uint64_t model_id) {
-  auto done = [](uint64_t model_id, bool success) {
-    if (success == false) {
-      LOG_ERROR("Save check point for model:" << model_id << " error!");
+      if (it.Valid()) {
+        exist_sparse_ids->emplace_back(sparse_id);
+        values->emplace_back(it.value().Clone());
+      }
     }
-  };
-
-  // use sub-thread to save check point.
-  checkpoint_executor_.Save(this, model_id, std::move(done));
+  }
 
   return ErrorCode::kSuccess;
 }

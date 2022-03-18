@@ -10,14 +10,12 @@
 namespace kraken {
 namespace py {
 
-void Initialize(const std::string& addrs, EmitterType emitter_type,
-                CompressType compress_type, uint64_t life_span, float eta);
+void Initialize(const std::string& s_addr);
 
 void Stop();
 
-uint64_t RegisterModel(
-    const std::string& model_name, OptimType optim_type,
-    const std::unordered_map<std::string, std::string>& optim_conf);
+void InitModel(const std::string& model_name, OptimType optim_type,
+               const std::unordered_map<std::string, std::string>& optim_conf);
 
 void UpdateLR(float lr);
 
@@ -35,8 +33,6 @@ std::vector<torch::Tensor> CombinePullDenseTable(
 
 void PushDenseTable(uint64_t table_id, torch::Tensor grad);
 
-torch::Tensor PushPullDenseTable(uint64_t table_id, torch::Tensor grad);
-
 torch::Tensor PullSparseTable(uint64_t table_id, torch::Tensor indices);
 
 std::vector<torch::Tensor> CombinePullSparseTable(
@@ -44,9 +40,11 @@ std::vector<torch::Tensor> CombinePullSparseTable(
     const std::vector<torch::Tensor>& indices);
 
 void PushSparseTable(uint64_t table_id, torch::Tensor indices,
-                     torch::Tensor grads);
+                     torch::Tensor grad);
 
-void SaveCheckPoint();
+void CombinePushSparseTable(const std::vector<uint64_t>& table_ids,
+                            const std::vector<torch::Tensor>& indices,
+                            const std::vector<torch::Tensor>& grads);
 
 }  // namespace py
 }  // namespace kraken

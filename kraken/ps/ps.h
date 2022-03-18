@@ -1,247 +1,201 @@
 #pragma once
 
+#include <atomic>
 #include <memory>
+#include <mutex>
 #include <shared_mutex>
-#include <unordered_map>
 
-#include "io/checkpoint.h"
-#include "io/checkpoint_executor.h"
-#include "ps/info.h"
-#include "ps/model.h"
+#include "common/async_task_queue.h"
+#include "common/info.h"
+#include "common/router.h"
+#include "common/skip_list.h"
+#include "protocol/combine_push_sparse_table_prot.h"
 #include "ps/optim/optim.h"
+#include "ps/proxy.h"
+#include "ps/table.h"
 
 namespace kraken {
 
 class Ps {
-  friend class io::CheckpointExecutor;
-  friend class io::Checkpoint;
-
 private:
-  size_t shard_num_;
-  size_t shard_id_;
+  enum class EventType : uint8_t {
+    kProxyFinishTransfer = 0,
+  };
 
-  // protect model_infos_/models_.
+  AsyncTaskQueue task_que_;
+
+  // Current node address.
+  std::string addr_;
+  std::string s_addr_;
+
+  // Protect status_/node_id_/events_/old_router_/router_/proxy_.
   std::shared_mutex mu_;
 
-  // model_infos_ contains the whole model information.
-  std::unordered_map<uint64_t, ModelInfo> model_infos_;
+  // The node Status.
+  uint32_t status_;
+  uint64_t node_id_;
 
-  // models_ include the whole SparseTable and part of DenseTable.
-  std::unordered_map<uint64_t, std::unique_ptr<Model>> models_;
+  Router old_router_;
+  Router router_;
 
-  // save Checkpoint.
-  io::CheckpointExecutor checkpoint_executor_;
+  std::unique_ptr<Proxy> proxy_;
+
+  // Store the event.
+  std::unordered_map<EventType, std::unordered_set<uint64_t>> events_;
+
+  std::shared_mutex model_mu_;
+  bool model_init_;
+  std::string model_name_;
+  std::unique_ptr<Optim> optim_;
+  SkipList<uint64_t, std::unique_ptr<Table>> tables_;
 
 public:
-  Ps(size_t shard_num, size_t shard_id, const std::string& save_dir,
-     size_t max_save_count);
+  Ps(const std::string& addr, const std::string& s_addr);
+
+  ~Ps() = default;
+
+private:
+  inline const char* NodeStatusStr(uint32_t status) const {
+    if (status == NodeStatus::kInit) {
+      return "kInit";
+    } else if (status == NodeStatus::kWork) {
+      return "kWork";
+    } else if (status == (NodeStatus::kWork | NodeStatus::kProxy)) {
+      return "kWork&kProxy";
+    } else if (status == (NodeStatus::kWork | NodeStatus::kTransfer)) {
+      return "kWork&kTransfer";
+    } else {
+      return "unKnow";
+    }
+  }
+
+  // Clean tables_ the not belong to this node.
+  void Clean();
+
+  // Transfer data to new node.
+  void Transfer(uint64_t target_id);
+
+  // Call this function must make sure the status is kWorker | kProxy.
+  void TryFetchDenseTableFromProxy(uint64_t table_id);
+
+  void TryCombineFetchDenseTableFromProxy(
+      const std::vector<uint64_t>& table_ids);
+
+  void TryFetchSparseMetaDataFromProxy(uint64_t table_id);
+
+  void TryFetchSparseValuesFromProxy(uint64_t table_id,
+                                     const std::vector<uint64_t>& sparse_ids);
 
 public:
-  size_t shard_num() const;
+  void Start();
 
-  size_t shard_id() const;
+  // Call by scheduler.
+  int32_t Heartbeat(uint32_t* status);
 
-  void Load(const std::string& load_dir);
+  // Call by other Ps node.
+  // Notify this PS other Ps has finish transfer data.
+  int32_t NotifyFinishTransfer(uint64_t node_id);
 
-  void Stop();
+  // Call by scheduler.
+  // Notify this Node that there is a new Node joined.
+  int32_t NotifyNodeJoin(uint64_t joined_id, const Router& old_router,
+                         const Router& new_router);
 
-  /**
-   * \brief Apply a model will return a unique model id.
-   * Will insert modelinfo to model_infos_.
-   *
-   * \param name Model name.
-   * \param optim_type Optim type.
-   * \param optim_conf Optim config.
-   * \param model_id Returned model id.
-   * \return int32_t ErrorCode.
-   */
-  int32_t ApplyModel(
-      const std::string& name, OptimType optim_type,
-      const std::unordered_map<std::string, std::string>& optim_conf,
-      uint64_t* model_id);
-
-  /**
-   * \brief Apply DenseTable
-   *
-   * \param model_id Model id.
-   * \param name Table name.
-   * \param shape Table shape.
-   * \param element_type ElementType.
-   * \param table_id Returned table id.
-   * \return int32_t ErrorCode.
-   */
-  int32_t ApplyDenseTable(uint64_t model_id, const std::string& name,
-                          const Shape& shape, ElementType element_type,
-                          uint64_t* table_id);
-
-  /**
-   * \brief Apply SparseTable.
-   *
-   * \param model_id Model id.
-   * \param name Table name.
-   * \param dimension Dimension.
-   * \param element_type ElementType.
-   * \param init_type Initialzie type.
-   * \param init_conf Initialize config.
-   * \param table_id Table id.
-   * \return int32_t ErrorCode.
-   */
-  int32_t ApplySparseTable(
-      uint64_t model_id, const std::string& name, int64_t dimension,
-      ElementType element_type, InitializerType init_type,
-      const std::unordered_map<std::string, std::string>& init_conf,
-      uint64_t* table_id);
-
-  /**
-   * \brief Register a model.
-   *
-   * \param name The model name.
-   * \param id Model id.
-   * \param optim_type Optim type.
-   * \param optim_conf Optim config.
-   * \return int32_t Error code.
-   */
-  int32_t RegisterModel(
-      uint64_t id, const std::string& name, OptimType optim_type,
+  // Call by other Scheduler.
+  int32_t CreateModel(
+      std::string name, OptimType optim_type,
       const std::unordered_map<std::string, std::string>& optim_conf);
 
-  /**
-   * \brief Register the DenseTable Info. every server will store all denstable info.
-   *
-   * \param model_id Model id.
-   * \param id Table id.
-   * \param name Table name.
-   * \param shape Table shape.
-   * \param element_type Element type.
-   * \return int32_t ErrorCode.
-   */
-  int32_t RegisterDenseTableInfo(uint64_t model_id, uint64_t id,
-                                 const std::string& name, const Shape& shape,
-                                 ElementType element_type);
+  // Call by other Scheduler.
+  int32_t CreateDenseTable(uint64_t table_id, std::string name,
+                           const Tensor& val);
 
-  /**
-   * \brief Register a DenseTabel for special model.
-   *
-   * \param model_id Model id.
-   * \param id Table id.
-   * \param name Table name.
-   * \param var Table value.
-   * \return int32_t Error code.
-   */
-  int32_t RegisterDenseTable(uint64_t model_id, uint64_t id,
-                             const std::string& name, const Tensor& var);
+  // Call by other Scheduler.
+  int32_t CreateSparseTable(
+      uint64_t table_id, std::string name, int64_t dimension,
+      ElementType element_type, InitializerType init_type,
+      const std::unordered_map<std::string, std::string>& init_conf);
 
-  /**
-   * \brief Register a sparse table.
-   *
-   * \param model_id Which model will be register.
-   * \param id Table id.
-   * \param name Table name.
-   * \param dimension Sparse tensor dimension.
-   * \param etype Sparse tensor element type.
-   * \param init_type Initialize type.
-   * \param init_conf Initialize config.
-   * \return int32_t Error code.
-   */
-  int32_t RegisterSparseTable(
-      uint64_t model_id, uint64_t id, const std::string& name,
+  // Call by other Ps node.
+  // Another node transfer DenseTable to this node.
+  int32_t TransferDenseTable(uint64_t from_node_id, uint64_t table_id,
+                             const std::string& name, const Value& value);
+
+  // Call by other Ps node.
+  // Another node transfer SparseTableMetaData to this node.
+  int32_t TransferSparseMetaData(
+      uint64_t from_node_id, uint64_t table_id, std::string name,
       int64_t dimension, ElementType element_type, InitializerType init_type,
       const std::unordered_map<std::string, std::string>& init_conf);
 
-  /**
-   * \brief Pull Dense tensor
-   *
-   * \param model_id model id.
-   * \param table_id table id.
-   * \param val Table value.
-   * \return int32_t error code.
-   */
-  int32_t PullDenseTable(uint64_t model_id, uint64_t table_id, Tensor* val);
+  // Call by other Ps node.
+  // Another node transfer SparseTable Embedding to this node.
+  int32_t TransferSparseValues(uint64_t from_node_id, uint64_t table_id,
+                               const std::vector<uint64_t>& sparse_ids,
+                               const std::vector<Value>& values);
 
-  /**
-   * \brief Pull list of dense table.
-   *
-   * \param model_id Model id.
-   * \param table_id Table_id list.
-   * \param vals The result.
-   * \return int32_t Error code.
-   */
-  int32_t CombinePullDenseTable(uint64_t model_id,
+  // Call by other Ps node.
+  // A node try to fetch DenseTable.
+  int32_t TryFetchDenseTable(uint64_t table_id, std::string* name,
+                             Value* value);
+
+  // Call by other Ps node.
+  int32_t TryCombineFetchDenseTable(const std::vector<uint64_t>& table_ids,
+                                    std::vector<uint64_t>* exist_table_ids,
+                                    std::vector<std::string>* names,
+                                    std::vector<Value>* values);
+
+  // Call by other Ps node.
+  int32_t TryFetchSparseMetaData(
+      uint64_t table_id, std::string* name, int64_t* dimension,
+      ElementType* element_type, InitializerType* init_type,
+      std::unordered_map<std::string, std::string>* init_conf);
+
+  // Call by other Ps node.
+  int32_t TryFetchSparseValues(uint64_t table_id,
+                               const std::vector<uint64_t>& sparse_ids,
+                               std::vector<uint64_t>* exist_sparse_ids,
+                               std::vector<Value>* values);
+
+  //////////////////////////////////////////////////////////////////////////////////
+  // For Worker.
+
+  // Call by Worker.
+  int32_t PullDenseTable(uint64_t router_version, uint64_t table_id,
+                         Tensor* val);
+
+  // Call by Worker.
+  int32_t CombinePullDenseTable(uint64_t router_version,
                                 const std::vector<uint64_t>& table_ids,
                                 std::vector<Tensor>* vals);
 
-  /**
-   * \brief Push and Pull dense table.
-   *
-   * \param model_id Model id.
-   * \param table_id Table id.
-   * \param grad Gradient.
-   * \param lr Learning rate.
-   * \param val Store value.
-   * \return int32_t Error code.
-   */
-  int32_t PushPullDenseTable(uint64_t model_id, uint64_t table_id,
-                             const Tensor& grad, float lr, Tensor* val);
-
-  /**
-   * \brief Push update dense table.
-   *
-   * \param model_id Model id.
-   * \param table_id Table id.
-   * \param grad The gradient.
-   * \param lr Learning rate.
-   * \return int32_t error code.
-   */
-  int32_t PushDenseTable(uint64_t model_id, uint64_t table_id,
+  // Call by Worker.
+  int32_t PushDenseTable(uint64_t router_version, uint64_t table_id,
                          const Tensor& grad, float lr);
 
-  /**
-   * \brief Pull sparse vector from server.
-   *
-   * \param model_id Model id.
-   * \param table_id Table id.
-   * \param indices Sparse indice.
-   * \param vals The result.
-   * \return int32_t Error code.
-   */
-  int32_t PullSparseTable(uint64_t model_id, uint64_t table_id,
-                          const std::vector<uint64_t>& indices,
+  // Call by Worker.
+  int32_t PullSparseTable(uint64_t router_version, uint64_t table_id,
+                          const std::vector<uint64_t>& sparse_ids,
                           std::vector<Tensor>* vals);
 
-  /**
-   * \brief Pull Sparse vector from this server.
-   *
-   * \param model_id Model id.
-   * \param indices A <TableId, Indices> map.
-   * \param vals The result.
-   * \return int32_t Error code.
-   */
+  // Call by Worker.
   int32_t CombinePullSparseTable(
-      uint64_t model_id,
-      const std::unordered_map<uint64_t, std::vector<uint64_t>>& indices,
-      std::unordered_map<uint64_t, std::vector<Tensor>>* vals);
+      uint64_t router_version,
+      const std::unordered_map<uint64_t, std::vector<uint64_t>>&
+          table_sparse_ids,
+      std::unordered_map<uint64_t, std::vector<Tensor>>* table_vals);
 
-  /**
-   * \brief Push gradient to server.
-   *
-   * \param model_id Model id.
-   * \param table_id Table id.
-   * \param indices Gradient index.
-   * \param grads Gradient.
-   * \param lr Learning rate.
-   * \return int32_t Error code.
-   */
-  int32_t PushSparseTable(uint64_t model_id, uint64_t table_id,
-                          const std::vector<uint64_t>& indices,
+  // Call by Worker.
+  int32_t PushSparseTable(uint64_t router_version, uint64_t table_id,
+                          const std::vector<uint64_t>& sparse_ids,
                           const std::vector<Tensor>& grads, float lr);
 
-  /**
-   * \brief Save CheckPoint.
-   *
-   * \param model_id Model id.
-   * \return int32_t ErrorCode.
-   */
-  int32_t SaveCheckPoint(uint64_t model_id);
+  // Call by Worker.
+  int32_t CombinePushSparseTable(
+      uint64_t router_version,
+      const std::unordered_map<uint64_t, CombinePushSparseTableItem>&
+          table_items,
+      float lr);
 };
 
 }  // namespace kraken

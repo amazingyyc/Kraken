@@ -5,111 +5,34 @@
 #include <vector>
 
 #include "common/exception.h"
+#include "pybind11/pytorch_utils.h"
 #include "t/element_type.h"
 #include "t/shape.h"
 #include "t/storage.h"
 #include "t/tensor.h"
-#include "worker/worker.h"
+#include "worker/emitter.h"
 
 namespace kraken {
 namespace py {
 
 std::once_flag flag;
-Worker worker;
+Emitter emitter;
 
-void Initialize(const std::string& addrs, EmitterType emitter_type,
-                CompressType compress_type, uint64_t life_span, float eta) {
-  std::call_once(flag, [&addrs, emitter_type, compress_type, life_span, eta]() {
-    worker.Initialize(addrs, emitter_type, compress_type, life_span, eta);
-  });
+void Initialize(const std::string& s_addr) {
+  std::call_once(flag, [&s_addr]() { emitter.Initialize(s_addr); });
 }
 
 void Stop() {
-  worker.Stop();
+  emitter.Stop();
 }
 
-Shape TorchSizesToShape(const torch::IntArrayRef& sizes) {
-  std::vector<int64_t> dims;
-  for (auto d : sizes) {
-    dims.emplace_back(d);
-  }
-
-  return Shape(dims);
-}
-
-torch::IntArrayRef ShapeToTorchSizes(const Shape& shape) {
-  const auto& dims = shape.dims();
-
-  return torch::IntArrayRef(dims);
-}
-
-ElementType TorchDTypeToElementType(torch::Dtype dtype) {
-  switch (dtype) {
-    case torch::kUInt8:
-      return ElementType::From<uint8_t>();
-    case torch::kInt8:
-      return ElementType::From<int8_t>();
-    case torch::kInt16:
-      return ElementType::From<int16_t>();
-    case torch::kInt32:
-      return ElementType::From<int32_t>();
-    case torch::kInt64:
-      return ElementType::From<int64_t>();
-    case torch::kFloat16:
-      return ElementType::From<half>();
-    case torch::kFloat32:
-      return ElementType::From<float>();
-    case torch::kFloat64:
-      return ElementType::From<double>();
-    default:
-      RUNTIME_ERROR("The Torch dtype does not support:" << dtype);
-  }
-}
-
-torch::Dtype ElementTypeToTorchDType(ElementType etype) {
-  switch (etype.dtype) {
-    case DType::kUint8:
-      return torch::kUInt8;
-    case DType::kInt8:
-      return torch::kInt8;
-    case DType::kInt16:
-      return torch::kInt16;
-    case DType::kInt32:
-      return torch::kInt32;
-    case DType::kInt64:
-      return torch::kInt64;
-    case DType::kFloat16:
-      return torch::kFloat16;
-    case DType::kFloat32:
-      return torch::kFloat32;
-    case DType::kFloat64:
-      return torch::kFloat64;
-    default:
-      RUNTIME_ERROR("The ElementType does not support:" << etype.Name());
-  }
-}
-
-// Becareful the returned tensor will share memory with torch tensor.
-Tensor TorchTensorToTensor(const torch::Tensor& tval) {
-  ARGUMENT_CHECK(tval.is_contiguous(),
-                 "TorchTensorToTensor need torch tensor is contiguous.");
-
-  auto storage = Storage::From(tval.data_ptr(), tval.nbytes());
-
-  Shape shape = TorchSizesToShape(tval.sizes());
-  ElementType etype = TorchDTypeToElementType(tval.scalar_type());
-
-  return Tensor::Dense(shape, storage, 0, etype);
-}
-
-uint64_t RegisterModel(
-    const std::string& model_name, OptimType optim_type,
-    const std::unordered_map<std::string, std::string>& optim_conf) {
-  return worker.RegisterModel(model_name, optim_type, optim_conf);
+void InitModel(const std::string& model_name, OptimType optim_type,
+               const std::unordered_map<std::string, std::string>& optim_conf) {
+  emitter.InitModel(model_name, optim_type, optim_conf);
 }
 
 void UpdateLR(float lr) {
-  worker.UpdateLR(lr);
+  emitter.UpdateLR(lr);
 }
 
 uint64_t RegisterDenseTable(const std::string& name, torch::Tensor val) {
@@ -124,7 +47,7 @@ uint64_t RegisterDenseTable(const std::string& name, torch::Tensor val) {
 
   Tensor kval = TorchTensorToTensor(cval);
 
-  return worker.RegisterDenseTable(name, kval);
+  return emitter.RegisterDenseTable(name, kval);
 }
 
 uint64_t RegisterSparseTable(
@@ -134,12 +57,12 @@ uint64_t RegisterSparseTable(
   torch::Dtype ttype = torch::python::detail::py_object_to_dtype(dtype);
   ElementType etype = TorchDTypeToElementType(ttype);
 
-  return worker.RegisterSparseTable(name, dimension, etype, init_type,
-                                    init_conf);
+  return emitter.RegisterSparseTable(name, dimension, etype, init_type,
+                                     init_conf);
 }
 
 torch::Tensor PullDenseTable(uint64_t table_id) {
-  Tensor kval = worker.PullDenseTable(table_id);
+  Tensor kval = emitter.PullDenseTable(table_id);
 
   torch::IntArrayRef sizes = ShapeToTorchSizes(kval.shape());
   torch::Dtype dtype = ElementTypeToTorchDType(kval.element_type());
@@ -154,7 +77,7 @@ torch::Tensor PullDenseTable(uint64_t table_id) {
 
 std::vector<torch::Tensor> CombinePullDenseTable(
     const std::vector<uint64_t>& table_ids) {
-  std::vector<Tensor> kvals = worker.CombinePullDenseTable(table_ids);
+  std::vector<Tensor> kvals = emitter.CombinePullDenseTable(table_ids);
   std::vector<torch::Tensor> vals;
 
   for (auto& kv : kvals) {
@@ -182,31 +105,7 @@ void PushDenseTable(uint64_t table_id, torch::Tensor grad) {
 
   Tensor kgrad = TorchTensorToTensor(cgrad);
 
-  worker.PushDenseTable(table_id, kgrad);
-}
-
-torch::Tensor PushPullDenseTable(uint64_t table_id, torch::Tensor grad) {
-  ARGUMENT_CHECK(!grad.is_cuda(), "PushDenseTable need torch::Tensor is CPU.");
-
-  // Convert to contiguous tensor.
-  torch::Tensor cgrad = grad;
-  if (!grad.is_contiguous()) {
-    cgrad = grad.contiguous();
-  }
-
-  Tensor kgrad = TorchTensorToTensor(cgrad);
-
-  Tensor kval = worker.PushPullDenseTable(table_id, kgrad);
-
-  torch::IntArrayRef sizes = ShapeToTorchSizes(kval.shape());
-  torch::Dtype dtype = ElementTypeToTorchDType(kval.element_type());
-
-  torch::Tensor val = torch::zeros(sizes, dtype);
-
-  // Copy memory.
-  memcpy(val.data_ptr(), kval.Ptr(), kval.NumBytes());
-
-  return val;
+  emitter.PushDenseTable(table_id, kgrad);
 }
 
 torch::Tensor PullSparseTable(uint64_t table_id, torch::Tensor indices) {
@@ -221,7 +120,7 @@ torch::Tensor PullSparseTable(uint64_t table_id, torch::Tensor indices) {
   Tensor kindices = TorchTensorToTensor(cindices);
 
   // The sparse embedding.
-  Tensor kval = worker.PullSparseTable(table_id, kindices);
+  Tensor kval = emitter.PullSparseTable(table_id, kindices);
 
   torch::IntArrayRef sizes = ShapeToTorchSizes(kval.shape());
   torch::Dtype dtype = ElementTypeToTorchDType(kval.element_type());
@@ -249,7 +148,7 @@ std::vector<torch::Tensor> CombinePullSparseTable(
   }
 
   std::vector<Tensor> kvals =
-      worker.CombinePullSparseTable(table_ids, kindices);
+      emitter.CombinePullSparseTable(table_ids, kindices);
 
   std::vector<torch::Tensor> vals;
 
@@ -268,8 +167,8 @@ std::vector<torch::Tensor> CombinePullSparseTable(
 }
 
 void PushSparseTable(uint64_t table_id, torch::Tensor indices,
-                     torch::Tensor grads) {
-  ARGUMENT_CHECK(!indices.is_cuda() && !grads.is_cuda(),
+                     torch::Tensor grad) {
+  ARGUMENT_CHECK(!indices.is_cuda() && !grad.is_cuda(),
                  "PushSparseTable need torch::Tensor is CPU.");
 
   torch::Tensor cindices = indices;
@@ -277,19 +176,47 @@ void PushSparseTable(uint64_t table_id, torch::Tensor indices,
     cindices = indices.contiguous();
   }
 
-  torch::Tensor cgrads = grads;
-  if (!cgrads.is_contiguous()) {
-    cgrads = grads.contiguous();
+  torch::Tensor cgrad = grad;
+  if (!cgrad.is_contiguous()) {
+    cgrad = cgrad.contiguous();
   }
 
   Tensor kindices = TorchTensorToTensor(cindices);
-  Tensor kgrads = TorchTensorToTensor(cgrads);
+  Tensor kgrad = TorchTensorToTensor(cgrad);
 
-  worker.PushSparseTable(table_id, kindices, kgrads);
+  emitter.PushSparseTable(table_id, kindices, kgrad);
 }
 
-void SaveCheckPoint() {
-  worker.SaveCheckPoint();
+void CombinePushSparseTable(const std::vector<uint64_t>& table_ids,
+                            const std::vector<torch::Tensor>& indices,
+                            const std::vector<torch::Tensor>& grads) {
+  ARGUMENT_CHECK(
+      table_ids.size() == indices.size() && table_ids.size() == grads.size(),
+      "CombinePushSparseTable args need same size!");
+
+  std::vector<Tensor> kindices;
+  kindices.reserve(indices.size());
+
+  std::vector<Tensor> kgrads;
+  kgrads.reserve(indices.size());
+
+  for (size_t i = 0; i < indices.size(); ++i) {
+    torch::Tensor cindice = indices[i];
+    if (!cindice.is_contiguous()) {
+      cindice = cindice.contiguous();
+    }
+
+    kindices.emplace_back(TorchTensorToTensor(cindice));
+
+    torch::Tensor cgrad = grads[i];
+    if (!cgrad.is_contiguous()) {
+      cgrad = cgrad.contiguous();
+    }
+
+    kgrads.emplace_back(TorchTensorToTensor(cgrad));
+  }
+
+  emitter.CombinePushSparseTable(table_ids, kindices, kgrads);
 }
 
 }  // namespace py
