@@ -1,10 +1,12 @@
 #include "worker/emitter.h"
 
-// #include <tuple>
+#include <assert.h>
 
 #include "common/exception.h"
 #include "common/log.h"
 #include "protocol/combine_pull_dense_table_prot.h"
+#include "protocol/combine_pull_sparse_table_prot.h"
+#include "protocol/combine_push_sparse_table_prot.h"
 #include "protocol/fetch_router_prot.h"
 #include "protocol/init_model_prot.h"
 #include "protocol/pull_dense_table_prot.h"
@@ -177,6 +179,100 @@ int32_t Emitter::PullSparseTableImpl(uint64_t table_id, const Tensor& indices,
   return ErrorCode::kSuccess;
 }
 
+int32_t Emitter::CombinePullSparseTableImpl(
+    const std::vector<uint64_t>& table_ids, const std::vector<Tensor>& indices,
+    std::vector<Tensor>* vals) {
+  assert(table_ids.size() == indices.size());
+
+  // Maybe share memory with pytorch.
+  std::vector<Tensor> indice_u64s;
+  indice_u64s.reserve(indices.size());
+  for (size_t i = 0; i < indices.size(); ++i) {
+    indice_u64s.emplace_back(indices[i].Cast(ElementType::From<uint64_t>()));
+  }
+
+  // <talbe_id, sparse_id>
+  using KeyType = std::pair<uint64_t, uint64_t>;
+  struct KeyHash : public std::unary_function<KeyType, std::size_t> {
+    std::size_t operator()(const KeyType& k) const {
+      return k.first ^ k.second;
+    }
+  };
+
+  std::unordered_map<KeyType, std::pair<uint64_t, size_t>, KeyHash>
+      sparse_val_idx;
+
+  std::unordered_map<uint64_t, CombinePullSparseTableRequest> reqs;
+  reqs.reserve(router_.nodes().size());
+
+  std::unordered_map<uint64_t, CombinePullSparseTableResponse> replies;
+
+  for (size_t i = 0; i < table_ids.size(); ++i) {
+    uint64_t table_id = table_ids[i];
+
+    int64_t row = indice_u64s[i].Size();
+    uint64_t* ptr = indice_u64s[i].Data<uint64_t>();
+
+    for (int64_t j = 0; j < row; ++j) {
+      uint64_t sparse_id = ptr[j];
+
+      uint64_t node_id = router_.Hit(utils::Hash(table_id, sparse_id));
+
+      auto key = std::make_pair(table_id, sparse_id);
+
+      if (sparse_val_idx.find(key) == sparse_val_idx.end()) {
+        sparse_val_idx[key] = std::make_pair(
+            node_id, reqs[node_id].table_sparse_ids[table_id].size());
+        reqs[node_id].table_sparse_ids[table_id].emplace_back(sparse_id);
+      }
+    }
+  }
+
+  for (auto& [_, req] : reqs) {
+    req.router_version = router_.version();
+  }
+
+  auto error_code =
+      clients_.Call(RPCFuncType::kCombinePullSparseTableType, reqs, &replies);
+  if (error_code != ErrorCode::kSuccess) {
+    return error_code;
+  }
+
+  vals->reserve(indice_u64s.size());
+
+  for (size_t i = 0; i < table_ids.size(); ++i) {
+    uint64_t table_id = table_ids[i];
+
+    int64_t row = indice_u64s[i].Size();
+    uint64_t* ptr = indice_u64s[i].Data<uint64_t>();
+
+    std::vector<Tensor> vecs;
+    vecs.reserve(row);
+
+    for (int64_t j = 0; j < row; ++j) {
+      uint64_t sparse_id = ptr[j];
+
+      auto key = std::make_pair(table_id, sparse_id);
+
+      auto pos = sparse_val_idx[key];
+
+      vecs.emplace_back(
+          replies[pos.first].table_vals.at(table_id).at(pos.second));
+    }
+
+    Tensor val = indice_u64s[i].ConcatVector(vecs);
+
+    std::vector<int64_t> dims = indice_u64s[i].shape().dims();
+    int64_t col = val.Size() / indice_u64s[i].Size();
+
+    dims.emplace_back(col);
+
+    vals->emplace_back(val.Reshape(dims));
+  }
+
+  return ErrorCode::kSuccess;
+}
+
 void Emitter::Initialize(const std::string& s_addr) {
   if (initialized_) {
     return;
@@ -244,7 +340,8 @@ uint64_t Emitter::RegisterDenseTable(const std::string& name,
   RPC_CALL(
       s_connecter_->Call(RPCFuncType::kRegisterDenseTableType, req, &reply));
 
-  LOG_INFO("Register DenseTable:" << name << ", id:" << reply.table_id);
+  LOG_INFO("Register DenseTable:[" << name << "], id:[" << reply.table_id
+                                   << "]");
 
   return reply.table_id;
 }
@@ -265,7 +362,8 @@ uint64_t Emitter::RegisterSparseTable(
   RPC_CALL(
       s_connecter_->Call(RPCFuncType::kRegisterSparseTableType, req, &reply));
 
-  LOG_INFO("Register SparseTable: " << name << ", id: " << reply.table_id);
+  LOG_INFO("Register SparseTable:[" << name << "], id:[" << reply.table_id
+                                    << "]");
 
   return reply.table_id;
 }
@@ -362,6 +460,28 @@ Tensor Emitter::PullSparseTable(uint64_t table_id, const Tensor& indices) {
   }
 }
 
+std::vector<Tensor> Emitter::CombinePullSparseTable(
+    const std::vector<uint64_t>& table_ids,
+    const std::vector<Tensor>& indices) {
+  ARGUMENT_CHECK(initialized_, "Emitter not initialize.");
+
+  std::vector<Tensor> vals;
+  auto error_code = CombinePullSparseTableImpl(table_ids, indices, &vals);
+
+  if (error_code == ErrorCode::kRouterVersionError) {
+    UpdataRouter();
+
+    // Try agian.
+    RPC_CALL(CombinePullSparseTableImpl(table_ids, indices, &vals));
+
+    return vals;
+  } else {
+    RPC_CALL(error_code);
+
+    return vals;
+  }
+}
+
 void Emitter::PushSparseTable(uint64_t table_id, const Tensor& indices,
                               const Tensor& grads) {
   ARGUMENT_CHECK(initialized_, "Emitter not initialize.");
@@ -410,22 +530,98 @@ void Emitter::PushSparseTable(uint64_t table_id, const Tensor& indices,
     v.lr = lr_;
   }
 
-  std::unordered_map<uint64_t,
-                     std::function<void(int32_t, PushSparseTableResponse&)>>
-      callbacks;
+  auto callback = [](int32_t error_code,
+                     PushSparseTableResponse& /*not care*/) {
+    if (error_code != ErrorCode::kSuccess) {
+      LOG_WARNING("PushSparseTable got error code:"
+                  << error_code << ", msg:" << ErrorCode::Msg(error_code)
+                  << ", we not handle Push error!");
+    }
+  };
 
-  for (const auto& [node_id, _] : reqs) {
-    callbacks[node_id] = [](int32_t error_code,
-                            PushSparseTableResponse& /*not care*/) {
-      if (error_code != ErrorCode::kSuccess) {
-        LOG_WARNING("PushSparseTable got error code:"
-                    << error_code << ", msg:" << ErrorCode::Msg(error_code)
-                    << ", we not handle Push error!");
+  clients_.CallAsync<PushSparseTableRequest, PushSparseTableResponse>(
+      RPCFuncType::kPushSparseTableType, reqs, callback);
+}
+
+void Emitter::CombinePushSparseTable(const std::vector<uint64_t>& table_ids,
+                                     const std::vector<Tensor>& indices,
+                                     const std::vector<Tensor>& grads) {
+  ARGUMENT_CHECK(initialized_, "Emitter not initialize.");
+  ARGUMENT_CHECK(
+      table_ids.size() == indices.size() && table_ids.size() == grads.size(),
+      "CombinePushSparseTable args error!");
+
+  std::unordered_map<uint64_t, CombinePushSparseTableRequest> reqs;
+  reqs.reserve(router_.nodes().size());
+
+  // <talbe_id, sparse_id>
+  using KeyType = std::pair<uint64_t, uint64_t>;
+  struct KeyHash : public std::unary_function<KeyType, std::size_t> {
+    std::size_t operator()(const KeyType& k) const {
+      return k.first ^ k.second;
+    }
+  };
+
+  // key:<talbe_id, sparse_id> value:<node_id, idx>
+  std::unordered_map<KeyType, std::pair<uint64_t, size_t>, KeyHash>
+      sparse_idx_map;
+
+  for (size_t t = 0; t < table_ids.size(); ++t) {
+    uint64_t table_id = table_ids[t];
+
+    std::vector<int64_t> dims = indices[t].shape().dims();
+    int64_t dimension = grads[t].shape()[-1];
+    dims.emplace_back(dimension);
+
+    ARGUMENT_CHECK(Shape(dims) == grads[t].shape(),
+                   "PushSparseTable indices and grads shape error.");
+
+    Tensor indices_u64 = indices[t].Cast(ElementType::From<uint64_t>());
+    int64_t row = indices_u64.Size();
+    uint64_t* ptr = indices_u64.Data<uint64_t>();
+
+    Tensor m_grads = grads[t].Reshape({row, dimension});
+
+    for (int64_t i = 0; i < row; ++i) {
+      uint64_t sparse_id = ptr[i];
+
+      KeyType key = std::make_pair(table_id, sparse_id);
+      auto it = sparse_idx_map.find(key);
+      if (it == sparse_idx_map.end()) {
+        uint64_t node_id = router_.Hit(utils::Hash(table_id, sparse_id));
+
+        sparse_idx_map[key] = std::make_pair(
+            node_id, reqs[node_id].table_items[table_id].sparse_ids.size());
+
+        reqs[node_id].table_items[table_id].sparse_ids.emplace_back(sparse_id);
+        reqs[node_id].table_items[table_id].grads.emplace_back(
+            m_grads.Vector(i).Clone());
+      } else {
+        uint64_t node_id = it->second.first;
+        size_t idx = it->second.second;
+
+        reqs[node_id].table_items[table_id].grads[idx] += m_grads.Vector(i);
       }
-    };
+    }
   }
 
-  clients_.CallAsync(RPCFuncType::kPushSparseTableType, reqs, callbacks);
+  for (auto& [_, req] : reqs) {
+    req.router_version = router_.version();
+    req.lr = lr_;
+  }
+
+  auto callback = [](int32_t error_code,
+                     CombinePushSparseTableResponse& /*not care*/) {
+    if (error_code != ErrorCode::kSuccess) {
+      LOG_WARNING("CombinePushSparseTable got error code:"
+                  << error_code << ", msg:" << ErrorCode::Msg(error_code)
+                  << ", we not handle Push error!");
+    }
+  };
+
+  clients_
+      .CallAsync<CombinePushSparseTableRequest, CombinePushSparseTableResponse>(
+          RPCFuncType::kCombinePushSparseTableType, reqs, callback);
 }
 
 }  // namespace kraken

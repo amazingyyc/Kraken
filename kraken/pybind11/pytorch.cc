@@ -132,9 +132,43 @@ torch::Tensor PullSparseTable(uint64_t table_id, torch::Tensor indices) {
   return val;
 }
 
+std::vector<torch::Tensor> CombinePullSparseTable(
+    const std::vector<uint64_t>& table_ids,
+    const std::vector<torch::Tensor>& indices) {
+  std::vector<Tensor> kindices;
+  kindices.reserve(indices.size());
+
+  for (size_t i = 0; i < indices.size(); ++i) {
+    torch::Tensor cindice = indices[i];
+    if (!indices[i].is_contiguous()) {
+      cindice = indices[i].contiguous();
+    }
+
+    kindices.emplace_back(TorchTensorToTensor(cindice));
+  }
+
+  std::vector<Tensor> kvals =
+      emitter.CombinePullSparseTable(table_ids, kindices);
+
+  std::vector<torch::Tensor> vals;
+
+  for (size_t i = 0; i < kvals.size(); ++i) {
+    torch::IntArrayRef sizes = ShapeToTorchSizes(kvals[i].shape());
+    torch::Dtype dtype = ElementTypeToTorchDType(kvals[i].element_type());
+    torch::Tensor val = torch::zeros(sizes, dtype);
+
+    // copy memory.
+    memcpy(val.data_ptr(), kvals[i].Ptr(), kvals[i].NumBytes());
+
+    vals.emplace_back(val);
+  }
+
+  return vals;
+}
+
 void PushSparseTable(uint64_t table_id, torch::Tensor indices,
-                     torch::Tensor grads) {
-  ARGUMENT_CHECK(!indices.is_cuda() && !grads.is_cuda(),
+                     torch::Tensor grad) {
+  ARGUMENT_CHECK(!indices.is_cuda() && !grad.is_cuda(),
                  "PushSparseTable need torch::Tensor is CPU.");
 
   torch::Tensor cindices = indices;
@@ -142,54 +176,48 @@ void PushSparseTable(uint64_t table_id, torch::Tensor indices,
     cindices = indices.contiguous();
   }
 
-  torch::Tensor cgrads = grads;
-  if (!cgrads.is_contiguous()) {
-    cgrads = grads.contiguous();
+  torch::Tensor cgrad = grad;
+  if (!cgrad.is_contiguous()) {
+    cgrad = cgrad.contiguous();
   }
 
   Tensor kindices = TorchTensorToTensor(cindices);
-  Tensor kgrads = TorchTensorToTensor(cgrads);
+  Tensor kgrad = TorchTensorToTensor(cgrad);
 
-  emitter.PushSparseTable(table_id, kindices, kgrads);
+  emitter.PushSparseTable(table_id, kindices, kgrad);
 }
 
-// std::vector<torch::Tensor> CombinePullSparseTable(
-//     const std::vector<uint64_t>& table_ids,
-//     const std::vector<torch::Tensor>& indices) {
-//   std::vector<Tensor> kindices;
-//   kindices.reserve(indices.size());
+void CombinePushSparseTable(const std::vector<uint64_t>& table_ids,
+                            const std::vector<torch::Tensor>& indices,
+                            const std::vector<torch::Tensor>& grads) {
+  ARGUMENT_CHECK(
+      table_ids.size() == indices.size() && table_ids.size() == grads.size(),
+      "CombinePushSparseTable args need same size!");
 
-//   for (size_t i = 0; i < indices.size(); ++i) {
-//     torch::Tensor cindice = indices[i];
-//     if (!indices[i].is_contiguous()) {
-//       cindice = indices[i].contiguous();
-//     }
+  std::vector<Tensor> kindices;
+  kindices.reserve(indices.size());
 
-//     kindices.emplace_back(TorchTensorToTensor(cindice));
-//   }
+  std::vector<Tensor> kgrads;
+  kgrads.reserve(indices.size());
 
-//   std::vector<Tensor> kvals =
-//       worker.CombinePullSparseTable(table_ids, kindices);
+  for (size_t i = 0; i < indices.size(); ++i) {
+    torch::Tensor cindice = indices[i];
+    if (!cindice.is_contiguous()) {
+      cindice = cindice.contiguous();
+    }
 
-//   std::vector<torch::Tensor> vals;
+    kindices.emplace_back(TorchTensorToTensor(cindice));
 
-//   for (size_t i = 0; i < kvals.size(); ++i) {
-//     torch::IntArrayRef sizes = ShapeToTorchSizes(kvals[i].shape());
-//     torch::Dtype dtype = ElementTypeToTorchDType(kvals[i].element_type());
-//     torch::Tensor val = torch::zeros(sizes, dtype);
+    torch::Tensor cgrad = grads[i];
+    if (!cgrad.is_contiguous()) {
+      cgrad = cgrad.contiguous();
+    }
 
-//     // copy memory.
-//     memcpy(val.data_ptr(), kvals[i].Ptr(), kvals[i].NumBytes());
+    kgrads.emplace_back(TorchTensorToTensor(cgrad));
+  }
 
-//     vals.emplace_back(val);
-//   }
-
-//   return vals;
-// }
-
-// void SaveCheckPoint() {
-//   worker.SaveCheckPoint();
-// }
+  emitter.CombinePushSparseTable(table_ids, kindices, kgrads);
+}
 
 }  // namespace py
 }  // namespace kraken

@@ -35,14 +35,16 @@ void PushDenseTable(uint64_t table_id, torch::Tensor grad);
 
 torch::Tensor PullSparseTable(uint64_t table_id, torch::Tensor indices);
 
+std::vector<torch::Tensor> CombinePullSparseTable(
+    const std::vector<uint64_t>& table_ids,
+    const std::vector<torch::Tensor>& indices);
+
 void PushSparseTable(uint64_t table_id, torch::Tensor indices,
-                     torch::Tensor grads);
+                     torch::Tensor grad);
 
-// std::vector<torch::Tensor> CombinePullSparseTable(
-//     const std::vector<uint64_t>& table_ids,
-//     const std::vector<torch::Tensor>& indices);
-
-// void SaveCheckPoint();
+void CombinePushSparseTable(const std::vector<uint64_t>& table_ids,
+                            const std::vector<torch::Tensor>& indices,
+                            const std::vector<torch::Tensor>& grads);
 
 }  // namespace py
 }  // namespace kraken

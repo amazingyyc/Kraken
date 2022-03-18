@@ -106,7 +106,7 @@ void SyncStation::Run() {
   std::string addr = "tcp://*:" + std::to_string(port_);
   ZMQ_CALL(zmq_bind(zmq_scoket_, addr.c_str()));
 
-  LOG_INFO("SyncStation start at port:" << port_);
+  LOG_INFO("SyncStation start at port:[" << port_ << "]");
 
   while (true) {
     zmq_msg_t identity;

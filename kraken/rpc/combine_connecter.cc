@@ -108,7 +108,7 @@ bool CombineConnecter::RemoveConnect(uint64_t id, zmq_pollitem_t** zmq_polls,
 int32_t CombineConnecter::SendMsg(uint64_t id, uint64_t timestamp,
                                   uint32_t rpc_type, ZMQBuffer* z_buf) {
   if (sender_idx_.find(id) == sender_idx_.end()) {
-    return ErrorCode::kNotExistError;
+    return ErrorCode::kSocketNotExistError;
   }
 
   void* sender = senders_[sender_idx_[id]];
@@ -179,6 +179,10 @@ void CombineConnecter::HandleReply(zmq_msg_t& reply) {
 }
 
 void CombineConnecter::Run() {
+  zmq_context_ = zmq_init(1);
+  ARGUMENT_CHECK(zmq_context_ != nullptr, "zmq_init return nullptr, error:"
+                                              << zmq_strerror(zmq_errno()));
+
   // We use zmq_pollitem_t to monitor the message queue and socket.
   // zmq_poll[0] always be the efd.
   int zmq_polls_size = 1;
@@ -312,6 +316,10 @@ void CombineConnecter::Run() {
   senders_.clear();
 
   free(zmq_polls);
+
+  // close zmq context.
+  ZMQ_CALL(zmq_term(zmq_context_));
+  zmq_context_ = nullptr;
 }
 
 void CombineConnecter::EnqueTask(Task&& task) {
@@ -328,10 +336,6 @@ void CombineConnecter::EnqueTask(Task&& task) {
 }
 
 void CombineConnecter::Start() {
-  zmq_context_ = zmq_init(1);
-  ARGUMENT_CHECK(zmq_context_ != nullptr, "zmq_init return nullptr, error:"
-                                              << zmq_strerror(zmq_errno()));
-
   // create eventfd.
   efd_ = eventfd(0, EFD_SEMAPHORE);
   ARGUMENT_CHECK(efd_ != -1, "eventfd error:" << efd_);
@@ -358,10 +362,6 @@ void CombineConnecter::Stop() {
 
   // close eventfd
   close(efd_);
-
-  // close zmq context.
-  ZMQ_CALL(zmq_term(zmq_context_));
-  zmq_context_ = nullptr;
 }
 
 bool CombineConnecter::AddConnect(uint64_t id, const std::string& addr) {
@@ -373,15 +373,6 @@ bool CombineConnecter::AddConnect(uint64_t id, const std::string& addr) {
     barrier.Release();
   };
 
-  AddConnectAsync(id, addr, std::move(callback));
-
-  barrier.Wait();
-
-  return success;
-}
-
-void CombineConnecter::AddConnectAsync(uint64_t id, const std::string& addr,
-                                       CALLBACK&& callback) {
   Task task;
   task.type = 0;
   task.id = id;
@@ -389,6 +380,10 @@ void CombineConnecter::AddConnectAsync(uint64_t id, const std::string& addr,
   task.callback = std::move(callback);
 
   EnqueTask(std::move(task));
+
+  barrier.Wait();
+
+  return success;
 }
 
 bool CombineConnecter::RemoveConnect(uint64_t id) {
@@ -397,24 +392,19 @@ bool CombineConnecter::RemoveConnect(uint64_t id) {
 
   auto callback = [&barrier, &success](bool s) {
     success = s;
-
     barrier.Release();
   };
 
-  RemoveConnectAsync(id, std::move(callback));
-
-  barrier.Wait();
-
-  return success;
-}
-
-void CombineConnecter::RemoveConnectAsync(uint64_t id, CALLBACK&& callback) {
   Task task;
   task.type = 1;
   task.id = id;
   task.callback = std::move(callback);
 
   EnqueTask(std::move(task));
+
+  barrier.Wait();
+
+  return success;
 }
 
 }  // namespace kraken

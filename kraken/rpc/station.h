@@ -36,7 +36,6 @@ private:
 
   // A seperate thread to listen connect.
   std::thread listen_t_;
-  bool async_;
 
   // zmp content
   void* zmq_context_;
@@ -54,7 +53,7 @@ private:
   std::unordered_map<uint32_t, FUNC> funcs_;
 
 public:
-  Station(uint32_t port, uint32_t thread_nums, bool async);
+  Station(uint32_t port, uint32_t thread_nums);
 
   ~Station();
 
@@ -130,7 +129,6 @@ public:
   void Wait();
 
   void Stop();
-
 };
 
 }  // namespace kraken

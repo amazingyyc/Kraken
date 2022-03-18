@@ -532,4 +532,54 @@ inline bool Deserialize::operator>>(Router& v) {
   return (*this) >> v.version_ && (*this) >> v.nodes_ && (*this) >> v.vnodes_;
 }
 
+template <>
+inline bool Deserialize::operator>>(
+    std::unordered_map<uint64_t, std::vector<uint64_t>>& v) {
+  v.clear();
+
+  uint64_t size;
+  if (((*this) >> size) == false) {
+    return false;
+  }
+
+  v.reserve(size);
+  for (uint64_t i = 0; i < size; ++i) {
+    uint64_t key;
+    std::vector<uint64_t> value;
+
+    if (((*this) >> key) == false || ((*this) >> value) == false) {
+      return false;
+    }
+
+    v.emplace(key, std::move(value));
+  }
+
+  return true;
+}
+
+template <>
+inline bool Deserialize::operator>>(
+    std::unordered_map<uint64_t, std::vector<Tensor>>& v) {
+  v.clear();
+
+  uint64_t size;
+  if (((*this) >> size) == false) {
+    return false;
+  }
+
+  v.reserve(size);
+  for (uint64_t i = 0; i < size; ++i) {
+    uint64_t key;
+    std::vector<Tensor> value;
+
+    if (((*this) >> key) == false || ((*this) >> value) == false) {
+      return false;
+    }
+
+    v.emplace(key, std::move(value));
+  }
+
+  return true;
+}
+
 }  // namespace kraken

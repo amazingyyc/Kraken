@@ -6,7 +6,7 @@ namespace kraken {
 
 PsServer::PsServer(uint32_t port, uint32_t thread_nums, const std::string& addr,
                    const std::string& s_addr)
-    : station_(port, thread_nums, true), ps_(addr, s_addr) {
+    : station_(port, thread_nums), ps_(addr, s_addr) {
 }
 
 int32_t PsServer::Heartbeat(const HeartbeatRequest& req,
@@ -108,10 +108,24 @@ int32_t PsServer::PullSparseTable(const PullSparseTableRequest& req,
                              &(rsp->vals));
 }
 
+int32_t PsServer::CombinePullSparseTable(
+    const CombinePullSparseTableRequest& req,
+    CombinePullSparseTableResponse* rsp) {
+  return ps_.CombinePullSparseTable(req.router_version, req.table_sparse_ids,
+                                    &(rsp->table_vals));
+}
+
 int32_t PsServer::PushSparseTable(const PushSparseTableRequest& req,
                                   PushSparseTableResponse* rsp) {
   return ps_.PushSparseTable(req.router_version, req.table_id, req.sparse_ids,
                              req.grads, req.lr);
+}
+
+int32_t PsServer::CombinePushSparseTable(
+    const CombinePushSparseTableRequest& req,
+    CombinePushSparseTableResponse* rsp) {
+  return ps_.CombinePushSparseTable(req.router_version, req.table_items,
+                                    req.lr);
 }
 
 void PsServer::RegisterFuncs() {
@@ -138,7 +152,9 @@ void PsServer::RegisterFuncs() {
   REGISTER_FUNC(CombinePullDenseTable, CombinePullDenseTable);
   REGISTER_FUNC(PushDenseTable, PushDenseTable);
   REGISTER_FUNC(PullSparseTable, PullSparseTable);
+  REGISTER_FUNC(CombinePullSparseTable, CombinePullSparseTable);
   REGISTER_FUNC(PushSparseTable, PushSparseTable);
+  REGISTER_FUNC(CombinePushSparseTable, CombinePushSparseTable);
 }
 
 void PsServer::Start() {

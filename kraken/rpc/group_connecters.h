@@ -123,16 +123,15 @@ public:
   }
 
   template <typename ReqType, typename ReplyType>
-  void CallAsync(
-      uint32_t rpc_type, const std::unordered_map<uint64_t, ReqType>& reqs,
-      std::unordered_map<uint64_t, std::function<void(int32_t, ReplyType&)>>&
-          callbacks,
-      int64_t timeout_ms = 5000) const {
+  void CallAsync(uint32_t rpc_type,
+                 const std::unordered_map<uint64_t, ReqType>& reqs,
+                 const std::function<void(int32_t, ReplyType&)>& callback,
+                 int64_t timeout_ms = 5000) {
     for (const auto& [node_id, req] : reqs) {
-      auto it = connecters_.find(node_id);
+      auto l_callback = callback;
 
-      it->second->CallAsync(rpc_type, req, std::move(callbacks[node_id]),
-                            timeout_ms);
+      auto it = connecters_.find(node_id);
+      it->second->CallAsync(rpc_type, req, std::move(l_callback), timeout_ms);
     }
   }
 

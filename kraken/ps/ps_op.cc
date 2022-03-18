@@ -260,14 +260,8 @@ int32_t Ps::PushDenseTable(uint64_t router_version, uint64_t table_id,
     return ErrorCode::kNodeStatusError;
   }
 
-  if (router_.Hit(utils::Hash(table_id)) != node_id_) {
-    // We need check the router version it not equal to current router we need
-    // tell the worker to update the router.
-    if (router_version != router_.version()) {
-      return ErrorCode::kRouterVersionError;
-    }
-
-    return ErrorCode::kRouteWrongNodeError;
+  if (router_version != router_.version()) {
+    return ErrorCode::kRouterVersionError;
   }
 
   if (status_ & NodeStatus::kProxy) {
@@ -315,7 +309,6 @@ int32_t Ps::PullSparseTable(uint64_t router_version, uint64_t table_id,
     return ErrorCode::kNodeStatusError;
   }
 
-  // Check whether Route to wrong node.
   if (router_version != router_.version()) {
     return ErrorCode::kRouterVersionError;
   }
@@ -376,6 +369,25 @@ int32_t Ps::PullSparseTable(uint64_t router_version, uint64_t table_id,
   }
 }
 
+int32_t Ps::CombinePullSparseTable(
+    uint64_t router_version,
+    const std::unordered_map<uint64_t, std::vector<uint64_t>>& table_sparse_ids,
+    std::unordered_map<uint64_t, std::vector<Tensor>>* table_vals) {
+  for (const auto& [table_id, sparse_ids] : table_sparse_ids) {
+    std::vector<Tensor> vals;
+
+    auto error_code =
+        PullSparseTable(router_version, table_id, sparse_ids, &vals);
+    if (error_code != ErrorCode::kSuccess) {
+      return error_code;
+    }
+
+    table_vals->emplace(table_id, std::move(vals));
+  }
+
+  return ErrorCode::kSuccess;
+}
+
 int32_t Ps::PushSparseTable(uint64_t router_version, uint64_t table_id,
                             const std::vector<uint64_t>& sparse_ids,
                             const std::vector<Tensor>& grads, float lr) {
@@ -385,7 +397,6 @@ int32_t Ps::PushSparseTable(uint64_t router_version, uint64_t table_id,
     return ErrorCode::kNodeStatusError;
   }
 
-  // Check whether Route to wrong node.
   if (router_version != router_.version()) {
     return ErrorCode::kRouterVersionError;
   }
@@ -442,6 +453,21 @@ int32_t Ps::PushSparseTable(uint64_t router_version, uint64_t table_id,
 
     return it.value()->Push(optim_.get(), sparse_ids, grads, lr);
   }
+}
+
+int32_t Ps::CombinePushSparseTable(
+    uint64_t router_version,
+    const std::unordered_map<uint64_t, CombinePushSparseTableItem>& table_items,
+    float lr) {
+  for (const auto& [table_id, table_item] : table_items) {
+    auto error_code = PushSparseTable(
+        router_version, table_id, table_item.sparse_ids, table_item.grads, lr);
+    if (error_code != ErrorCode::kSuccess) {
+      return error_code;
+    }
+  }
+
+  return ErrorCode::kSuccess;
 }
 
 }  // namespace kraken

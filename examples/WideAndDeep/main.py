@@ -97,7 +97,7 @@ for epoch in range(n_epochs):
 
     end_t = time.clock()
 
-    if i % 1000 == 0:
+    if i % 1 == 0:
       print('Cost {:0,.2f} Epoch {} of {}, Loss: {}, accuracy: {}'.format((end_t - start_t) * 1000, epoch + 1, n_epochs,
                                                                           round(loss.item(), 3),
                                                                           round(correct / total, 4)))

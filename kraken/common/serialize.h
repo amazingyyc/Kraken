@@ -396,4 +396,38 @@ inline bool Serialize::operator<<(const Router& v) {
          (*this) << v.vnodes();
 }
 
+template <>
+inline bool Serialize::operator<<(
+    const std::unordered_map<uint64_t, std::vector<uint64_t>>& v) {
+  uint64_t size = v.size();
+  if (((*this) << size) == false) {
+    return false;
+  }
+
+  for (const auto& [key, val] : v) {
+    if (((*this) << key) == false || ((*this) << val) == false) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+template <>
+inline bool Serialize::operator<<(
+    const std::unordered_map<uint64_t, std::vector<Tensor>>& v) {
+  uint64_t size = v.size();
+  if (((*this) << size) == false) {
+    return false;
+  }
+
+  for (const auto& [key, val] : v) {
+    if (((*this) << key) == false || ((*this) << val) == false) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 }  // namespace kraken

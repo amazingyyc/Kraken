@@ -94,7 +94,7 @@ int32_t SparseTable::Push(Optim* optim, const std::vector<uint64_t>& sparse_ids,
 
       auto it = h.skip_list.Find(sparse_id);
       if (it.Valid() == false) {
-        return ErrorCode::kSparseTableIdNotExistError;
+        return ErrorCode::kSparseIdNotExistError;
       }
 
       int32_t error_code = optim->Update(grads[i], lr, &(it.value()));

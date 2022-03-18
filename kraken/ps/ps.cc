@@ -341,7 +341,7 @@ void Ps::Start() {
   std::unique_lock<std::shared_mutex> lock(mu_);
 
   // Connect to scheduler.
-  LOG_INFO("Try connect to scheduler:" << s_addr_);
+  LOG_INFO("Try connect to scheduler:[" << s_addr_ << "]");
   IndepConnecter s_connecter(s_addr_, CompressType::kNo);
   s_connecter.Start();
 
@@ -458,12 +458,12 @@ int32_t Ps::NotifyFinishTransfer(uint64_t node_id) {
   }
 
   if (events_.find(EventType::kProxyFinishTransfer) == events_.end()) {
-    return ErrorCode::kUnSupportEventTypeError;
+    return ErrorCode::kUnSupportEventError;
   }
 
   if (events_[EventType::kProxyFinishTransfer].find(node_id) ==
       events_[EventType::kProxyFinishTransfer].end()) {
-    return ErrorCode::kUnSupportEventTypeError;
+    return ErrorCode::kUnSupportEventError;
   }
 
   events_[EventType::kProxyFinishTransfer].erase(node_id);
@@ -489,7 +489,7 @@ int32_t Ps::NotifyNodeJoin(uint64_t joined_id, const Router& old_router,
   // A node is allowed to join must need all node status is kWork.
   if (status_ != NodeStatus::kWork) {
     LOG_INFO("Status is not kWork, So not allowed join new node.");
-    return ErrorCode::kNodeStatusInappropriateError;
+    return ErrorCode::kNodeStatusError;
   }
 
   LOG_INFO("Got notification: node:" << joined_id
@@ -589,9 +589,10 @@ int32_t Ps::CreateDenseTable(uint64_t table_id, std::string name,
 
   tables_.Insert(table_id, std::move(table));
 
-  LOG_INFO("Create DenseTable:" << name << ", id:" << table_id
-                                << ", ElementType:" << val.element_type().Name()
-                                << ", shape:" << val.shape().Str());
+  LOG_INFO("Create DenseTable:["
+           << name << "], id:[" << table_id << "], ElementType:["
+           << val.element_type().Name() << "], shape:[" << val.shape().Str()
+           << "]");
 
   return ErrorCode::kSuccess;
 }
@@ -629,10 +630,10 @@ int32_t Ps::CreateSparseTable(
 
   tables_.Insert(table_id, std::move(table));
 
-  LOG_INFO("Create SparseTable:"
-           << name << ", id:" << table_id << ", dimension:" << dimension
-           << ", ElementType:" << element_type.Name()
-           << ", init_type:" << init_type << ", init_conf:" << init_conf);
+  LOG_INFO("Create SparseTable:["
+           << name << "], id:[" << table_id << "], dimension:[" << dimension
+           << "], ElementType:[" << element_type.Name() << "], init_type:["
+           << init_type << "], init_conf:[" << init_conf << "]");
 
   return ErrorCode::kSuccess;
 }

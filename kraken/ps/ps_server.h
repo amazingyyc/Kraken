@@ -1,6 +1,7 @@
 #pragma once
 
 #include "protocol/combine_pull_dense_table_prot.h"
+#include "protocol/combine_pull_sparse_table_prot.h"
 #include "protocol/create_dense_table_prot.h"
 #include "protocol/create_model_prot.h"
 #include "protocol/create_sparse_table_prot.h"
@@ -82,8 +83,14 @@ private:
   int32_t PullSparseTable(const PullSparseTableRequest& req,
                           PullSparseTableResponse* rsp);
 
+  int32_t CombinePullSparseTable(const CombinePullSparseTableRequest& req,
+                                 CombinePullSparseTableResponse* rsp);
+
   int32_t PushSparseTable(const PushSparseTableRequest& req,
                           PushSparseTableResponse* rsp);
+
+  int32_t CombinePushSparseTable(const CombinePushSparseTableRequest& req,
+                                 CombinePushSparseTableResponse* rsp);
 
   void RegisterFuncs();
 

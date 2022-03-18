@@ -14,11 +14,12 @@ from kraken_native import pull_dense_table
 from kraken_native import combine_pull_dense_table
 from kraken_native import push_dense_table
 from kraken_native import pull_sparse_table
+from kraken_native import combine_pull_sparse_table
 from kraken_native import push_sparse_table
-# from kraken_native import combine_pull_sparse_table
-# from kraken_native import save_check_point
+from kraken_native import combine_push_sparse_table
 
 from .embedding import Embedding
+from .combine_embedding import CombineEmbedding
 from .lr import ConstantLR
 from .optim import Adagrad
 from .optim import Adam

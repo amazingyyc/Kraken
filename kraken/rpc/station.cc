@@ -11,12 +11,8 @@
 
 namespace kraken {
 
-Station::Station(uint32_t port, uint32_t thread_nums, bool async)
-    : port_(port),
-      thread_nums_(thread_nums),
-      async_(async),
-      started_(false),
-      stop_(false) {
+Station::Station(uint32_t port, uint32_t thread_nums)
+    : port_(port), thread_nums_(thread_nums), started_(false), stop_(false) {
 }
 
 Station::~Station() {
@@ -164,31 +160,34 @@ void Station::Start() {
       workers_.emplace_back(std::move(t));
     }
 
-    LOG_INFO("Station start at port:" << port_);
-    // set flag.
+    LOG_INFO("Station start at port:[" << port_ << "]");
     started_.store(true);
 
     // start
     zmq_device(ZMQ_QUEUE, zmq_clients_, zmq_workers_);
+
+    // never be called.
+    // close socket and destroy context.
+    ZMQ_CALL(zmq_close(zmq_workers_));
+    zmq_workers_ = nullptr;
+
+    ZMQ_CALL(zmq_close(zmq_clients_));
+    zmq_clients_ = nullptr;
+
+    ZMQ_CALL(zmq_term(zmq_context_));
+    zmq_context_ = nullptr;
   };
 
-  if (async_) {
-    // use separate thread to listen the connection.
-    listen_t_ = std::thread(std::move(callback));
+  // use separate thread to listen the connection.
+  listen_t_ = std::thread(std::move(callback));
 
-    // Wait start finish.
-    while (started_.load() == false) {
-    }
-  } else {
-    // Async is false will block at here.
-    callback();
+  // Wait start finish.
+  while (started_.load() == false) {
   }
 }
 
 void Station::Wait() {
-  if (async_) {
-    listen_t_.join();
-  }
+  listen_t_.join();
 }
 
 void Station::Stop() {
@@ -200,16 +199,6 @@ void Station::Stop() {
   //     t.join();
   //   }
   // }
-
-  // // close socket and destroy context.
-  // ZMQ_CALL(zmq_close(zmq_workers_));
-  // zmq_workers_ = nullptr;
-
-  // ZMQ_CALL(zmq_close(zmq_clients_));
-  // zmq_clients_ = nullptr;
-
-  // ZMQ_CALL(zmq_term(zmq_context_));
-  // zmq_context_ = nullptr;
 }
 
 }  // namespace kraken

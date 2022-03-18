@@ -9,6 +9,7 @@
 #include "common/info.h"
 #include "common/router.h"
 #include "common/skip_list.h"
+#include "protocol/combine_push_sparse_table_prot.h"
 #include "ps/optim/optim.h"
 #include "ps/proxy.h"
 #include "ps/table.h"
@@ -178,9 +179,23 @@ public:
                           std::vector<Tensor>* vals);
 
   // Call by Worker.
+  int32_t CombinePullSparseTable(
+      uint64_t router_version,
+      const std::unordered_map<uint64_t, std::vector<uint64_t>>&
+          table_sparse_ids,
+      std::unordered_map<uint64_t, std::vector<Tensor>>* table_vals);
+
+  // Call by Worker.
   int32_t PushSparseTable(uint64_t router_version, uint64_t table_id,
                           const std::vector<uint64_t>& sparse_ids,
                           const std::vector<Tensor>& grads, float lr);
+
+  // Call by Worker.
+  int32_t CombinePushSparseTable(
+      uint64_t router_version,
+      const std::unordered_map<uint64_t, CombinePushSparseTableItem>&
+          table_items,
+      float lr);
 };
 
 }  // namespace kraken

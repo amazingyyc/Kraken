@@ -35,6 +35,9 @@ private:
     // add connect.
     std::string addr;
 
+    // Add/Remvoe callback.
+    CALLBACK callback;
+
     // send message.
     uint64_t timestamp;
 
@@ -46,7 +49,7 @@ private:
     // Becareful z_buf include the RequestHeader.
     ZMQBuffer z_buf;
 
-    CALLBACK callback;
+    // Send message callback.
     ZMQ_CALLBACK z_callback;
 
     // Timeout milliseconds.
@@ -107,12 +110,7 @@ public:
 
   bool AddConnect(uint64_t id, const std::string& addr);
 
-  void AddConnectAsync(uint64_t id, const std::string& addr,
-                       CALLBACK&& callback);
-
   bool RemoveConnect(uint64_t id);
-
-  void RemoveConnectAsync(uint64_t id, CALLBACK&& callback);
 
   template <typename ReqType, typename ReplyType>
   int32_t Call(uint32_t rpc_type, const std::vector<uint64_t>& ids,

@@ -31,7 +31,7 @@ int32_t Scheduler::TryJoin(const std::string& addr, bool* allow,
                            uint64_t* node_id, Router* old_router,
                            Router* new_router) {
   // Allow a Node join in that need all exist ps Node be kWorker status.
-  LOG_INFO("A node:" << addr << " try to join.");
+  LOG_INFO("A node:[" << addr << "] try to join.");
 
   {
     std::vector<uint64_t> ids;
@@ -70,7 +70,7 @@ int32_t Scheduler::TryJoin(const std::string& addr, bool* allow,
   }
 
   if (connecter_.AddConnect(real_id, addr) == false) {
-    return ErrorCode::kAddConnecterError;
+    return ErrorCode::kConnectNodeError;
   }
 
   Node node;
@@ -161,8 +161,8 @@ int32_t Scheduler::InitModel(
         connecter_.Call(RPCFuncType::kCreateModelType, ids, req, &replies));
   }
 
-  LOG_INFO("Init model:" << name << ", optim_type:" << optim_type
-                         << ", optim_conf:" << optim_conf);
+  LOG_INFO("Init model:[" << name << "], optim_type:[" << optim_type
+                          << "], optim_conf:[" << optim_conf << "]");
 
   return ErrorCode::kSuccess;
 }
@@ -291,10 +291,10 @@ int32_t Scheduler::RegisterSparseTable(
 
   *table_id = real_id;
 
-  LOG_INFO("Register SparseTable:"
-           << name << ", id:" << real_id << ", dimension:" << dimension
-           << ", ElementType:" << element_type.Name() << ", init_type:"
-           << init_type << ", init_conf:" << init_conf << ", in all Ps.");
+  LOG_INFO("Register SparseTable:["
+           << name << "], id:[" << real_id << "], dimension:[" << dimension
+           << "], ElementType:[" << element_type.Name() << "], init_type:["
+           << init_type << "], init_conf:[" << init_conf << "], in all Ps.");
 
   return ErrorCode::kSuccess;
 }
