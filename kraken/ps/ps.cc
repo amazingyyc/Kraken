@@ -591,8 +591,7 @@ int32_t Ps::CreateDenseTable(uint64_t table_id, std::string name,
 
   LOG_INFO("Create DenseTable:["
            << name << "], id:[" << table_id << "], ElementType:["
-           << val.element_type().Name() << "], shape:[" << val.shape().Str()
-           << "]");
+           << val.element_type().Name() << "], shape:" << val.shape().Str());
 
   return ErrorCode::kSuccess;
 }

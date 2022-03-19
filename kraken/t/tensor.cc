@@ -79,6 +79,10 @@ std::string Tensor::Str() const {
     for (int64_t i = 0; i < size; ++i) {
       ss << Data<int64_t>()[i] << ", ";
     }
+  } else if (element_type().Is<uint64_t>()) {
+    for (int64_t i = 0; i < size; ++i) {
+      ss << Data<uint64_t>()[i] << ", ";
+    }
   } else {
     RUNTIME_ERROR("Type:" << element_type().Name() << " not support str().");
   }

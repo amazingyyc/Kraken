@@ -43,7 +43,7 @@ int32_t SparseTable::Pull(const std::vector<uint64_t>& sparse_ids,
     slot_idx_map[vals_.HitSlot(sparse_ids[i])].emplace_back(i);
   }
 
-  for (auto& [slot, v] : slot_idx_map) {
+  for (const auto& [slot, v] : slot_idx_map) {
     // Lock the slot.
     auto h = vals_.UniqueSkipListHandler(slot);
 
@@ -85,7 +85,7 @@ int32_t SparseTable::Push(Optim* optim, const std::vector<uint64_t>& sparse_ids,
     slot_idx_map[vals_.HitSlot(sparse_ids[i])].emplace_back(i);
   }
 
-  for (auto& [slot, v] : slot_idx_map) {
+  for (const auto& [slot, v] : slot_idx_map) {
     // Lock the slot.
     auto h = vals_.UniqueSkipListHandler(slot);
 
