@@ -8,6 +8,8 @@ from kraken.pytorch.lr import LR, ConstantLR
 from kraken.pytorch.optim import Optim
 import kraken_native
 
+logging.getLogger().setLevel(logging.INFO)
+
 
 class Optimizer:
 

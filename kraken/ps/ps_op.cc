@@ -213,7 +213,6 @@ int32_t Ps::CombinePullDenseTable(uint64_t router_version,
       auto it = tables_.Find(table_ids[i]);
 
       if (it.Valid() == false) {
-        std::cout << "DenseTableId not exit:" << table_ids[i] << "\n";
         return ErrorCode::kTableNotExistError;
       }
 
@@ -357,7 +356,6 @@ int32_t Ps::PullSparseTable(uint64_t router_version, uint64_t table_id,
     // Try to pull again.
     return it.value()->Pull(sparse_ids, vals);
   } else {
-    // Normal.
     std::shared_lock<std::shared_mutex> ll(model_mu_);
 
     auto it = tables_.Find(table_id);

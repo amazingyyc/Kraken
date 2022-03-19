@@ -1,5 +1,6 @@
 # coding=utf-8
 
+from pickletools import read_unicodestring1
 from typing import List, Union
 import torch
 from kraken.pytorch.combine_sparse_table import CombineSparseTable
@@ -42,5 +43,6 @@ class CombineEmbedding(torch.nn.Module):
                                                    initializers=initializers,
                                                    names=names)
 
-  def forward(self, indices: Union[list, tuple]):
-    return CombineEmbeddingFunction.apply(self.combine_sparse_table, *indices)
+  def forward(self, indices: list):
+    vals = CombineEmbeddingFunction.apply(self.combine_sparse_table, *indices)
+    return list(vals)

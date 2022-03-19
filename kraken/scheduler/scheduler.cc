@@ -182,7 +182,7 @@ int32_t Scheduler::RegisterDenseTable(std::string name, const Tensor& val,
 
       *table_id = v.id;
 
-      LOG_INFO("DenseTable:" << name << " already registered!");
+      LOG_INFO("DenseTable:[" << name << "] already registered!");
 
       return ErrorCode::kSuccess;
     }
@@ -218,10 +218,10 @@ int32_t Scheduler::RegisterDenseTable(std::string name, const Tensor& val,
 
   *table_id = real_id;
 
-  LOG_INFO("Register DenseTable:"
-           << name << ", id:" << real_id
-           << ", ElementType:" << val.element_type().Name()
-           << ", shape:" << val.shape().Str() << " in Ps:" << node_id);
+  LOG_INFO("Register DenseTable:["
+           << name << "], id:[" << real_id << "], ElementType:["
+           << val.element_type().Name() << "], shape:" << val.shape().Str()
+           << " in Ps:[" << node_id << "]");
 
   return ErrorCode::kSuccess;
 }
@@ -244,7 +244,7 @@ int32_t Scheduler::RegisterSparseTable(
 
       *table_id = v.id;
 
-      LOG_INFO("SparseTable:" << name << " already registered!");
+      LOG_INFO("SparseTable:[" << name << "] already registered!");
 
       return ErrorCode::kSuccess;
     }

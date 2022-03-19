@@ -454,11 +454,12 @@ void ConcatVector(const std::vector<std::shared_ptr<TensorImpl>>& xs,
 
 template <typename T>
 void NormalImpl(T* v, int64_t n, T mean, T stddev) {
-  static thread_local std::mt19937 generator;
-  std::normal_distribution<T> distribution(mean, stddev);
+  std::random_device rd{};
+  std::mt19937 gen{rd()};
+  std::normal_distribution<T> dist{mean, stddev};
 
   for (int64_t i = 0; i < n; ++i) {
-    v[i] = distribution(generator);
+    v[i] = dist(gen);
   }
 }
 
@@ -484,11 +485,12 @@ void XavierNormal(TensorImpl& x, float gain) {
 
 template <typename T>
 void UniformImpl(T* v, int64_t n, T lower, T upper) {
-  static thread_local std::mt19937 gen;
-  std::uniform_real_distribution<T> dis(lower, upper);
+  std::random_device rd{};
+  std::mt19937 gen{rd()};
+  std::uniform_real_distribution<T> dist{lower, upper};
 
   for (int64_t i = 0; i < n; ++i) {
-    v[i] = dis(gen);
+    v[i] = dist(gen);
   }
 }
 

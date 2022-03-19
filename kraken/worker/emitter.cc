@@ -182,7 +182,9 @@ int32_t Emitter::PullSparseTableImpl(uint64_t table_id, const Tensor& indices,
 int32_t Emitter::CombinePullSparseTableImpl(
     const std::vector<uint64_t>& table_ids, const std::vector<Tensor>& indices,
     std::vector<Tensor>* vals) {
-  assert(table_ids.size() == indices.size());
+  ARGUMENT_CHECK(
+      table_ids.size() == indices.size(),
+      "CombinePullSparseTable need table_ids/indices has same size.");
 
   // Maybe share memory with pytorch.
   std::vector<Tensor> indice_u64s;
@@ -207,11 +209,11 @@ int32_t Emitter::CombinePullSparseTableImpl(
 
   std::unordered_map<uint64_t, CombinePullSparseTableResponse> replies;
 
-  for (size_t i = 0; i < table_ids.size(); ++i) {
-    uint64_t table_id = table_ids[i];
+  for (size_t t = 0; t < table_ids.size(); ++t) {
+    uint64_t table_id = table_ids[t];
 
-    int64_t row = indice_u64s[i].Size();
-    uint64_t* ptr = indice_u64s[i].Data<uint64_t>();
+    int64_t row = indice_u64s[t].Size();
+    uint64_t* ptr = indice_u64s[t].Data<uint64_t>();
 
     for (int64_t j = 0; j < row; ++j) {
       uint64_t sparse_id = ptr[j];
@@ -240,11 +242,11 @@ int32_t Emitter::CombinePullSparseTableImpl(
 
   vals->reserve(indice_u64s.size());
 
-  for (size_t i = 0; i < table_ids.size(); ++i) {
-    uint64_t table_id = table_ids[i];
+  for (size_t t = 0; t < table_ids.size(); ++t) {
+    uint64_t table_id = table_ids[t];
 
-    int64_t row = indice_u64s[i].Size();
-    uint64_t* ptr = indice_u64s[i].Data<uint64_t>();
+    int64_t row = indice_u64s[t].Size();
+    uint64_t* ptr = indice_u64s[t].Data<uint64_t>();
 
     std::vector<Tensor> vecs;
     vecs.reserve(row);
@@ -253,17 +255,16 @@ int32_t Emitter::CombinePullSparseTableImpl(
       uint64_t sparse_id = ptr[j];
 
       auto key = std::make_pair(table_id, sparse_id);
-
       auto pos = sparse_val_idx[key];
 
       vecs.emplace_back(
           replies[pos.first].table_vals.at(table_id).at(pos.second));
     }
 
-    Tensor val = indice_u64s[i].ConcatVector(vecs);
+    Tensor val = indice_u64s[t].ConcatVector(vecs);
 
-    std::vector<int64_t> dims = indice_u64s[i].shape().dims();
-    int64_t col = val.Size() / indice_u64s[i].Size();
+    std::vector<int64_t> dims = indice_u64s[t].shape().dims();
+    int64_t col = val.Size() / indice_u64s[t].Size();
 
     dims.emplace_back(col);
 
@@ -577,10 +578,11 @@ void Emitter::CombinePushSparseTable(const std::vector<uint64_t>& table_ids,
                    "PushSparseTable indices and grads shape error.");
 
     Tensor indices_u64 = indices[t].Cast(ElementType::From<uint64_t>());
+
     int64_t row = indices_u64.Size();
     uint64_t* ptr = indices_u64.Data<uint64_t>();
 
-    Tensor m_grads = grads[t].Reshape({row, dimension});
+    Tensor m_grad = grads[t].Reshape({row, dimension});
 
     for (int64_t i = 0; i < row; ++i) {
       uint64_t sparse_id = ptr[i];
@@ -595,12 +597,12 @@ void Emitter::CombinePushSparseTable(const std::vector<uint64_t>& table_ids,
 
         reqs[node_id].table_items[table_id].sparse_ids.emplace_back(sparse_id);
         reqs[node_id].table_items[table_id].grads.emplace_back(
-            m_grads.Vector(i).Clone());
+            m_grad.Vector(i).Clone());
       } else {
         uint64_t node_id = it->second.first;
         size_t idx = it->second.second;
 
-        reqs[node_id].table_items[table_id].grads[idx] += m_grads.Vector(i);
+        reqs[node_id].table_items[table_id].grads[idx] += m_grad.Vector(i);
       }
     }
   }
