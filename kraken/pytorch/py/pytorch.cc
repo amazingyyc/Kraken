@@ -1,38 +1,41 @@
-#include "pybind11/pytorch.h"
+#include "pytorch/py/pytorch.h"
 
 #include <cinttypes>
 #include <memory>
 #include <vector>
 
 #include "common/exception.h"
-#include "pybind11/pytorch_utils.h"
+#include "pytorch/py/pytorch_utils.h"
 #include "t/element_type.h"
 #include "t/shape.h"
 #include "t/storage.h"
 #include "t/tensor.h"
-#include "worker/emitter.h"
+#include "worker/worker.h"
 
 namespace kraken {
 namespace py {
 
 std::once_flag flag;
-Emitter emitter;
+Worker worker;
 
-void Initialize(const std::string& s_addr) {
-  std::call_once(flag, [&s_addr]() { emitter.Initialize(s_addr); });
+void Initialize(const std::string& s_addr, EmitterType emitter_type,
+                uint64_t life_span, float eta) {
+  std::call_once(flag, [&s_addr, emitter_type, life_span, eta]() {
+    worker.Initialize(s_addr, emitter_type, life_span, eta);
+  });
 }
 
 void Stop() {
-  emitter.Stop();
+  worker.Stop();
 }
 
 void InitModel(const std::string& model_name, OptimType optim_type,
                const std::unordered_map<std::string, std::string>& optim_conf) {
-  emitter.InitModel(model_name, optim_type, optim_conf);
+  worker.InitModel(model_name, optim_type, optim_conf);
 }
 
 void UpdateLR(float lr) {
-  emitter.UpdateLR(lr);
+  worker.UpdateLR(lr);
 }
 
 uint64_t RegisterDenseTable(const std::string& name, torch::Tensor val) {
@@ -47,7 +50,7 @@ uint64_t RegisterDenseTable(const std::string& name, torch::Tensor val) {
 
   Tensor k_val = TorchTensorToTensor(c_val);
 
-  return emitter.RegisterDenseTable(name, k_val);
+  return worker.RegisterDenseTable(name, k_val);
 }
 
 uint64_t RegisterSparseTable(
@@ -57,12 +60,12 @@ uint64_t RegisterSparseTable(
   torch::Dtype ttype = torch::python::detail::py_object_to_dtype(dtype);
   ElementType etype = TorchDTypeToElementType(ttype);
 
-  return emitter.RegisterSparseTable(name, dimension, etype, init_type,
-                                     init_conf);
+  return worker.RegisterSparseTable(name, dimension, etype, init_type,
+                                    init_conf);
 }
 
 torch::Tensor PullDenseTable(uint64_t table_id) {
-  Tensor k_val = emitter.PullDenseTable(table_id);
+  Tensor k_val = worker.PullDenseTable(table_id);
 
   torch::IntArrayRef sizes = ShapeToTorchSizes(k_val.shape());
   torch::Dtype dtype = ElementTypeToTorchDType(k_val.element_type());
@@ -77,7 +80,7 @@ torch::Tensor PullDenseTable(uint64_t table_id) {
 
 std::vector<torch::Tensor> CombinePullDenseTable(
     const std::vector<uint64_t>& table_ids) {
-  std::vector<Tensor> k_vals = emitter.CombinePullDenseTable(table_ids);
+  std::vector<Tensor> k_vals = worker.CombinePullDenseTable(table_ids);
   std::vector<torch::Tensor> vals;
 
   for (auto& kv : k_vals) {
@@ -105,7 +108,7 @@ void PushDenseTable(uint64_t table_id, torch::Tensor grad) {
 
   Tensor k_grad = TorchTensorToTensor(c_grad);
 
-  emitter.PushDenseTable(table_id, k_grad);
+  worker.PushDenseTable(table_id, k_grad);
 }
 
 torch::Tensor PullSparseTable(uint64_t table_id, torch::Tensor indices) {
@@ -120,7 +123,7 @@ torch::Tensor PullSparseTable(uint64_t table_id, torch::Tensor indices) {
   Tensor k_indices = TorchTensorToTensor(c_indices);
 
   // The sparse embedding.
-  Tensor k_val = emitter.PullSparseTable(table_id, k_indices);
+  Tensor k_val = worker.PullSparseTable(table_id, k_indices);
 
   torch::IntArrayRef sizes = ShapeToTorchSizes(k_val.shape());
   torch::Dtype dtype = ElementTypeToTorchDType(k_val.element_type());
@@ -159,7 +162,7 @@ std::vector<torch::Tensor> CombinePullSparseTable(
   }
 
   std::vector<Tensor> k_vals =
-      emitter.CombinePullSparseTable(table_ids, k_indices);
+      worker.CombinePullSparseTable(table_ids, k_indices);
 
   std::vector<torch::Tensor> vals;
 
@@ -195,7 +198,7 @@ void PushSparseTable(uint64_t table_id, torch::Tensor indices,
   Tensor k_indices = TorchTensorToTensor(c_indices);
   Tensor k_grad = TorchTensorToTensor(c_grad);
 
-  emitter.PushSparseTable(table_id, k_indices, k_grad);
+  worker.PushSparseTable(table_id, k_indices, k_grad);
 }
 
 void CombinePushSparseTable(const std::vector<uint64_t>& table_ids,
@@ -239,7 +242,7 @@ void CombinePushSparseTable(const std::vector<uint64_t>& table_ids,
     k_grads.emplace_back(TorchTensorToTensor(c_grads[i]));
   }
 
-  emitter.CombinePushSparseTable(table_ids, k_indices, k_grads);
+  worker.CombinePushSparseTable(table_ids, k_indices, k_grads);
 }
 
 }  // namespace py

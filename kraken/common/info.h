@@ -9,6 +9,13 @@
 
 namespace kraken {
 
+// Worker emitter type.
+enum class EmitterType : uint8_t {
+  kDefault = 0,
+  kDCT = 1,  // ref: Training Recommender Systems at Scale:
+             // Communication-Efficient Model and Data Parallelism
+};
+
 // Cluster node type.
 enum class NodeType : uint8_t {
   kScheduler = 0,

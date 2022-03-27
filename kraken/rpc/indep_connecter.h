@@ -57,8 +57,8 @@ private:
 
   std::thread worker_;
 
-  // zmp content
   void* zmq_context_;
+  void* zmq_socket_;
 
 public:
   IndepConnecter(const std::string& addr, CompressType compress_type);

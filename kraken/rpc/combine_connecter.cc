@@ -179,8 +179,8 @@ void CombineConnecter::HandleReply(zmq_msg_t& reply) {
 }
 
 void CombineConnecter::Run() {
-  zmq_context_ = zmq_init(1);
-  ARGUMENT_CHECK(zmq_context_ != nullptr, "zmq_init return nullptr, error:"
+  zmq_context_ = zmq_ctx_new();
+  ARGUMENT_CHECK(zmq_context_ != nullptr, "zmq_ctx_new return nullptr, error:"
                                               << zmq_strerror(zmq_errno()));
 
   // We use zmq_pollitem_t to monitor the message queue and socket.

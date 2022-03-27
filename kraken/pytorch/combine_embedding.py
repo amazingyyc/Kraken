@@ -1,7 +1,6 @@
 # coding=utf-8
 
-from pickletools import read_unicodestring1
-from typing import List, Union
+from typing import List
 import torch
 from kraken.pytorch.combine_sparse_table import CombineSparseTable
 from kraken.pytorch.initializer import Initializer
@@ -16,7 +15,8 @@ class CombineEmbeddingFunction(torch.autograd.Function):
 
     assert len(combine_sparse_table.table_ids()) == len(indices)
 
-    vals = kraken_native.combine_pull_sparse_table(combine_sparse_table.table_ids(), list(indices))
+    vals = kraken_native.combine_pull_sparse_table(
+        combine_sparse_table.table_ids(), list(indices))
 
     return tuple(vals)
 
@@ -24,7 +24,8 @@ class CombineEmbeddingFunction(torch.autograd.Function):
   def backward(ctx, *grads):
     combine_sparse_table, *indices, = ctx.saved_tensors
 
-    kraken_native.combine_push_sparse_table(combine_sparse_table.table_ids(), list(indices), list(grads))
+    kraken_native.combine_push_sparse_table(combine_sparse_table.table_ids(),
+                                            list(indices), list(grads))
 
     return tuple([None] * (1 + len(grads)))
 
@@ -43,6 +44,9 @@ class CombineEmbedding(torch.nn.Module):
                                                    initializers=initializers,
                                                    names=names)
 
-  def forward(self, indices: list):
+  def forward(self, indices: List[torch.Tensor]):
+    assert len(self.combine_sparse_table.table_ids()) == len(indices)
+
     vals = CombineEmbeddingFunction.apply(self.combine_sparse_table, *indices)
+
     return list(vals)

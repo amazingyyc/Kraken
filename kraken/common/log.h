@@ -87,6 +87,19 @@ inline Logger& Logger::operator<<(const InitializerType& init_type) {
   return *this;
 }
 
+template <>
+inline Logger& Logger::operator<<(const EmitterType& emitter_type) {
+  if (emitter_type == EmitterType::kDefault) {
+    oss_ << "kDefault";
+  } else if (emitter_type == EmitterType::kDCT) {
+    oss_ << "kDCT";
+  } else {
+    oss_ << "UnKnow";
+  }
+
+  return *this;
+}
+
 }  // namespace log
 
 #define LOG_DEBUG_LEVEL 0

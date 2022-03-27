@@ -309,10 +309,6 @@ void Emitter::Stop() {
   initialized_ = false;
 }
 
-void Emitter::UpdateLR(float lr) {
-  lr_ = lr;
-}
-
 void Emitter::InitModel(
     const std::string& model_name, OptimType optim_type,
     const std::unordered_map<std::string, std::string>& optim_conf) {
@@ -327,6 +323,10 @@ void Emitter::InitModel(
   InitModelResponse reply;
 
   RPC_CALL(s_connecter_->Call(RPCFuncType::kInitModelType, req, &reply));
+}
+
+void Emitter::UpdateLR(float lr) {
+  lr_ = lr;
 }
 
 uint64_t Emitter::RegisterDenseTable(const std::string& name,

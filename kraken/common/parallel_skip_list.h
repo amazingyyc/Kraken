@@ -9,7 +9,14 @@
 
 namespace kraken {
 
-template <typename Key, typename Value, typename KeyHash = std::hash<Key>,
+template <typename T>
+struct ItselfHash {
+  inline T operator()(const T& v) const {
+    return v;
+  }
+};
+
+template <typename Key, typename Value, typename KeyHash = ItselfHash<Key>,
           size_t SlotCount = 8>
 class ParallelSkipList {
 public:

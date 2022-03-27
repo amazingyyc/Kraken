@@ -90,13 +90,14 @@ void SyncStation::HandleMsg(zmq_msg_t& identity, zmq_msg_t& msg, void* socket) {
   ZMQ_CALL(zmq_msg_send(&replyid, socket, ZMQ_SNDMORE));
   ZMQ_CALL(zmq_msg_send(&reply, socket, 0));
 
+  // http://api.zeromq.org/4-1:zmq-msg-send
   // ZMQ_CALL(zmq_msg_close(&replyid));
   // ZMQ_CALL(zmq_msg_close(&reply));
 }
 
 void SyncStation::Run() {
-  zmq_context_ = zmq_init(1);
-  ARGUMENT_CHECK(zmq_context_ != nullptr, "zmq_init return nullptr, error:"
+  zmq_context_ = zmq_ctx_new();
+  ARGUMENT_CHECK(zmq_context_ != nullptr, "zmq_ctx_new return nullptr, error:"
                                               << zmq_strerror(zmq_errno()));
 
   zmq_scoket_ = zmq_socket(zmq_context_, ZMQ_ROUTER);
