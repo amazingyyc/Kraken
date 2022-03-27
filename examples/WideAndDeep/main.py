@@ -11,7 +11,7 @@ from model import WideDeep, WideDeepLoader
 import kraken.pytorch as kk
 
 # initialize Kraken
-kk.initialize('127.0.0.1:50000')
+kk.initialize(s_addr='127.0.0.1:50000', emitter_type=kk.EmitterType.kDCT)
 
 path = 'data/adult_data.csv'
 

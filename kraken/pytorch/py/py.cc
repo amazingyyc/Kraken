@@ -9,7 +9,8 @@
 
 #include "ps/initializer/initializer.h"
 #include "ps/optim/optim.h"
-#include "pybind11/pytorch.h"
+#include "pytorch/py/jagged_ops.h"
+#include "pytorch/py/pytorch.h"
 #include "rpc/protocol.h"
 #include "worker/emitter.h"
 
@@ -38,7 +39,9 @@ PYBIND11_MODULE(kraken_native, m) {
       .value("kDefault", EmitterType::kDefault)
       .value("kDCT", EmitterType::kDCT);
 
-  m.def("initialize", &Initialize, pybind11::arg("s_addr"));
+  m.def("initialize", &Initialize, pybind11::arg("s_addr"),
+        pybind11::arg("emitter_type") = EmitterType::kDefault,
+        pybind11::arg("life_span") = 1000, pybind11::arg("eta") = 0.75);
 
   m.def("stop", &Stop);
 
@@ -75,6 +78,18 @@ PYBIND11_MODULE(kraken_native, m) {
 
   m.def("combine_push_sparse_table", &CombinePushSparseTable,
         pybind11::arg("table_ids"), pybind11::arg("indices"),
+        pybind11::arg("grads"));
+
+  // Jagged tensor Sum op.
+  m.def("jagged_sum_forward", &jagged::SumForward, pybind11::arg("values"),
+        pybind11::arg("offsets"), pybind11::arg("patch_value"));
+  m.def("jagged_sum_backward", &jagged::SumBackward, pybind11::arg("offsets"),
+        pybind11::arg("grads"));
+
+  // Jagged tensor Mean op.
+  m.def("jagged_mean_forward", &jagged::MeanForward, pybind11::arg("values"),
+        pybind11::arg("offsets"), pybind11::arg("patch_value"));
+  m.def("jagged_mean_backward", &jagged::MeanBackward, pybind11::arg("offsets"),
         pybind11::arg("grads"));
 }
 

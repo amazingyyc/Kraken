@@ -43,24 +43,24 @@ void IndepConnecter::HandleReply(zmq_msg_t& reply) {
 }
 
 void IndepConnecter::Run() {
-  zmq_context_ = zmq_init(1);
-  ARGUMENT_CHECK(zmq_context_ != nullptr, "zmq_init return nullptr, error:"
+  zmq_context_ = zmq_ctx_new();
+  ARGUMENT_CHECK(zmq_context_ != nullptr, "zmq_ctx_new return nullptr, error:"
                                               << zmq_strerror(zmq_errno()));
 
   // create zmq socket.
-  void* zsocket = zmq_socket(zmq_context_, ZMQ_DEALER);
-  ARGUMENT_CHECK(zsocket != nullptr, "zmq_socket return nullptr, error:"
-                                         << zmq_strerror(zmq_errno()));
+  zmq_socket_ = zmq_socket(zmq_context_, ZMQ_DEALER);
+  ARGUMENT_CHECK(zmq_socket_ != nullptr, "zmq_socket return nullptr, error:"
+                                             << zmq_strerror(zmq_errno()));
 
   std::string tcp_addr = "tcp://" + addr_;
 
   // connect server.
-  ZMQ_CALL(zmq_connect(zsocket, tcp_addr.c_str()));
+  ZMQ_CALL(zmq_connect(zmq_socket_, tcp_addr.c_str()));
 
   zmq_pollitem_t items[2];
 
   // 0 to accept socket response.
-  items[0].socket = zsocket;
+  items[0].socket = zmq_socket_;
   items[0].fd = 0;
   items[0].events = ZMQ_POLLIN;
   items[0].revents = 0;
@@ -85,7 +85,7 @@ void IndepConnecter::Run() {
       zmq_msg_t reply;
 
       ZMQ_CALL(zmq_msg_init(&reply));
-      ZMQ_CALL(zmq_msg_recv(&reply, zsocket, 0));
+      ZMQ_CALL(zmq_msg_recv(&reply, zmq_socket_, 0));
 
       HandleReply(reply);
 
@@ -152,7 +152,7 @@ void IndepConnecter::Run() {
 
         // zero copy.
         ZMQ_CALL(zmq_msg_init_data(&zmq_msg, ptr, offset, zmq_free, nullptr));
-        ZMQ_CALL(zmq_msg_send(&zmq_msg, zsocket, 0));
+        ZMQ_CALL(zmq_msg_send(&zmq_msg, zmq_socket_, 0));
         // ref: http://api.zeromq.org/4-1:zmq-msg-send
         // A successful invocation of zmq_msg_send() does not indicate that the
         // message has been transmitted to the network, only that it has been
@@ -206,7 +206,8 @@ void IndepConnecter::Run() {
     }
   }
 
-  ZMQ_CALL(zmq_close(zsocket));
+  ZMQ_CALL(zmq_close(zmq_socket_));
+  zmq_socket_ = nullptr;
 
   // close zmq context.
   ZMQ_CALL(zmq_term(zmq_context_));

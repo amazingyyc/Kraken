@@ -73,7 +73,12 @@ class Adam(Optim):
 
 class RMSprop(Optim):
 
-  def __init__(self, weight_decay=None, momentum=None, alpha: float = 0.99, eps: float = 1e-8, centered: bool = False):
+  def __init__(self,
+               weight_decay=None,
+               momentum=None,
+               alpha: float = 0.99,
+               eps: float = 1e-8,
+               centered: bool = False):
     super(RMSprop, self).__init__()
 
     self._weight_decay = weight_decay
@@ -106,7 +111,11 @@ class RMSprop(Optim):
 
 class SGD(Optim):
 
-  def __init__(self, momentum=None, dampening=None, weight_decay=None, nesterov: bool = False):
+  def __init__(self,
+               momentum=None,
+               dampening=None,
+               weight_decay=None,
+               nesterov: bool = False):
     super(SGD, self).__init__()
 
     self._momentum = momentum

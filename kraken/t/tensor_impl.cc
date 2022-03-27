@@ -529,6 +529,7 @@ std::shared_ptr<TensorImpl> TensorImpl::ToDense() const {
 
 std::shared_ptr<TensorImpl> TensorImpl::ToCoo(float th) const {
   ARGUMENT_CHECK(IsDense(), "ToCoo need Dense TensorImpl.");
+  ARGUMENT_CHECK(th >= 0, "ToCoo need th >= 0.");
 
   // Current tensor element count.
   int64_t size = Size();
@@ -556,6 +557,8 @@ std::shared_ptr<TensorImpl> TensorImpl::ToCoo(float th) const {
 }
 
 std::shared_ptr<TensorImpl> TensorImpl::LtKeep(float th) const {
+  ARGUMENT_CHECK(th >= 0, "LtKeep need th >= 0.");
+
   auto out = Like();
   math::LtKeep(*this, th, *out);
 

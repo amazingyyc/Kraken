@@ -4,18 +4,13 @@
 #include <memory>
 #include <vector>
 
+#include "common/info.h"
 #include "common/router.h"
 #include "rpc/group_connecters.h"
 #include "rpc/indep_connecter.h"
 #include "rpc/protocol.h"
 
 namespace kraken {
-
-enum class EmitterType : uint8_t {
-  kDefault = 0,
-  kDCT = 1,  // ref: Training Recommender Systems at Scale:
-             // Communication-Efficient Model and Data Parallelism
-};
 
 // We assume that Emitter is thread-safe guarantee by caller.
 class Emitter {
@@ -63,13 +58,14 @@ public:
 
   void Stop();
 
-  void UpdateLR(float lr);
-
   void InitModel(
       const std::string& model_name, OptimType optim_type,
       const std::unordered_map<std::string, std::string>& optim_conf);
 
-  uint64_t RegisterDenseTable(const std::string& name, const Tensor& val);
+  void UpdateLR(float lr);
+
+  virtual uint64_t RegisterDenseTable(const std::string& name,
+                                      const Tensor& val);
 
   uint64_t RegisterSparseTable(
       const std::string& name, int64_t dimension, ElementType element_type,
@@ -81,7 +77,7 @@ public:
   std::vector<Tensor> CombinePullDenseTable(
       const std::vector<uint64_t>& table_ids);
 
-  void PushDenseTable(uint64_t table_id, const Tensor& grad);
+  virtual void PushDenseTable(uint64_t table_id, const Tensor& grad);
 
   Tensor PullSparseTable(uint64_t table_id, const Tensor& indices);
 

@@ -1,6 +1,5 @@
 # coding=utf-8
 
-from typing import List
 import torch
 from kraken.pytorch.sparse_table import SparseTable
 from kraken.pytorch.initializer import Initializer, NormalInitializer
@@ -31,10 +30,13 @@ class Embedding(torch.nn.Module):
                initializer: Initializer = NormalInitializer(),
                name: str = None):
     super(Embedding, self).__init__()
-    # At here we just create a SparseTabel instance.
-    # This instance include dimension/dtype/name.
-    # We will actually register the SparseTable in server when user call optimizer.
-    self.sparse_table = SparseTable(dimension=dimension, dtype=dtype, initializer=initializer, name=name)
+    '''At here we just create a SparseTabel instance.
+    This instance include dimension/dtype/name.
+    We will actually register the SparseTable in server when user call optimizer.'''
+    self.sparse_table = SparseTable(dimension=dimension,
+                                    dtype=dtype,
+                                    initializer=initializer,
+                                    name=name)
 
   def forward(self, indices):
     return EmbeddingFunction.apply(self.sparse_table, indices)

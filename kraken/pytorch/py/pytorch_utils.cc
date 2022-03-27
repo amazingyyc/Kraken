@@ -1,4 +1,4 @@
-#include "pybind11/pytorch_utils.h"
+#include "pytorch/py/pytorch_utils.h"
 
 #include "common/exception.h"
 
@@ -6,11 +6,7 @@ namespace kraken {
 namespace py {
 
 Shape TorchSizesToShape(const torch::IntArrayRef& sizes) {
-  std::vector<int64_t> dims;
-  for (auto d : sizes) {
-    dims.emplace_back(d);
-  }
-
+  std::vector<int64_t> dims = sizes.vec();
   return Shape(dims);
 }
 

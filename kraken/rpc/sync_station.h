@@ -47,6 +47,7 @@ private:
   void HandleMsg(zmq_msg_t& identity, zmq_msg_t& msg, void* socket);
 
 public:
+  // Cannot call this function after start.
   template <typename RequestType, typename ReplyType>
   void RegisterFunc(
       uint32_t type,

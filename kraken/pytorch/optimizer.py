@@ -13,7 +13,8 @@ logging.getLogger().setLevel(logging.INFO)
 
 class Optimizer:
 
-  def __init__(self, model_name: str, named_parameters, lr: Union[float, LR], optim: Optim):
+  def __init__(self, model_name: str, named_parameters, lr: Union[float, LR],
+               optim: Optim):
 
     self._model_name = model_name
 
@@ -27,10 +28,12 @@ class Optimizer:
     # <param, table_id/table_ids>
     self._param_table_id = {}
 
-    kraken_native.init_model(self._model_name, self._optim.type(), self._optim.conf())
+    kraken_native.init_model(self._model_name, self._optim.type(),
+                             self._optim.conf())
 
     logging.info(
-        f'Register model:[{self._model_name}], optim_type:{self._optim.type()}, optim_conf:{self._optim.conf()}.')
+        f'Register model:[{self._model_name}], optim_type:{self._optim.type()}, optim_conf:{self._optim.conf()}.'
+    )
 
     # We should update learning rate when initialize model.
     kraken_native.update_lr(self._lr.lr())
@@ -49,11 +52,12 @@ class Optimizer:
         dtype = param.dtype()
         initializer = param.initializer()
 
-        table_id = kraken_native.register_sparse_table(name=real_name,
-                                                       dimension=dimension,
-                                                       dtype=dtype,
-                                                       init_type=initializer.type(),
-                                                       init_conf=initializer.conf())
+        table_id = kraken_native.register_sparse_table(
+            name=real_name,
+            dimension=dimension,
+            dtype=dtype,
+            init_type=initializer.type(),
+            init_conf=initializer.conf())
 
         param.set_table_id(table_id)
         param.set_name(real_name)
@@ -84,11 +88,12 @@ class Optimizer:
           dtype = param.dtypes()[i]
           initializer = param.initializers()[i]
 
-          table_id = kraken_native.register_sparse_table(name=real_name,
-                                                         dimension=dimension,
-                                                         dtype=dtype,
-                                                         init_type=initializer.type(),
-                                                         init_conf=initializer.conf())
+          table_id = kraken_native.register_sparse_table(
+              name=real_name,
+              dimension=dimension,
+              dtype=dtype,
+              init_type=initializer.type(),
+              init_conf=initializer.conf())
 
           table_ids.append(table_id)
 
@@ -113,8 +118,7 @@ class Optimizer:
         # Register a hook func to send gradient to server.
         param.register_hook(self._create_dense_grad_hook(name, table_id))
 
-        logging.info(f'Register DenseTable:[{name}], ' \
-                      f'table id:[{table_id}].')
+        logging.info(f'Register DenseTable:[{name}], table id:[{table_id}].')
 
     # When finish register SpareTable/DenseTable in Ps we need pull DenseTable at beginning.
     # make sure the the Model is same as stored in Ps.
@@ -122,7 +126,8 @@ class Optimizer:
     dense_table_ids = []
 
     for param, table_id in self._param_table_id.items():
-      if not isinstance(param, SparseTable) and not isinstance(param, CombineSparseTable):
+      if not isinstance(param, SparseTable) and not isinstance(
+          param, CombineSparseTable):
         dense_params.append(param)
         dense_table_ids.append(table_id)
 
@@ -148,7 +153,8 @@ class Optimizer:
     dense_table_ids = []
 
     for param, table_id in self._param_table_id.items():
-      if not isinstance(param, SparseTable) and not isinstance(param, CombineSparseTable):
+      if not isinstance(param, SparseTable) and not isinstance(
+          param, CombineSparseTable):
         dense_params.append(param)
         dense_table_ids.append(table_id)
 

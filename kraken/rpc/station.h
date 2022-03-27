@@ -37,15 +37,6 @@ private:
   // A seperate thread to listen connect.
   std::thread listen_t_;
 
-  // zmp content
-  void* zmq_context_;
-
-  // zmq clients.
-  void* zmq_clients_;
-
-  // zmq worker.
-  void* zmq_workers_;
-
   std::atomic_bool started_;
   std::atomic_bool stop_;
 
@@ -56,6 +47,9 @@ public:
   Station(uint32_t port, uint32_t thread_nums);
 
   ~Station();
+
+private:
+  void ZMQReceiveAndSend(void* from, void* to);
 
   void HandleError(uint64_t timestamp, int32_t error_code, zmq_msg_t& identity,
                    void* socket);

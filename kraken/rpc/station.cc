@@ -18,6 +18,23 @@ Station::Station(uint32_t port, uint32_t thread_nums)
 Station::~Station() {
 }
 
+void Station::ZMQReceiveAndSend(void* from, void* to) {
+  int64_t more;
+  size_t more_len = sizeof(more);
+  do {
+    zmq_msg_t part;
+    ZMQ_CALL(zmq_msg_init(&part));
+    ZMQ_CALL(zmq_msg_recv(&part, from, 0));
+
+    // Check whether send more.
+    ZMQ_CALL(zmq_getsockopt(from, ZMQ_RCVMORE, &more, &more_len));
+
+    // http://api.zeromq.org/4-1:zmq-msg-send
+    ZMQ_CALL(zmq_msg_send(&part, to, more ? ZMQ_SNDMORE : 0));
+
+  } while (more);
+}
+
 void Station::HandleError(uint64_t timestamp, int32_t error_code,
                           zmq_msg_t& identity, void* socket) {
   ReplyHeader reply_header;
@@ -52,6 +69,7 @@ void Station::HandleError(uint64_t timestamp, int32_t error_code,
   ZMQ_CALL(zmq_msg_send(&replyid, socket, ZMQ_SNDMORE));
   ZMQ_CALL(zmq_msg_send(&reply, socket, 0));
 
+  // http://api.zeromq.org/4-1:zmq-msg-send
   // ZMQ_CALL(zmq_msg_close(&replyid));
   // ZMQ_CALL(zmq_msg_close(&reply));
 }
@@ -101,6 +119,7 @@ void Station::HandleMsg(zmq_msg_t& identity, zmq_msg_t& msg, void* socket) {
   ZMQ_CALL(zmq_msg_send(&replyid, socket, ZMQ_SNDMORE));
   ZMQ_CALL(zmq_msg_send(&reply, socket, 0));
 
+  // http://api.zeromq.org/4-1:zmq-msg-send
   // ZMQ_CALL(zmq_msg_close(&replyid));
   // ZMQ_CALL(zmq_msg_close(&reply));
 }
@@ -112,7 +131,7 @@ void Station::Run(void* zmp_context) {
 
   ZMQ_CALL(zmq_connect(receiver, "inproc://workers"));
 
-  while (!stop_.load()) {
+  while (stop_.load() == false) {
     // For Router and DEALER model the worker will recieve 2 message one is
     // identity another is real msg.
     zmq_msg_t identity;
@@ -135,47 +154,69 @@ void Station::Run(void* zmp_context) {
 
 void Station::Start() {
   auto callback = [this]() {
-    zmq_context_ = zmq_init(1);
-    ARGUMENT_CHECK(zmq_context_ != nullptr, "zmq_init return nullptr, error:"
-                                                << zmq_strerror(zmq_errno()));
+    void* zmq_context = zmq_ctx_new();
+    ARGUMENT_CHECK(zmq_context != nullptr, "zmq_ctx_new return nullptr, error:"
+                                               << zmq_strerror(zmq_errno()));
 
-    zmq_clients_ = zmq_socket(zmq_context_, ZMQ_ROUTER);
-    ARGUMENT_CHECK(zmq_clients_ != nullptr, "zmq_socket return nullptr, error:"
-                                                << zmq_strerror(zmq_errno()));
+    void* frontend = zmq_socket(zmq_context, ZMQ_ROUTER);
+    ARGUMENT_CHECK(frontend != nullptr, "zmq_socket return nullptr, error:"
+                                            << zmq_strerror(zmq_errno()));
 
-    // bind port for client
+    // Bind to tcp.
     std::string addr = "tcp://*:" + std::to_string(port_);
-    ZMQ_CALL(zmq_bind(zmq_clients_, addr.c_str()));
+    ZMQ_CALL(zmq_bind(frontend, addr.c_str()));
 
     // create socket for worker. inner process socket.
-    zmq_workers_ = zmq_socket(zmq_context_, ZMQ_DEALER);
-    ARGUMENT_CHECK(zmq_workers_ != nullptr, "zmq_socket return nullptr, error:"
-                                                << zmq_strerror(zmq_errno()));
+    void* backend = zmq_socket(zmq_context, ZMQ_DEALER);
+    ARGUMENT_CHECK(backend != nullptr, "zmq_socket return nullptr, error:"
+                                           << zmq_strerror(zmq_errno()));
 
-    ZMQ_CALL(zmq_bind(zmq_workers_, "inproc://workers"));
+    ZMQ_CALL(zmq_bind(backend, "inproc://workers"));
 
-    // create a thread pool.
+    // Start thread pool.
     for (uint32_t i = 0; i < thread_nums_; ++i) {
-      std::thread t(&Station::Run, this, zmq_context_);
+      std::thread t(&Station::Run, this, zmq_context);
       workers_.emplace_back(std::move(t));
     }
 
-    LOG_INFO("Station start at port:[" << port_ << "]");
+    zmq_pollitem_t items[] = {{frontend, 0, ZMQ_POLLIN, 0},
+                              {backend, 0, ZMQ_POLLIN, 0}};
+
     started_.store(true);
+    LOG_INFO("Station start at port:[" << port_ << "]");
 
-    // start
-    zmq_device(ZMQ_QUEUE, zmq_clients_, zmq_workers_);
+    while (stop_.load() == false) {
+      zmq_poll(items, 2, -1);
 
-    // never be called.
+      if (items[0].revents & ZMQ_POLLIN) {
+        // frontend to backend.
+        // http://api.zeromq.org/4-0:zmq-msg-recv
+        // http://thisthread.blogspot.com/2012/02/zeromq-31-multithreading-reviewed.html
+        ZMQReceiveAndSend(frontend, backend);
+      }
+
+      if (items[1].revents & ZMQ_POLLIN) {
+        // backend to frontend.
+        ZMQReceiveAndSend(backend, frontend);
+      }
+    }
+
+    // Wait worker thread finish.
+    for (auto& t : workers_) {
+      if (t.joinable()) {
+        t.join();
+      }
+    }
+
     // close socket and destroy context.
-    ZMQ_CALL(zmq_close(zmq_workers_));
-    zmq_workers_ = nullptr;
+    ZMQ_CALL(zmq_close(backend));
+    backend = nullptr;
 
-    ZMQ_CALL(zmq_close(zmq_clients_));
-    zmq_clients_ = nullptr;
+    ZMQ_CALL(zmq_close(frontend));
+    frontend = nullptr;
 
-    ZMQ_CALL(zmq_term(zmq_context_));
-    zmq_context_ = nullptr;
+    ZMQ_CALL(zmq_term(zmq_context));
+    zmq_context = nullptr;
   };
 
   // use separate thread to listen the connection.
@@ -192,13 +233,6 @@ void Station::Wait() {
 
 void Station::Stop() {
   // (TODO) fix.
-  // stop_.store(true);
-
-  // for (auto& t : workers_) {
-  //   if (t.joinable()) {
-  //     t.join();
-  //   }
-  // }
 }
 
 }  // namespace kraken
