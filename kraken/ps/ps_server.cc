@@ -5,13 +5,25 @@
 namespace kraken {
 
 PsServer::PsServer(uint32_t port, uint32_t thread_nums, const std::string& addr,
-                   const std::string& s_addr)
-    : station_(port, thread_nums), ps_(addr, s_addr) {
+                   const std::string& s_addr, const std::string& saved_dir,
+                   size_t max_save_count)
+    : station_(port, thread_nums),
+      ps_(addr, s_addr, saved_dir, max_save_count) {
 }
 
 int32_t PsServer::Heartbeat(const HeartbeatRequest& req,
                             HeartbeatResponse* rsp) {
   return ps_.Heartbeat(&(rsp->status));
+}
+
+int32_t PsServer::NotifySaveModel(const NotifySaveModelRequest& req,
+                                  NotifySaveModelResponse* rsp) {
+  return ps_.NotifySaveModel(req.model_mdata);
+}
+
+int32_t PsServer::NotifyLoadModel(const NotifyLoadModelRequest& req,
+                                  NotifyLoadModelResponse* rsp) {
+  return ps_.NotifyLoadModel(req.load_dir);
 }
 
 int32_t PsServer::NotifyFinishTransfer(const NotifyFinishTransferRequest& req,
@@ -136,6 +148,8 @@ void PsServer::RegisterFuncs() {
       RPCFuncType::k##TYPE##Type, std::bind(&PsServer::FUNC, this, _1, _2));
 
   REGISTER_FUNC(Heartbeat, Heartbeat);
+  REGISTER_FUNC(NotifySaveModel, NotifySaveModel);
+  REGISTER_FUNC(NotifyLoadModel, NotifyLoadModel);
   REGISTER_FUNC(NotifyFinishTransfer, NotifyFinishTransfer);
   REGISTER_FUNC(NotifyNodeJoin, NotifyNodeJoin);
   REGISTER_FUNC(CreateModel, CreateModel);

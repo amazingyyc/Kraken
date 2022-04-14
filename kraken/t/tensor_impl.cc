@@ -26,46 +26,37 @@ TensorImpl::TensorImpl(const Shape& shape, std::shared_ptr<Storage> storage,
 }
 
 std::shared_ptr<TensorImpl> TensorImpl::Dense(const Shape& shape,
-                                              ElementType etype) {
-  auto storage = Storage::Create(shape.Size() * etype.ByteWidth());
+                                              ElementType element_type) {
+  auto storage = Storage::Create(shape.Size() * element_type.ByteWidth());
 
-  return std::shared_ptr<TensorImpl>(new TensorImpl(shape, storage, 0, etype));
+  return std::shared_ptr<TensorImpl>(
+      new TensorImpl(shape, storage, 0, element_type));
 }
 
 std::shared_ptr<TensorImpl> TensorImpl::Dense(const Shape& shape,
                                               std::shared_ptr<Storage> storage,
                                               size_t offset,
-                                              ElementType etype) {
+                                              ElementType element_type) {
   return std::shared_ptr<TensorImpl>(
-      new TensorImpl(shape, storage, offset, etype));
+      new TensorImpl(shape, storage, offset, element_type));
 }
 
-std::shared_ptr<TensorImpl> TensorImpl::Empty(ElementType etype) {
-  // Empty still include a storage, avoid unexpected error.
-  auto storage = Storage::Create(0);
+std::shared_ptr<TensorImpl> TensorImpl::Empty(const Shape& shape,
+                                              ElementType element_type) {
+  auto storage = Storage::Create(shape.Size() * element_type.ByteWidth());
 
   return std::shared_ptr<TensorImpl>(
-      new TensorImpl(Shape(), storage, 0, etype));
+      new TensorImpl(shape, storage, 0, element_type));
 }
 
 std::shared_ptr<TensorImpl> TensorImpl::Coo(std::shared_ptr<TensorImpl> indices,
                                             std::shared_ptr<TensorImpl> values,
                                             const Shape& shape) {
-  ARGUMENT_CHECK(indices->IsDense() && values->IsDense(),
-                 "Coo need indices/values is Dense.")
-
   Tensor t_indices(indices);
   Tensor t_values(values);
 
   return std::shared_ptr<CooTensorImpl>(
       new CooTensorImpl(t_indices, t_values, shape));
-}
-
-std::shared_ptr<TensorImpl> TensorImpl::EmptyCoo(ElementType value_etype,
-                                                 const Shape& shape) {
-  return std::shared_ptr<CooTensorImpl>(
-      new CooTensorImpl(Tensor::Empty(ElementType::From<int64_t>()),
-                        Tensor::Empty(value_etype), shape));
 }
 
 Layout TensorImpl::layout() const {
@@ -536,13 +527,25 @@ std::shared_ptr<TensorImpl> TensorImpl::ToCoo(float th) const {
   Shape shape({size});
 
   if (IsEmpty()) {
-    return TensorImpl::EmptyCoo(element_type_, shape);
+    // Even this tensor is empty we need create a empty Coo tensor with indice's
+    // shape:[1, 0] and values's shape:[0].
+    Tensor empty_indices =
+        Tensor::Empty(Shape({1, 0}), ElementType::From<int64_t>());
+    Tensor empty_values = Tensor::Empty(Shape({0}), element_type_);
+
+    return std::shared_ptr<CooTensorImpl>(
+        new CooTensorImpl(empty_indices, empty_values, shape));
   }
 
   // shape: [nnz]
   auto indices = math::FlatNonZero(*this, th);
   if (indices->IsEmpty()) {
-    return TensorImpl::EmptyCoo(element_type_, shape);
+    Tensor empty_indices =
+        Tensor::Empty(Shape({1, 0}), ElementType::From<int64_t>());
+    Tensor empty_values = Tensor::Empty(Shape({0}), element_type_);
+
+    return std::shared_ptr<CooTensorImpl>(
+        new CooTensorImpl(empty_indices, empty_values, shape));
   }
 
   // to [1, nnz]

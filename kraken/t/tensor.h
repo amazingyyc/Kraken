@@ -50,14 +50,15 @@ public:
   std::string Str() const;
 
 public:
-  static Tensor Dense(const std::vector<int64_t>& dims, ElementType etype);
+  static Tensor Dense(const std::vector<int64_t>& dims,
+                      ElementType element_type);
 
-  static Tensor Dense(const Shape& shape, ElementType etype);
+  static Tensor Dense(const Shape& shape, ElementType element_type);
 
   static Tensor Dense(const Shape& shape, std::shared_ptr<Storage> storage,
-                      size_t offset, ElementType etype);
+                      size_t offset, ElementType element_type);
 
-  static Tensor Empty(ElementType etype);
+  static Tensor Empty(const Shape& shape, ElementType element_type);
 
 public:
   Tensor operator+(const Tensor& other) const;

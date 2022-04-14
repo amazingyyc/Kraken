@@ -1,4 +1,4 @@
-#include "io/file_reader.h"
+#include "checkpoint/file_reader.h"
 
 namespace kraken {
 namespace io {

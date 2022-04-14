@@ -91,6 +91,10 @@ public:
   void CombinePushSparseTable(const std::vector<uint64_t>& table_ids,
                               const std::vector<Tensor>& indices,
                               const std::vector<Tensor>& grads);
+
+  bool TrySaveModel();
+
+  bool TryLoadModelBlocked(const std::string& load_dir);
 };
 
 }  // namespace kraken

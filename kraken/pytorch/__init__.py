@@ -17,6 +17,8 @@ from kraken_native import pull_sparse_table
 from kraken_native import combine_pull_sparse_table
 from kraken_native import push_sparse_table
 from kraken_native import combine_push_sparse_table
+from kraken_native import try_save_model
+from kraken_native import try_load_model_blocked
 
 from .embedding import Embedding
 from .combine_embedding import CombineEmbedding

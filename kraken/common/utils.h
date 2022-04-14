@@ -25,6 +25,8 @@ std::string ToLower(const std::string& v);
 
 bool EndWith(const std::string& value, const std::string& ending);
 
+bool StartWith(const std::string& value, const std::string& beginning);
+
 inline uint64_t Hash(uint64_t v) {
   v = v * 3935559000370003845 + 2691343689449507681;
 

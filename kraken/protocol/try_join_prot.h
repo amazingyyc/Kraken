@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common/deserialize.h"
+#include "common/info.h"
 #include "common/router.h"
 #include "common/serialize.h"
 
@@ -26,18 +27,23 @@ struct TryJoinResponse {
 
   Router old_router;
   Router new_router;
+
+  bool model_init;
+  ModelMetaData model_mdata;
 };
 
 template <>
 inline bool Serialize::operator<<(const TryJoinResponse& v) {
   return (*this) << v.allow && (*this) << v.node_id &&
-         (*this) << v.old_router && (*this) << v.new_router;
+         (*this) << v.old_router && (*this) << v.new_router &&
+         (*this) << v.model_init && (*this) << v.model_mdata;
 }
 
 template <>
 inline bool Deserialize::operator>>(TryJoinResponse& v) {
   return (*this) >> v.allow && (*this) >> v.node_id &&
-         (*this) >> v.old_router && (*this) >> v.new_router;
+         (*this) >> v.old_router && (*this) >> v.new_router &&
+         (*this) >> v.model_init && (*this) >> v.model_mdata;
 }
 
 }  // namespace kraken

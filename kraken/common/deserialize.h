@@ -481,7 +481,7 @@ inline bool Deserialize::operator>>(Router::VirtualNode& v) {
 }
 
 template <>
-inline bool Deserialize::operator>>(std::map<uint64_t, Router::Node>& v) {
+inline bool Deserialize::operator>>(std::vector<Router::Node>& v) {
   v.clear();
 
   uint64_t size;
@@ -489,23 +489,18 @@ inline bool Deserialize::operator>>(std::map<uint64_t, Router::Node>& v) {
     return false;
   }
 
+  v.resize(size);
   for (uint64_t i = 0; i < size; ++i) {
-    uint64_t key;
-    Router::Node value;
-
-    if (((*this) >> key) == false || ((*this) >> value) == false) {
+    if (((*this) >> v[i]) == false) {
       return false;
     }
-
-    v.emplace(key, std::move(value));
   }
 
   return true;
 }
 
 template <>
-inline bool Deserialize::operator>>(
-    std::map<uint64_t, Router::VirtualNode>& v) {
+inline bool Deserialize::operator>>(std::vector<Router::VirtualNode>& v) {
   v.clear();
 
   uint64_t size;
@@ -513,15 +508,11 @@ inline bool Deserialize::operator>>(
     return false;
   }
 
+  v.resize(size);
   for (uint64_t i = 0; i < size; ++i) {
-    uint64_t key;
-    Router::VirtualNode value;
-
-    if (((*this) >> key) == false || ((*this) >> value) == false) {
+    if (((*this) >> v[i]) == false) {
       return false;
     }
-
-    v.emplace(key, std::move(value));
   }
 
   return true;

@@ -12,7 +12,7 @@ Shape::Shape(const Shape& other)
 
 Shape::Shape(const std::vector<int64_t>& dims) : dims_(dims) {
   for (auto d : dims_) {
-    ARGUMENT_CHECK(d > 0, "dimension need > 0");
+    ARGUMENT_CHECK(d >= 0, "dimension need >= 0");
   }
 
   UpdateStrides();
@@ -20,7 +20,7 @@ Shape::Shape(const std::vector<int64_t>& dims) : dims_(dims) {
 
 Shape::Shape(std::vector<int64_t>&& dims) : dims_(std::move(dims)) {
   for (auto d : dims_) {
-    ARGUMENT_CHECK(d > 0, "dimension need > 0");
+    ARGUMENT_CHECK(d >= 0, "dimension need >= 0");
   }
 
   UpdateStrides();
@@ -32,7 +32,11 @@ void Shape::UpdateStrides() {
   strides_.resize(ndims);
 
   if (ndims > 0) {
-    strides_[ndims - 1] = 1;
+    if (dims_[ndims - 1] == 0) {
+      strides_[ndims - 1] = 0;
+    } else {
+      strides_[ndims - 1] = 1;
+    }
 
     for (int64_t i = ndims - 2; i >= 0; --i) {
       strides_[i] = strides_[i + 1] * dims_[i + 1];
@@ -89,8 +93,11 @@ int64_t Shape::NDims() const {
 }
 
 int64_t Shape::Size() const {
-  int64_t size = 1;
+  if (dims_.empty()) {
+    return 0;
+  }
 
+  int64_t size = 1;
   for (auto d : dims_) {
     size *= d;
   }

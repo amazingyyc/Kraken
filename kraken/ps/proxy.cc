@@ -16,10 +16,7 @@ Proxy::Proxy(const std::unordered_set<uint64_t>& proxy_ids,
       compress_type_(compress_type),
       g_connecters_(compress_type) {
   for (auto id : proxy_ids) {
-    const auto it = router_.nodes().find(id);
-    ARGUMENT_CHECK(it != router_.nodes().end(), "Cannot find node:" << id);
-
-    g_connecters_.Add(id, it->second.name);
+    g_connecters_.Add(id, router_.node(id).name);
   }
 }
 

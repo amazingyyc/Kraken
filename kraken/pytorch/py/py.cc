@@ -80,6 +80,10 @@ PYBIND11_MODULE(kraken_native, m) {
         pybind11::arg("table_ids"), pybind11::arg("indices"),
         pybind11::arg("grads"));
 
+  m.def("try_save_model", &TrySaveModel);
+
+  m.def("try_load_model_blocked", &TryLoadModelBlocked);
+
   // Jagged tensor Sum op.
   m.def("jagged_sum_forward", &jagged::SumForward, pybind11::arg("values"),
         pybind11::arg("offsets"), pybind11::arg("patch_value"));

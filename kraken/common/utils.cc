@@ -70,5 +70,13 @@ bool EndWith(const std::string& value, const std::string& ending) {
   return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
 }
 
+bool StartWith(const std::string& value, const std::string& beginning) {
+  if (beginning.size() > value.size()) {
+    return false;
+  }
+
+  return std::equal(beginning.begin(), beginning.end(), value.begin());
+}
+
 }  // namespace utils
 }  // namespace kraken

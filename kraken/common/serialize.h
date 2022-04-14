@@ -358,14 +358,14 @@ inline bool Serialize::operator<<(const Router::VirtualNode& v) {
 }
 
 template <>
-inline bool Serialize::operator<<(const std::map<uint64_t, Router::Node>& v) {
+inline bool Serialize::operator<<(const std::vector<Router::Node>& v) {
   uint64_t size = v.size();
   if (((*this) << size) == false) {
     return false;
   }
 
-  for (const auto& [key, val] : v) {
-    if (((*this) << key) == false || ((*this) << val) == false) {
+  for (const auto& i : v) {
+    if (((*this) << i) == false) {
       return false;
     }
   }
@@ -374,15 +374,14 @@ inline bool Serialize::operator<<(const std::map<uint64_t, Router::Node>& v) {
 }
 
 template <>
-inline bool Serialize::operator<<(
-    const std::map<uint64_t, Router::VirtualNode>& v) {
+inline bool Serialize::operator<<(const std::vector<Router::VirtualNode>& v) {
   uint64_t size = v.size();
   if (((*this) << size) == false) {
     return false;
   }
 
-  for (const auto& [key, val] : v) {
-    if (((*this) << key) == false || ((*this) << val) == false) {
+  for (const auto& i : v) {
+    if (((*this) << i) == false) {
       return false;
     }
   }
@@ -392,8 +391,7 @@ inline bool Serialize::operator<<(
 
 template <>
 inline bool Serialize::operator<<(const Router& v) {
-  return (*this) << v.version() && (*this) << v.nodes() &&
-         (*this) << v.vnodes();
+  return (*this) << v.version_ && (*this) << v.nodes_ && (*this) << v.vnodes_;
 }
 
 template <>

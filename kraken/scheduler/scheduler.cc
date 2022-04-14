@@ -2,13 +2,17 @@
 
 #include <iostream>
 
+#include "checkpoint/checkpoint.h"
+#include "checkpoint/checkpoint_exec.h"
 #include "common/log.h"
 #include "protocol/create_dense_table_prot.h"
 #include "protocol/create_model_prot.h"
 #include "protocol/create_sparse_table_prot.h"
 #include "protocol/heartbeat_prot.h"
+#include "protocol/notify_load_model_prot.h"
 #include "protocol/notify_node_join_prot.h"
 #include "protocol/notify_router_change_prot.h"
+#include "protocol/notify_save_model_prot.h"
 #include "protocol/rpc_func_type.h"
 
 namespace kraken {
@@ -17,6 +21,28 @@ Scheduler::Scheduler() : connecter_(CompressType::kNo), model_init_(false) {
 }
 
 Scheduler::~Scheduler() {
+}
+
+bool Scheduler::LoadModelMetaData(const std::string& load_dir) {
+  // In Scheduler we only need load the model metadata.
+  std::string model_mdata_binary_path;
+
+  io::CheckpointExec checkpoint_exec;
+  if (checkpoint_exec.GetLatestModelMetaDataBinaryPath(
+          load_dir, &model_mdata_binary_path) == false) {
+    LOG_ERROR("Get model meta data binary path from:[" << load_dir
+                                                       << "] error!");
+    return false;
+  }
+
+  if (io::Checkpoint::LoadModelMetaDataBinary(model_mdata_binary_path,
+                                              &model_mdata_) == false) {
+    LOG_ERROR("Load ModelMetaData from:[" << model_mdata_binary_path
+                                          << "] error!");
+    return false;
+  }
+
+  return true;
 }
 
 void Scheduler::Start() {
@@ -29,7 +55,8 @@ void Scheduler::Stop() {
 
 int32_t Scheduler::TryJoin(const std::string& addr, bool* allow,
                            uint64_t* node_id, Router* old_router,
-                           Router* new_router) {
+                           Router* new_router, bool* model_init,
+                           ModelMetaData* model_mdata) {
   // Allow a Node join in that need all exist ps Node be kWorker status.
   LOG_INFO("A node:[" << addr << "] try to join.");
 
@@ -87,6 +114,9 @@ int32_t Scheduler::TryJoin(const std::string& addr, bool* allow,
   ARGUMENT_CHECK(router_.Add(real_id, addr), "Router add error!");
   *new_router = router_;
 
+  *model_init = model_init_;
+  *model_mdata = model_mdata_;
+
   LOG_INFO("Old router:" << old_router->Str());
   LOG_INFO("New router:" << new_router->Str());
 
@@ -115,14 +145,6 @@ int32_t Scheduler::TryJoin(const std::string& addr, bool* allow,
   return ErrorCode::kSuccess;
 }
 
-int32_t Scheduler::FetchModelMetaData(bool* model_init,
-                                      ModelMetaData* model_mdata) {
-  *model_init = model_init_;
-  *model_mdata = model_mdata_;
-
-  return ErrorCode::kSuccess;
-}
-
 int32_t Scheduler::FetchRouter(Router* router) {
   *router = router_;
 
@@ -145,8 +167,8 @@ int32_t Scheduler::InitModel(
   // Ask Ps to init model.
   {
     std::vector<uint64_t> ids;
-    for (auto& [k, v] : router_.nodes()) {
-      ids.emplace_back(v.id);
+    for (const auto& node : router_.nodes()) {
+      ids.emplace_back(node.id);
     }
 
     CreateModelRequest req;
@@ -259,9 +281,8 @@ int32_t Scheduler::RegisterSparseTable(
   {
     std::vector<uint64_t> ids;
     ids.reserve(router_.nodes().size());
-
-    for (const auto& [k, v] : router_.nodes()) {
-      ids.emplace_back(k);
+    for (const auto& node : router_.nodes()) {
+      ids.emplace_back(node.id);
     }
 
     CreateSparseTableRequest req;
@@ -295,6 +316,151 @@ int32_t Scheduler::RegisterSparseTable(
            << name << "], id:[" << real_id << "], dimension:[" << dimension
            << "], ElementType:[" << element_type.Name() << "], init_type:["
            << init_type << "], init_conf:[" << init_conf << "], in all Ps.");
+
+  return ErrorCode::kSuccess;
+}
+
+int32_t Scheduler::TrySaveModel(bool* success) {
+  if (model_init_ == false) {
+    return ErrorCode::kModelNotInitializedError;
+  }
+
+  // Check Ps status.
+  {
+    std::vector<uint64_t> ids;
+    for (const auto& [k, v] : nodes_) {
+      if (v.type == NodeType::kPs) {
+        ids.emplace_back(v.id);
+      }
+    }
+
+    HeartbeatRequest req;
+    std::vector<HeartbeatResponse> replies;
+
+    if (connecter_.Call(RPCFuncType::kHeartbeatType, ids, req, &replies) !=
+        ErrorCode::kSuccess) {
+      *success = false;
+      return ErrorCode::kSuccess;
+    }
+
+    for (auto& reply : replies) {
+      if (reply.status != NodeStatus::kWork) {
+        *success = false;
+
+        LOG_INFO("One of Ps status is not kWork, reject save model.");
+
+        return ErrorCode::kSuccess;
+      }
+    }
+  }
+
+  std::vector<uint64_t> ids;
+  ids.reserve(router_.nodes().size());
+  for (const auto& node : router_.nodes()) {
+    ids.emplace_back(node.id);
+  }
+
+  NotifySaveModelRequest req;
+  req.model_mdata = model_mdata_;
+
+  std::vector<NotifySaveModelResponse> replies;
+
+  RPC_CALL(
+      connecter_.Call(RPCFuncType::kNotifySaveModelType, ids, req, &replies));
+
+  *success = true;
+
+  return ErrorCode::kSuccess;
+}
+
+int32_t Scheduler::TryLoadModel(const std::string& load_dir, bool* success) {
+  LOG_INFO("Try load model from:[" << load_dir << "].");
+
+  if (model_init_ == true) {
+    LOG_WARNING("Scheduler already initialize the model, name:["
+                << model_mdata_.name << "].");
+    *success = true;
+    return ErrorCode::kSuccess;
+  }
+
+  // Check Ps status.
+  {
+    std::vector<uint64_t> ids;
+    for (const auto& [k, v] : nodes_) {
+      if (v.type == NodeType::kPs) {
+        ids.emplace_back(v.id);
+      }
+    }
+
+    HeartbeatRequest req;
+    std::vector<HeartbeatResponse> replies;
+
+    if (connecter_.Call(RPCFuncType::kHeartbeatType, ids, req, &replies) !=
+        ErrorCode::kSuccess) {
+      *success = false;
+      return ErrorCode::kSuccess;
+    }
+
+    for (auto& reply : replies) {
+      if (reply.status != NodeStatus::kWork) {
+        *success = false;
+
+        LOG_INFO("One of Ps status is not kWork, reject load model.");
+        return ErrorCode::kSuccess;
+      }
+    }
+  }
+
+  if (LoadModelMetaData(load_dir) == false) {
+    LOG_ERROR("Scheduler load ModelMetaData error!");
+    return ErrorCode::kLoadModelError;
+  }
+
+  std::vector<uint64_t> ids;
+  ids.reserve(router_.nodes().size());
+  for (const auto& node : router_.nodes()) {
+    ids.emplace_back(node.id);
+  }
+
+  // Tell ps to load model.
+  NotifyLoadModelRequest req;
+  req.load_dir = load_dir;
+  std::vector<NotifyLoadModelResponse> replies;
+
+  RPC_CALL(
+      connecter_.Call(RPCFuncType::kNotifyLoadModelType, ids, req, &replies));
+
+  *success = true;
+
+  // Set flag.
+  model_init_ = true;
+
+  return ErrorCode::kSuccess;
+}
+
+int32_t Scheduler::IsAllPsWorking(bool* yes) {
+  std::vector<uint64_t> ids;
+  for (const auto& [k, v] : nodes_) {
+    if (v.type == NodeType::kPs) {
+      ids.emplace_back(v.id);
+    }
+  }
+
+  *yes = true;
+
+  HeartbeatRequest req;
+  std::vector<HeartbeatResponse> replies;
+
+  if (connecter_.Call(RPCFuncType::kHeartbeatType, ids, req, &replies) !=
+      ErrorCode::kSuccess) {
+    *yes = false;
+  } else {
+    for (const auto& reply : replies) {
+      if (reply.status != NodeStatus::kWork) {
+        *yes = false;
+      }
+    }
+  }
 
   return ErrorCode::kSuccess;
 }

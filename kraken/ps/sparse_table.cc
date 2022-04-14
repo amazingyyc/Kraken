@@ -26,7 +26,7 @@ Initializer* SparseTable::initializer() const {
   return initializer_.get();
 }
 
-ParallelSkipList<uint64_t, Value>* SparseTable::vals() {
+ParallelSkipList<uint64_t, Value>* SparseTable::mutable_vals() {
   return &vals_;
 }
 

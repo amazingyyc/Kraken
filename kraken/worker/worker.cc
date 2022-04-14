@@ -92,4 +92,12 @@ void Worker::CombinePushSparseTable(const std::vector<uint64_t>& table_ids,
   emitter_->CombinePushSparseTable(table_ids, indices, grads);
 }
 
+bool Worker::TrySaveModel() {
+  return emitter_->TrySaveModel();
+}
+
+bool Worker::TryLoadModelBlocked(const std::string& load_dir) {
+  return emitter_->TryLoadModelBlocked(load_dir);
+}
+
 }  // namespace kraken

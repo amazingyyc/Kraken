@@ -18,32 +18,26 @@ CooTensorImpl::CooTensorImpl(const Tensor& indices, const Tensor& values,
           indices_.element_type().Is<uint64_t>() ||
           indices_.element_type().Is<int64_t>(),
       "Coo Tensor need indices element type is:uint32/int32/uint64/int64.");
+  ARGUMENT_CHECK(indices_.shape().NDims() == 2,
+                 "Coo need indices's NDim is 2.");
+  ARGUMENT_CHECK(indices_.shape()[-1] == values_.shape()[0],
+                 "Coo need indices's last dimension same with values's first "
+                 "dimension.");
+  ARGUMENT_CHECK(
+      shape_.NDims() + 1 == indices_.shape()[0] + values_.shape().NDims(),
+      "Coo shape error!");
 
-  if (indices_.IsEmpty()) {
-    sparse_dim_ = 0;
-    dense_dim_ = 0;
-  } else {
-    ARGUMENT_CHECK(indices_.shape().NDims() == 2,
-                   "Coo need indices's NDim is 2.");
-    ARGUMENT_CHECK(indices_.shape()[-1] == values_.shape()[0],
-                   "Coo need indices's last dimension same with values's first "
-                   "dimension.");
-    ARGUMENT_CHECK(
-        shape_.NDims() + 1 == indices_.shape()[0] + values_.shape().NDims(),
-        "Coo shape error!");
+  // indices_ shape is: [M, nse]
+  // values_ shape is: (nse,) + shape[M : M + K]
+  // sparse_dim_ >= 1
+  // dense_dim_ >= 0
+  sparse_dim_ = indices_.shape()[0];
 
-    // indices_ shape is: [M, nse]
-    // values_ shape is: (nse,) + shape[M : M + K]
-    // sparse_dim_ >= 1
-    // dense_dim_ >= 0
-    sparse_dim_ = indices_.shape()[0];
-
-    for (int64_t i = sparse_dim_, j = 1; i < shape_.NDims(); ++i, ++j) {
-      ARGUMENT_CHECK(shape_[i] == values_.shape()[j], "Coo shape error!");
-    }
-
-    dense_dim_ = values_.shape().NDims() - 1;
+  for (int64_t i = sparse_dim_, j = 1; i < shape_.NDims(); ++i, ++j) {
+    ARGUMENT_CHECK(shape_[i] == values_.shape()[j], "Coo shape error!");
   }
+
+  dense_dim_ = values_.shape().NDims() - 1;
 }
 
 int64_t CooTensorImpl::sparse_dim() const {

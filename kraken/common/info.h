@@ -26,8 +26,14 @@ enum class NodeType : uint8_t {
 struct NodeStatus {
   static constexpr uint32_t kInit = 1 << 0;
   static constexpr uint32_t kWork = 1 << 1;
+  // In proxy from other Ps.
   static constexpr uint32_t kProxy = 1 << 2;
+  // In transfer data to other Ps.
   static constexpr uint32_t kTransfer = 1 << 3;
+  // In save model.
+  static constexpr uint32_t kSave = 1 << 4;
+  // In load model.
+  static constexpr uint32_t kLoad = 1 << 5;
 };
 
 // Table type.

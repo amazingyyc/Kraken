@@ -29,6 +29,8 @@ struct ErrorCode {
   static constexpr int32_t kConnectNodeError = 20;
   static constexpr int32_t kTableNotExistError = 21;
   static constexpr int32_t kRouterVersionError = 22;
+  static constexpr int32_t kModelAlreadyInitializedError = 23;
+  static constexpr int32_t kLoadModelError = 24;
 
   static const char* Msg(int32_t code) {
     switch (code) {
@@ -80,6 +82,10 @@ struct ErrorCode {
         return "Table not exist";
       case ErrorCode::kRouterVersionError:
         return "Router version error";
+      case ErrorCode::kModelAlreadyInitializedError:
+        return "Model already initialized error";
+      case ErrorCode::kLoadModelError:
+        return "Load model error";
       default:
         return "Unrecognized error";
     }

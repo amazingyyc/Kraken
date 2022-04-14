@@ -119,7 +119,7 @@ void Ps::TryFetchSparseValuesFromProxy(
     }
 
     SparseTable* table = (SparseTable*)it.value().get();
-    table->vals()->Insert(exist_sparse_ids, values);
+    table->mutable_vals()->Insert(exist_sparse_ids, values);
   } else {
     LOG_ERROR("TryFetchSparseValuesFromPorxy get error code:"
               << error_code << ", msg:" << ErrorCode::Msg(error_code));
@@ -335,7 +335,7 @@ int32_t Ps::PullSparseTable(uint64_t router_version, uint64_t table_id,
     not_exist_ids.reserve(sparse_ids.size());
 
     for (auto sparse_id : sparse_ids) {
-      if (table->vals()->Contains(sparse_id) == false) {
+      if (table->mutable_vals()->Contains(sparse_id) == false) {
         not_exist_ids.emplace_back(sparse_id);
       }
     }
@@ -422,7 +422,7 @@ int32_t Ps::PushSparseTable(uint64_t router_version, uint64_t table_id,
     not_exist_ids.reserve(sparse_ids.size());
 
     for (auto sparse_id : sparse_ids) {
-      if (table->vals()->Contains(sparse_id) == false) {
+      if (table->mutable_vals()->Contains(sparse_id) == false) {
         not_exist_ids.emplace_back(sparse_id);
       }
     }
