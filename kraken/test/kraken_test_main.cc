@@ -37,7 +37,7 @@ public:
       std::string addr = "127.0.0.1:50001";
       std::string s_addr = "127.0.0.1:50000";
 
-      kraken::PsServer ps_server(port, thread_nums, addr, s_addr);
+      kraken::PsServer ps_server(port, thread_nums, addr, s_addr, "", 3);
       ps_server.Start();
     }));
 
@@ -51,7 +51,7 @@ public:
       std::string addr = "127.0.0.1:50002";
       std::string s_addr = "127.0.0.1:50000";
 
-      kraken::PsServer ps_server(port, thread_nums, addr, s_addr);
+      kraken::PsServer ps_server(port, thread_nums, addr, s_addr, "", 3);
       ps_server.Start();
     }));
 

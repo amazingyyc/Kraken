@@ -4,6 +4,7 @@
 #include <functional>
 #include <sstream>
 
+#include "common/exception.h"
 #include "common/utils.h"
 
 namespace kraken {
@@ -14,41 +15,62 @@ const std::string Router::kVirtualNodeSep = "#";
 Router::Router() : version_(0) {
 }
 
+bool Router::ContainVirtualNode(uint64_t hash_v) const {
+  return BinaryFindVirtualNode(hash_v) != vnodes_.end();
+}
+
+std::vector<Router::Node>::const_iterator Router::BinaryFindNode(
+    uint64_t id) const {
+  auto it = std::lower_bound(
+      nodes_.begin(), nodes_.end(), id,
+      [](const Node& node, uint64_t id) -> bool { return node.id < id; });
+
+  if (it != nodes_.end() && it->id == id) {
+    return it;
+  }
+
+  return nodes_.end();
+}
+
+std::vector<Router::VirtualNode>::const_iterator Router::BinaryFindVirtualNode(
+    uint64_t hash_v) const {
+  auto it =
+      std::lower_bound(vnodes_.begin(), vnodes_.end(), hash_v,
+                       [](const VirtualNode& vnode, uint64_t hash_v) -> bool {
+                         return vnode.hash_v < hash_v;
+                       });
+
+  if (it != vnodes_.end() && it->hash_v == hash_v) {
+    return it;
+  }
+
+  return vnodes_.end();
+}
+
 bool Router::operator==(const Router& other) const {
   if (version_ != other.version_ || nodes_.size() != other.nodes_.size() ||
       vnodes_.size() != other.vnodes_.size()) {
     return false;
   }
 
-  for (const auto& [k, v] : nodes_) {
-    auto it = other.nodes_.find(k);
-    if (it == other.nodes_.end()) {
+  for (size_t i = 0; i < nodes_.size(); ++i) {
+    if (nodes_[i].id != other.nodes_[i].id ||
+        nodes_[i].name != other.nodes_[i].name ||
+        nodes_[i].vnode_list.size() != other.nodes_[i].vnode_list.size()) {
       return false;
     }
 
-    if (v.id != it->second.id || v.name != it->second.name) {
-      return false;
-    }
-
-    if (v.vnode_list.size() != it->second.vnode_list.size()) {
-      return false;
-    }
-
-    for (size_t i = 0; i < v.vnode_list.size(); ++i) {
-      if (v.vnode_list[i] != it->second.vnode_list[i]) {
+    for (size_t j = 0; j < nodes_[i].vnode_list.size(); ++j) {
+      if (nodes_[i].vnode_list[j] != other.nodes_[i].vnode_list[j]) {
         return false;
       }
     }
   }
 
-  for (const auto& [k, v] : vnodes_) {
-    auto it = other.vnodes_.find(k);
-    if (it == other.vnodes_.end()) {
-      return false;
-    }
-
-    if (v.hash_v != it->second.hash_v || v.node_id != it->second.node_id ||
-        v.name != it->second.name) {
+  for (size_t i = 0; i < vnodes_.size(); ++i) {
+    if (vnodes_[i].hash_v != other.vnodes_[i].hash_v ||
+        vnodes_[i].node_id != other.vnodes_[i].node_id ||
+        vnodes_[i].name != other.vnodes_[i].name) {
       return false;
     }
   }
@@ -64,29 +86,36 @@ uint64_t Router::version() const {
   return version_;
 }
 
-const std::map<uint64_t, Router::Node>& Router::nodes() const {
+const std::vector<Router::Node>& Router::nodes() const {
   return nodes_;
 }
 
-const std::map<uint64_t, Router::VirtualNode>& Router::vnodes() const {
+const std::vector<Router::VirtualNode>& Router::vnodes() const {
   return vnodes_;
 }
 
-bool Router::node(uint64_t id, Router::Node* node) const {
-  auto it = nodes_.find(id);
+const Router::Node& Router::node(uint64_t id) const {
+  auto it = BinaryFindNode(id);
   if (it == nodes_.end()) {
-    return false;
+    RUNTIME_ERROR("Con't find node:" << id);
   }
 
-  *node = it->second;
+  return *it;
+}
 
-  return true;
+const Router::VirtualNode& Router::virtual_node(uint64_t hash_v) const {
+  auto it = BinaryFindVirtualNode(hash_v);
+  if (it == vnodes_.end()) {
+    RUNTIME_ERROR("Con't find virtual node:" << hash_v);
+  }
+
+  return *it;
 }
 
 bool Router::Add(uint64_t id, const std::string& name) {
   // The new node id must bigger than all exist id.
   if (nodes_.empty() == false) {
-    if (nodes_.rbegin()->first >= id) {
+    if (nodes_.back().id >= id) {
       return false;
     }
   }
@@ -104,7 +133,7 @@ bool Router::Add(uint64_t id, const std::string& name) {
     std::string name_v = name + kVirtualNodeSep + std::to_string(i);
     uint64_t hash_v = (uint64_t)std::hash<std::string>{}(name_v);
 
-    while (vnodes_.find(hash_v) != vnodes_.end()) {
+    while (ContainVirtualNode(hash_v)) {
       // Not care about the overflow.
       hash_v += utils::ThreadLocalRandom<uint64_t>(1, interval);
     }
@@ -114,11 +143,18 @@ bool Router::Add(uint64_t id, const std::string& name) {
     vnode.node_id = id;
     vnode.name = name_v;
 
-    vnodes_.emplace(hash_v, std::move(vnode));
+    vnodes_.emplace_back(std::move(vnode));
     node.vnode_list.emplace_back(hash_v);
   }
 
-  nodes_.emplace(id, std::move(node));
+  // Always is ascending order.
+  nodes_.emplace_back(std::move(node));
+
+  // Sort ascending order.
+  std::sort(vnodes_.begin(), vnodes_.end(),
+            [](const VirtualNode& v1, const VirtualNode& v2) -> bool {
+              return v1.hash_v < v2.hash_v;
+            });
 
   version_++;
 
@@ -126,15 +162,21 @@ bool Router::Add(uint64_t id, const std::string& name) {
 }
 
 bool Router::Remove(uint64_t id) {
-  if (nodes_.find(id) == nodes_.end()) {
+  auto it = BinaryFindNode(id);
+  if (it == nodes_.end()) {
     return false;
   }
 
-  for (auto hash_v : nodes_[id].vnode_list) {
-    vnodes_.erase(hash_v);
+  for (size_t i = 0; i < it->vnode_list.size(); ++i) {
+    auto vit = BinaryFindVirtualNode(it->vnode_list[i]);
+    if (vit == vnodes_.end()) {
+      continue;
+    }
+
+    vnodes_.erase(vit);
   }
 
-  nodes_.erase(id);
+  nodes_.erase(it);
 
   version_++;
 
@@ -146,16 +188,75 @@ bool Router::Empty() const {
 }
 
 bool Router::Contains(uint64_t id) const {
-  return nodes_.find(id) != nodes_.end();
+  return BinaryFindNode(id) != nodes_.end();
 }
 
 std::vector<uint64_t> Router::VirtualHashs(uint64_t id) const {
-  auto it = nodes_.find(id);
+  auto it = BinaryFindNode(id);
   if (it != nodes_.end()) {
-    return it->second.vnode_list;
+    return it->vnode_list;
   }
 
   return {};
+}
+
+std::vector<Router::Range> Router::NodeHashRanges(uint64_t id) const {
+  std::vector<Router::Range> ranges;
+  ranges.reserve(kVirtualNodeNum);
+
+  auto it = BinaryFindNode(id);
+  if (it == nodes_.end()) {
+    return ranges;
+  }
+
+  for (const auto& hash_v : it->vnode_list) {
+    auto vit = BinaryFindVirtualNode(hash_v);
+    if (vit == vnodes_.end()) {
+      continue;
+    }
+
+    if (vit == vnodes_.begin()) {
+      Range head_range;
+      head_range.start = 0;
+      head_range.end = vit->hash_v;
+
+      Range zero_range;
+      zero_range.start = 0;
+      zero_range.end = 0;
+
+      Range tail_range;
+      tail_range.start = vnodes_.rbegin()->hash_v;
+      tail_range.end = std::numeric_limits<uint64_t>::max();
+
+      ranges.emplace_back(head_range);
+      ranges.emplace_back(zero_range);
+      ranges.emplace_back(tail_range);
+    } else {
+      Range range;
+      range.start = (vit - 1)->hash_v;
+      range.end = vit->hash_v;
+
+      ranges.emplace_back(range);
+    }
+  }
+
+  return ranges;
+}
+
+std::unordered_set<uint64_t> Router::IntersectNodes(const Range& range) const {
+  std::unordered_set<uint64_t> intersect_ids;
+
+  for (const auto& node : nodes_) {
+    auto ranges = NodeHashRanges(node.id);
+
+    for (const auto& other : ranges) {
+      if (range.start < other.end && range.end > other.start) {
+        intersect_ids.emplace(node.id);
+      }
+    }
+  }
+
+  return intersect_ids;
 }
 
 uint64_t Router::Hit(uint64_t hv) const {
@@ -163,11 +264,15 @@ uint64_t Router::Hit(uint64_t hv) const {
     return uint64_t(-1);
   }
 
-  auto it = vnodes_.lower_bound(hv);
+  auto it = std::lower_bound(vnodes_.begin(), vnodes_.end(), hv,
+                             [](const VirtualNode& vnode, uint64_t hv) -> bool {
+                               return vnode.hash_v < hv;
+                             });
+
   if (it == vnodes_.end()) {
-    return vnodes_.begin()->second.node_id;
+    return vnodes_.begin()->node_id;
   } else {
-    return it->second.node_id;
+    return it->node_id;
   }
 }
 
@@ -175,17 +280,17 @@ std::string Router::Str() const {
   std::ostringstream oss;
 
   oss << "Version:" << version_ << ", Nodes:[";
-  for (const auto& [_, v] : nodes_) {
-    oss << "id:" << v.id << ", name:" << v.name << ", vnode_list:";
-    for (auto vn : v.vnode_list) {
-      oss << vn << ", ";
+  for (const auto& node : nodes_) {
+    oss << "id:" << node.id << ", name:" << node.name << ", vnode_list:";
+    for (auto vid : node.vnode_list) {
+      oss << vid << ", ";
     }
   }
   oss << "]";
 
   oss << ", Ring:[";
-  for (const auto& [_, v] : vnodes_) {
-    oss << v.node_id << ", ";
+  for (const auto& vnode : vnodes_) {
+    oss << vnode.node_id << ", ";
   }
   oss << "]";
 

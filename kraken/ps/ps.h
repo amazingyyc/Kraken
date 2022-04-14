@@ -5,6 +5,7 @@
 #include <mutex>
 #include <shared_mutex>
 
+#include "checkpoint/checkpoint_exec.h"
 #include "common/async_task_queue.h"
 #include "common/info.h"
 #include "common/router.h"
@@ -13,10 +14,13 @@
 #include "ps/optim/optim.h"
 #include "ps/proxy.h"
 #include "ps/table.h"
+#include "ps/transfer.h"
 
 namespace kraken {
 
 class Ps {
+  friend class io::CheckpointExec;
+
 private:
   enum class EventType : uint8_t {
     kProxyFinishTransfer = 0,
@@ -28,6 +32,8 @@ private:
   std::string addr_;
   std::string s_addr_;
 
+  io::CheckpointExec checkpoint_exec_;
+
   // Protect status_/node_id_/events_/old_router_/router_/proxy_.
   std::shared_mutex mu_;
 
@@ -35,7 +41,6 @@ private:
   uint32_t status_;
   uint64_t node_id_;
 
-  Router old_router_;
   Router router_;
 
   std::unique_ptr<Proxy> proxy_;
@@ -50,7 +55,8 @@ private:
   SkipList<uint64_t, std::unique_ptr<Table>> tables_;
 
 public:
-  Ps(const std::string& addr, const std::string& s_addr);
+  Ps(const std::string& addr, const std::string& s_addr,
+     const std::string& saved_dir, size_t max_save_count);
 
   ~Ps() = default;
 
@@ -60,20 +66,34 @@ private:
       return "kInit";
     } else if (status == NodeStatus::kWork) {
       return "kWork";
+    } else if (status == NodeStatus::kLoad) {
+      return "kLoad";
     } else if (status == (NodeStatus::kWork | NodeStatus::kProxy)) {
       return "kWork&kProxy";
     } else if (status == (NodeStatus::kWork | NodeStatus::kTransfer)) {
       return "kWork&kTransfer";
+    } else if (status == (NodeStatus::kWork | NodeStatus::kSave)) {
+      return "kWork&kSave";
     } else {
       return "unKnow";
     }
   }
 
   // Clean tables_ the not belong to this node.
-  void Clean();
+  void CleanDenseTables();
+
+  void CleanSparseTables();
+
+  void CleanTables();
 
   // Transfer data to new node.
-  void Transfer(uint64_t target_id);
+  void TransferDenseTableTo(const Transfer& transfer, uint64_t target_id);
+
+  void TransferSparseMetaDataTo(const Transfer& transfer, uint64_t target_id);
+
+  void TransferSparseValuesTo(const Transfer& transfer, uint64_t target_id);
+
+  void TransferTo(uint64_t target_id);
 
   // Call this function must make sure the status is kWorker | kProxy.
   void TryFetchDenseTableFromProxy(uint64_t table_id);
@@ -87,34 +107,41 @@ private:
                                      const std::vector<uint64_t>& sparse_ids);
 
 public:
+  // Start Ps server.
   void Start();
 
   // Call by scheduler.
   int32_t Heartbeat(uint32_t* status);
 
-  // Call by other Ps node.
-  // Notify this PS other Ps has finish transfer data.
-  int32_t NotifyFinishTransfer(uint64_t node_id);
+  // Call by scheduler.
+  int32_t NotifySaveModel(const ModelMetaData& model_mdata);
+
+  // Call by scheduler.
+  int32_t NotifyLoadModel(const std::string& load_dir);
 
   // Call by scheduler.
   // Notify this Node that there is a new Node joined.
   int32_t NotifyNodeJoin(uint64_t joined_id, const Router& old_router,
                          const Router& new_router);
 
-  // Call by other Scheduler.
+  // Call by Scheduler.
   int32_t CreateModel(
       std::string name, OptimType optim_type,
       const std::unordered_map<std::string, std::string>& optim_conf);
 
-  // Call by other Scheduler.
+  // Call by Scheduler.
   int32_t CreateDenseTable(uint64_t table_id, std::string name,
                            const Tensor& val);
 
-  // Call by other Scheduler.
+  // Call by Scheduler.
   int32_t CreateSparseTable(
       uint64_t table_id, std::string name, int64_t dimension,
       ElementType element_type, InitializerType init_type,
       const std::unordered_map<std::string, std::string>& init_conf);
+
+  // Call by other Ps node.
+  // Notify this PS other Ps has finish transfer data.
+  int32_t NotifyFinishTransfer(uint64_t from_node_id);
 
   // Call by other Ps node.
   // Another node transfer DenseTable to this node.

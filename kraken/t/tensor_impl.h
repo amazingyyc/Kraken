@@ -49,20 +49,19 @@ public:
 public:
   // Create a Dense TensorImpl.
   static std::shared_ptr<TensorImpl> Dense(const Shape& shape,
-                                           ElementType etype);
+                                           ElementType element_type);
 
   static std::shared_ptr<TensorImpl> Dense(const Shape& shape,
                                            std::shared_ptr<Storage> storage,
-                                           size_t offset, ElementType etype);
+                                           size_t offset,
+                                           ElementType element_type);
 
-  static std::shared_ptr<TensorImpl> Empty(ElementType etype);
+  static std::shared_ptr<TensorImpl> Empty(const Shape& shape,
+                                           ElementType element_type);
 
   static std::shared_ptr<TensorImpl> Coo(std::shared_ptr<TensorImpl> indices,
                                          std::shared_ptr<TensorImpl> values,
                                          const Shape& shape);
-
-  static std::shared_ptr<TensorImpl> EmptyCoo(ElementType value_etype,
-                                              const Shape& shape);
 
 public:
   Layout layout() const;

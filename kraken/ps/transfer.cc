@@ -12,17 +12,18 @@ Transfer::Transfer(uint64_t target_id, const std::string& target_addr,
                    CompressType compress_type, uint32_t try_num)
     : target_id_(target_id),
       target_addr_(target_addr),
-      connecter_(target_addr, compress_type),
+      connecter_(new IndepConnecter(target_addr, compress_type)),
       try_num_(try_num) {
-  connecter_.Start();
+  connecter_->Start();
 }
 
 Transfer::~Transfer() {
-  connecter_.Stop();
+  connecter_->Stop();
 }
 
 int32_t Transfer::TransferDenseTable(uint64_t from_node_id, uint64_t table_id,
-                                     const std::string& name, Value& val) {
+                                     const std::string& name,
+                                     Value& val) const {
   uint32_t try_n = try_num_;
 
   TransferDenseTableRequest req;
@@ -36,7 +37,7 @@ int32_t Transfer::TransferDenseTable(uint64_t from_node_id, uint64_t table_id,
   int32_t error_code = ErrorCode::kSuccess;
   while (try_n-- > 0) {
     error_code =
-        connecter_.Call(RPCFuncType::kTransferDenseTableType, req, &reply);
+        connecter_->Call(RPCFuncType::kTransferDenseTableType, req, &reply);
 
     if (error_code == ErrorCode::kSuccess) {
       return ErrorCode::kSuccess;
@@ -49,7 +50,7 @@ int32_t Transfer::TransferDenseTable(uint64_t from_node_id, uint64_t table_id,
 int32_t Transfer::TransferSparseMetaData(
     uint64_t from_node_id, uint64_t table_id, std::string name,
     int64_t dimension, ElementType element_type, InitializerType init_type,
-    const std::unordered_map<std::string, std::string>& init_conf) {
+    const std::unordered_map<std::string, std::string>& init_conf) const {
   uint32_t try_n = try_num_;
 
   TransferSparseMetaDataRequest req;
@@ -66,7 +67,7 @@ int32_t Transfer::TransferSparseMetaData(
   int32_t error_code = ErrorCode::kSuccess;
   while (try_n-- > 0) {
     error_code =
-        connecter_.Call(RPCFuncType::kTransferSparseMetaDataType, req, &reply);
+        connecter_->Call(RPCFuncType::kTransferSparseMetaDataType, req, &reply);
 
     if (error_code == ErrorCode::kSuccess) {
       return ErrorCode::kSuccess;
@@ -78,7 +79,7 @@ int32_t Transfer::TransferSparseMetaData(
 
 int32_t Transfer::TransferSparseValues(uint64_t from_node_id, uint64_t table_id,
                                        const std::vector<uint64_t>& sparse_ids,
-                                       const std::vector<Value>& vals) {
+                                       const std::vector<Value>& vals) const {
   if (sparse_ids.empty()) {
     return ErrorCode::kSuccess;
   }
@@ -95,7 +96,7 @@ int32_t Transfer::TransferSparseValues(uint64_t from_node_id, uint64_t table_id,
   int32_t error_code = ErrorCode::kSuccess;
   while (try_n-- > 0) {
     error_code =
-        connecter_.Call(RPCFuncType::kTransferSparseValuesType, req, &reply);
+        connecter_->Call(RPCFuncType::kTransferSparseValuesType, req, &reply);
 
     if (error_code == ErrorCode::kSuccess) {
       return ErrorCode::kSuccess;
@@ -105,7 +106,7 @@ int32_t Transfer::TransferSparseValues(uint64_t from_node_id, uint64_t table_id,
   return error_code;
 }
 
-int32_t Transfer::NotifyFinishTransfer(uint64_t from_node_id) {
+int32_t Transfer::NotifyFinishTransfer(uint64_t from_node_id) const {
   uint32_t try_n = try_num_;
 
   NotifyFinishTransferRequest req;
@@ -116,7 +117,7 @@ int32_t Transfer::NotifyFinishTransfer(uint64_t from_node_id) {
 
   while (try_n-- > 0) {
     error_code =
-        connecter_.Call(RPCFuncType::kNotifyFinishTransferType, req, &reply);
+        connecter_->Call(RPCFuncType::kNotifyFinishTransferType, req, &reply);
 
     if (error_code == ErrorCode::kSuccess) {
       return ErrorCode::kSuccess;

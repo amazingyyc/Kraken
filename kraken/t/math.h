@@ -68,7 +68,7 @@ void Take(const TensorImpl& x, const TensorImpl& indices, TensorImpl& y);
 std::shared_ptr<TensorImpl> FlatNonZero(const TensorImpl& x, float th);
 
 // Get nonzero index from x
-// suppose nonzero count is nnz. Than the return shape NDims is 2: [nnz,
+// suppose nonzero count is nnz. Than the return shape is: [nnz,
 // x.Ndims()]
 std::shared_ptr<TensorImpl> NonZero(const TensorImpl& x, float th);
 
@@ -79,7 +79,7 @@ void Transpose(const TensorImpl& x, TensorImpl& y, int64_t d0, int64_t d1);
 void CooToDense(const TensorImpl& indices, const TensorImpl& values,
                 TensorImpl& dense);
 
-// it the Abs(v) <= th than keep it. 
+// it the Abs(v) <= th than keep it.
 void LtKeep(const TensorImpl& x, float th, TensorImpl& y);
 
 void Cast(const TensorImpl& x, TensorImpl& y);

@@ -834,7 +834,7 @@ std::shared_ptr<TensorImpl> FlatNonZeroImpl(T* x, int64_t n, T th) {
   }
 
   if (num <= 0) {
-    return TensorImpl::Empty(ElementType::From<int64_t>());
+    return TensorImpl::Empty(Shape({0}), ElementType::From<int64_t>());
   }
 
   auto storage = Storage::Create(sizeof(int64_t) * num);
@@ -855,7 +855,7 @@ std::shared_ptr<TensorImpl> FlatNonZero(const TensorImpl& x, float th) {
   ARGUMENT_CHECK(x.IsDense(), "FlatNonZero need TensorImpl is Dense.");
 
   if (x.IsEmpty()) {
-    return TensorImpl::Empty(ElementType::From<int64_t>());
+    return TensorImpl::Empty(Shape({0}), ElementType::From<int64_t>());
   }
 
   if (x.element_type().Is<float>()) {
@@ -904,12 +904,14 @@ std::shared_ptr<TensorImpl> NonZero(const TensorImpl& x, float th) {
   ARGUMENT_CHECK(x.IsDense(), "NonZero need TensorImpl is Dense.");
 
   if (x.IsEmpty()) {
-    return TensorImpl::Empty(ElementType::From<int64_t>());
+    return TensorImpl::Empty(Shape({0, x.shape().NDims()}),
+                             ElementType::From<int64_t>());
   }
 
   std::shared_ptr<TensorImpl> f_indices = FlatNonZero(x, th);
   if (f_indices->IsEmpty()) {
-    return f_indices;
+    return TensorImpl::Empty(Shape({0, x.shape().NDims()}),
+                             ElementType::From<int64_t>());
   }
 
   int64_t nnz = f_indices->Size();

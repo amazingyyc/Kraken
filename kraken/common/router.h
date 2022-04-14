@@ -5,14 +5,17 @@
 #include <map>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace kraken {
 
 class Deserialize;
+class Serialize;
 
 class Router {
   friend class Deserialize;
+  friend class Serialize;
 
 private:
   // How many virtual node for every real node.
@@ -20,6 +23,12 @@ private:
   static const std::string kVirtualNodeSep;
 
 public:
+  // A range left open right close: (start, end].
+  struct Range {
+    uint64_t start;
+    uint64_t end;
+  };
+
   struct Node {
     uint64_t id;
     std::string name;
@@ -41,14 +50,22 @@ public:
 private:
   uint64_t version_;
 
-  // <id, Node> map.
-  std::map<uint64_t, Node> nodes_;
+  // Sort by id.
+  std::vector<Node> nodes_;
 
   // sort by hash hash_v.
-  std::map<uint64_t, VirtualNode> vnodes_;
+  std::vector<VirtualNode> vnodes_;
 
 public:
   Router();
+
+private:
+  bool ContainVirtualNode(uint64_t hash_v) const;
+
+  std::vector<Node>::const_iterator BinaryFindNode(uint64_t id) const;
+
+  std::vector<VirtualNode>::const_iterator BinaryFindVirtualNode(
+      uint64_t hash_v) const;
 
 public:
   bool operator==(const Router& other) const;
@@ -57,11 +74,13 @@ public:
 
   uint64_t version() const;
 
-  const std::map<uint64_t, Node>& nodes() const;
+  const std::vector<Node>& nodes() const;
 
-  const std::map<uint64_t, VirtualNode>& vnodes() const;
+  const std::vector<VirtualNode>& vnodes() const;
 
-  bool node(uint64_t id, Router::Node* node) const;
+  const Node& node(uint64_t id) const;
+
+  const VirtualNode& virtual_node(uint64_t hash_v) const;
 
   bool Add(uint64_t id, const std::string& name);
 
@@ -72,6 +91,10 @@ public:
   bool Contains(uint64_t id) const;
 
   std::vector<uint64_t> VirtualHashs(uint64_t id) const;
+
+  std::vector<Range> NodeHashRanges(uint64_t id) const;
+
+  std::unordered_set<uint64_t> IntersectNodes(const Range& range) const;
 
   uint64_t Hit(uint64_t hv) const;
 

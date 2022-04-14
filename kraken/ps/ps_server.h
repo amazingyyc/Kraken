@@ -7,7 +7,9 @@
 #include "protocol/create_sparse_table_prot.h"
 #include "protocol/heartbeat_prot.h"
 #include "protocol/notify_finish_transfer_prot.h"
+#include "protocol/notify_load_model_prot.h"
 #include "protocol/notify_node_join_prot.h"
+#include "protocol/notify_save_model_prot.h"
 #include "protocol/pull_dense_table_prot.h"
 #include "protocol/pull_sparse_table_prot.h"
 #include "protocol/push_dense_table_prot.h"
@@ -31,13 +33,17 @@ private:
 
 public:
   PsServer(uint32_t port, uint32_t thread_nums, const std::string& addr,
-           const std::string& s_addr);
+           const std::string& s_addr, const std::string& saved_dir,
+           size_t max_save_count);
 
 private:
   int32_t Heartbeat(const HeartbeatRequest& req, HeartbeatResponse* rsp);
 
-  int32_t NotifyFinishTransfer(const NotifyFinishTransferRequest& req,
-                               NotifyFinishTransferResponse* rsp);
+  int32_t NotifySaveModel(const NotifySaveModelRequest& req,
+                          NotifySaveModelResponse* rsp);
+
+  int32_t NotifyLoadModel(const NotifyLoadModelRequest& req,
+                          NotifyLoadModelResponse* rsp);
 
   int32_t NotifyNodeJoin(const NotifyNodeJoinRequest& req,
                          NotifyNodeJoinResponse* rsp);
@@ -49,6 +55,9 @@ private:
 
   int32_t CreateSparseTable(const CreateSparseTableRequest& req,
                             CreateSparseTableResponse* rsp);
+
+  int32_t NotifyFinishTransfer(const NotifyFinishTransferRequest& req,
+                               NotifyFinishTransferResponse* rsp);
 
   int32_t TransferDenseTable(const TransferDenseTableRequest& req,
                              TransferDenseTableResponse* rsp);

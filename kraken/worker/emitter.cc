@@ -9,6 +9,7 @@
 #include "protocol/combine_push_sparse_table_prot.h"
 #include "protocol/fetch_router_prot.h"
 #include "protocol/init_model_prot.h"
+#include "protocol/is_all_ps_working_prot.h"
 #include "protocol/pull_dense_table_prot.h"
 #include "protocol/pull_sparse_table_prot.h"
 #include "protocol/push_dense_table_prot.h"
@@ -16,6 +17,8 @@
 #include "protocol/register_dense_table_prot.h"
 #include "protocol/register_sparse_table_prot.h"
 #include "protocol/rpc_func_type.h"
+#include "protocol/try_load_model_prot.h"
+#include "protocol/try_save_model_prot.h"
 
 namespace kraken {
 
@@ -43,14 +46,14 @@ void Emitter::UpdataRouter() {
   router_ = reply.router;
 
   // Remove old node id.
-  for (const auto& [_, v] : old_router.nodes()) {
-    if (router_.nodes().find(v.id) == router_.nodes().end()) {
-      clients_.Remove(v.id);
+  for (const auto& node : old_router.nodes()) {
+    if (router_.Contains(node.id) == false) {
+      clients_.Remove(node.id);
     }
   }
 
-  for (const auto& [_, v] : router_.nodes()) {
-    clients_.Add(v.id, v.name);
+  for (const auto& node : router_.nodes()) {
+    clients_.Add(node.id, node.name);
   }
 
   LOG_INFO("Update router success.");
@@ -292,8 +295,8 @@ void Emitter::Initialize(const std::string& s_addr) {
 
   LOG_INFO("Fetch router:" << router_.Str());
 
-  for (const auto& [_, v] : router_.nodes()) {
-    clients_.Add(v.id, v.name);
+  for (const auto& node : router_.nodes()) {
+    clients_.Add(node.id, node.name);
   }
 
   // set flag.
@@ -302,6 +305,8 @@ void Emitter::Initialize(const std::string& s_addr) {
 
 void Emitter::Stop() {
   ARGUMENT_CHECK(initialized_, "Emitter not initialize.");
+
+  clients_.RemoveAll();
 
   s_connecter_->Stop();
   s_connecter_.reset(nullptr);
@@ -624,6 +629,57 @@ void Emitter::CombinePushSparseTable(const std::vector<uint64_t>& table_ids,
   clients_
       .CallAsync<CombinePushSparseTableRequest, CombinePushSparseTableResponse>(
           RPCFuncType::kCombinePushSparseTableType, reqs, callback);
+}
+
+bool Emitter::TrySaveModel() {
+  TrySaveModelRequest req;
+  TrySaveModelResponse reply;
+
+  auto error_code =
+      s_connecter_->Call(RPCFuncType::kTrySaveModelType, req, &reply);
+
+  if (error_code != ErrorCode::kSuccess) {
+    LOG_ERROR("Try save model get error:" << ErrorCode::Msg(error_code));
+    return false;
+  }
+
+  return reply.success;
+}
+
+bool Emitter::TryLoadModelBlocked(const std::string& load_dir) {
+  TryLoadModelRequest req;
+  req.load_dir = load_dir;
+  TryLoadModelResponse reply;
+
+  auto error_code =
+      s_connecter_->Call(RPCFuncType::kTryLoadModelType, req, &reply);
+
+  if (error_code != ErrorCode::kSuccess) {
+    LOG_ERROR("Try load model get error:" << ErrorCode::Msg(error_code));
+    return false;
+  }
+
+  if (reply.success == false) {
+    return false;
+  }
+
+  // Notify Ps load model success. will wait Ps finish load.
+  int64_t sleep_s = 5;
+  do {
+    IsAllPsWorkingRequest req;
+    IsAllPsWorkingResponse reply;
+
+    auto error_code =
+        s_connecter_->Call(RPCFuncType::kIsAllPsWorkingType, req, &reply);
+
+    if (error_code != ErrorCode::kSuccess || reply.yes == false) {
+      LOG_INFO("Some Ps still loading model, need wait:" << sleep_s << "s.");
+      std::this_thread::sleep_for(std::chrono::seconds(sleep_s));
+      sleep_s += sleep_s / 2;
+    } else {
+      return true;
+    }
+  } while (true);
 }
 
 }  // namespace kraken

@@ -91,25 +91,26 @@ std::string Tensor::Str() const {
   return ss.str();
 }
 
-Tensor Tensor::Dense(const std::vector<int64_t>& dims, ElementType etype) {
+Tensor Tensor::Dense(const std::vector<int64_t>& dims,
+                     ElementType element_type) {
   Shape shape(dims);
 
-  return Dense(shape, etype);
+  return Dense(shape, element_type);
 }
 
-Tensor Tensor::Dense(const Shape& shape, ElementType etype) {
-  auto impl = TensorImpl::Dense(shape, etype);
+Tensor Tensor::Dense(const Shape& shape, ElementType element_type) {
+  auto impl = TensorImpl::Dense(shape, element_type);
   return Tensor(impl);
 }
 
 Tensor Tensor::Dense(const Shape& shape, std::shared_ptr<Storage> storage,
-                     size_t offset, ElementType etype) {
-  auto impl = TensorImpl::Dense(shape, storage, offset, etype);
+                     size_t offset, ElementType element_type) {
+  auto impl = TensorImpl::Dense(shape, storage, offset, element_type);
   return Tensor(impl);
 }
 
-Tensor Tensor::Empty(ElementType etype) {
-  return Tensor(TensorImpl::Empty(etype));
+Tensor Tensor::Empty(const Shape& shape, ElementType element_type) {
+  return Tensor(TensorImpl::Empty(shape, element_type));
 }
 
 Tensor Tensor::operator+(const Tensor& other) const {

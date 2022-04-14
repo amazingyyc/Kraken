@@ -12,9 +12,6 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# SIMD
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
-
 # try to find openmp
 find_package(OpenMP)
 
@@ -76,20 +73,20 @@ file(GLOB_RECURSE KRAKEN_PYTORCH_HEAD_FILES "kraken/pytorch/*.h")
 file(GLOB_RECURSE KRAKEN_PYTORCH_SRC_FILES "kraken/pytorch/*.cc")
 
 # watcher file
-file(GLOB_RECURSE KRAKEN_WATCHER_HEAD_FILES "kraken/watch/*.h")
-file(GLOB_RECURSE KRAKEN_WATCHER_SRC_FILES "kraken/watch/*.cc")
+# file(GLOB_RECURSE KRAKEN_WATCHER_HEAD_FILES "kraken/watch/*.h")
+# file(GLOB_RECURSE KRAKEN_WATCHER_SRC_FILES "kraken/watch/*.cc")
 
 # remove test/main file
 list(FILTER KRAKEN_SRC_FILES EXCLUDE REGEX ".*_test.cc")
 list(FILTER KRAKEN_SRC_FILES EXCLUDE REGEX ".*_main.cc")
 
-# remove for pytorch file
+# remove for pybind11 file
 list(REMOVE_ITEM KRAKEN_HEAD_FILES ${KRAKEN_PYTORCH_HEAD_FILES})
 list(REMOVE_ITEM KRAKEN_SRC_FILES ${KRAKEN_PYTORCH_SRC_FILES})
 
 # remove watcher file
-list(REMOVE_ITEM KRAKEN_HEAD_FILES ${KRAKEN_WATCHER_HEAD_FILES})
-list(REMOVE_ITEM KRAKEN_SRC_FILES ${KRAKEN_WATCHER_SRC_FILES})
+# list(REMOVE_ITEM KRAKEN_HEAD_FILES ${KRAKEN_WATCHER_HEAD_FILES})
+# list(REMOVE_ITEM KRAKEN_SRC_FILES ${KRAKEN_WATCHER_SRC_FILES})
 
 # test file
 file(GLOB_RECURSE KRAKEN_TEST_HEAD_FILES "kraken/test/*.h")
@@ -100,9 +97,6 @@ list(FILTER KRAKEN_TEST_SRC_FILES EXCLUDE REGEX ".*_main.cc")
 # ##############################################################################
 # include third_party cmake
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
-
-# setup eigen build
-add_definitions(-DEIGEN_USE_THREADS -DEIGEN_FAST_MATH -DEIGEN_NO_CUDA)
 
 include(eigen)
 include(pybind11)
@@ -144,8 +138,9 @@ message(STATUS "KRAKEN_PYTORCH_SRC_FILES:${KRAKEN_PYTORCH_SRC_FILES}")
 # ##############################################################################
 # kraken_native
 add_library(
-  kraken_native SHARED ${KRAKEN_HEAD_FILES} ${KRAKEN_SRC_FILES}
-                       ${KRAKEN_PYTORCH_HEAD_FILES} ${KRAKEN_PYTORCH_SRC_FILES})
+  kraken_native SHARED
+  ${KRAKEN_HEAD_FILES} ${KRAKEN_SRC_FILES} ${KRAKEN_PYTORCH_HEAD_FILES}
+  ${KRAKEN_PYTORCH_SRC_FILES})
 
 # remove lib prefix for kraken_native
 set_target_properties(kraken_native PROPERTIES PREFIX "")
@@ -175,12 +170,13 @@ target_link_libraries(
 # ps_server executable
 add_executable(ps_server kraken/executable/ps_server_main.cc
                          ${KRAKEN_HEAD_FILES} ${KRAKEN_SRC_FILES})
-target_link_libraries(ps_server stdc++fs libzmq-static snappy libcuckoo gflags)
+target_link_libraries(ps_server stdc++fs libzmq-static snappy libcuckoo
+                      gflags)
 
 # ##############################################################################
 # ps_server executable
 add_executable(scheduler_server kraken/executable/scheduler_server_main.cc
-                                ${KRAKEN_HEAD_FILES} ${KRAKEN_SRC_FILES})
+                         ${KRAKEN_HEAD_FILES} ${KRAKEN_SRC_FILES})
 target_link_libraries(scheduler_server stdc++fs libzmq-static snappy libcuckoo
                       gflags)
 

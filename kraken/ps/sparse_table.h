@@ -39,7 +39,7 @@ public:
 
   Initializer* initializer() const;
 
-  ParallelSkipList<uint64_t, Value>* vals();
+  ParallelSkipList<uint64_t, Value>* mutable_vals();
 
   int32_t Pull(const std::vector<uint64_t>& sparse_ids,
                std::vector<Tensor>* vals) override;

@@ -17,45 +17,16 @@ private:
       connecters_;
 
 public:
-  GroupConnecters(CompressType compress_type) : compress_type_(compress_type) {
-  }
+  GroupConnecters(CompressType compress_type);
 
-  ~GroupConnecters() {
-    for (auto& [_, conn] : connecters_) {
-      conn->Stop();
-    }
-
-    connecters_.clear();
-  }
+  ~GroupConnecters() = default;
 
 public:
-  void Add(uint64_t node_id, const std::string& addr) {
-    auto it = connecters_.find(node_id);
-    if (it != connecters_.end()) {
-      if (it->second->addr() == addr) {
-        return;
-      }
+  void Add(uint64_t node_id, const std::string& addr);
 
-      it->second->Stop();
-      connecters_.erase(it);
-    }
+  void Remove(uint64_t node_id);
 
-    std::unique_ptr<IndepConnecter> conn(
-        new IndepConnecter(addr, compress_type_));
-    conn->Start();
-
-    connecters_.emplace(node_id, std::move(conn));
-
-    return;
-  }
-
-  void Remove(uint64_t node_id) {
-    auto it = connecters_.find(node_id);
-    if (it != connecters_.end()) {
-      it->second->Stop();
-      connecters_.erase(it);
-    }
-  }
+  void RemoveAll();
 
   // The caller must make sure the node_id is Added.
   template <typename ReqType, typename ReplyType>

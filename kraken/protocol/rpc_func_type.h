@@ -31,6 +31,11 @@ struct RPCFuncType {
   static constexpr uint32_t kCombinePullSparseTableType = 23;
   static constexpr uint32_t kPushSparseTableType = 24;
   static constexpr uint32_t kCombinePushSparseTableType = 25;
+  static constexpr uint32_t kTrySaveModelType = 26;
+  static constexpr uint32_t kTryLoadModelType = 27;
+  static constexpr uint32_t kNotifySaveModelType = 28;
+  static constexpr uint32_t kNotifyLoadModelType = 29;
+  static constexpr uint32_t kIsAllPsWorkingType = 30;
 };
 
 }  // namespace kraken

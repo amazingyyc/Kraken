@@ -47,5 +47,9 @@ void CombinePushSparseTable(const std::vector<uint64_t>& table_ids,
                             const std::vector<torch::Tensor>& indices,
                             const std::vector<torch::Tensor>& grads);
 
+bool TrySaveModel();
+
+bool TryLoadModelBlocked(const std::string& load_dir);
+
 }  // namespace py
 }  // namespace kraken

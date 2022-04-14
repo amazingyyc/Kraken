@@ -11,12 +11,8 @@ SchedulerServer::SchedulerServer(uint32_t port) : station_(port), scheduler_() {
 int32_t SchedulerServer::TryJoin(const TryJoinRequest& req,
                                  TryJoinResponse* rsp) {
   return scheduler_.TryJoin(req.addr, &(rsp->allow), &(rsp->node_id),
-                            &(rsp->old_router), &(rsp->new_router));
-}
-
-int32_t SchedulerServer::FetchModelMetaData(
-    const FetchModelMetaDataRequest& req, FetchModelMetaDataResponse* rsp) {
-  return scheduler_.FetchModelMetaData(&(rsp->model_init), &(rsp->model_mdata));
+                            &(rsp->old_router), &(rsp->new_router),
+                            &(rsp->model_init), &(rsp->model_mdata));
 }
 
 int32_t SchedulerServer::FetchRouter(const FetchRouterRequest& req,
@@ -41,6 +37,21 @@ int32_t SchedulerServer::RegisterSparseTable(
                                         req.init_conf, &(rsp->table_id));
 }
 
+int32_t SchedulerServer::TrySaveModel(const TrySaveModelRequest& req,
+                                      TrySaveModelResponse* rsp) {
+  return scheduler_.TrySaveModel(&(rsp->success));
+}
+
+int32_t SchedulerServer::TryLoadModel(const TryLoadModelRequest& req,
+                                      TryLoadModelResponse* rsp) {
+  return scheduler_.TryLoadModel(req.load_dir, &(rsp->success));
+}
+
+int32_t SchedulerServer::IsAllPsWorking(const IsAllPsWorkingRequest& req,
+                                        IsAllPsWorkingResponse* rsp) {
+  return scheduler_.IsAllPsWorking(&(rsp->yes));
+}
+
 void SchedulerServer::RegisterFuncs() {
   using namespace std::placeholders;
 
@@ -50,11 +61,13 @@ void SchedulerServer::RegisterFuncs() {
       std::bind(&SchedulerServer::FUNC, this, _1, _2));
 
   REGISTER_FUNC(TryJoin, TryJoin);
-  REGISTER_FUNC(FetchModelMetaData, FetchModelMetaData);
   REGISTER_FUNC(FetchRouter, FetchRouter);
   REGISTER_FUNC(InitModel, InitModel);
   REGISTER_FUNC(RegisterDenseTable, RegisterDenseTable);
   REGISTER_FUNC(RegisterSparseTable, RegisterSparseTable);
+  REGISTER_FUNC(TrySaveModel, TrySaveModel);
+  REGISTER_FUNC(TryLoadModel, TryLoadModel);
+  REGISTER_FUNC(IsAllPsWorking, IsAllPsWorking);
 }
 
 void SchedulerServer::Start() {

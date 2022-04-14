@@ -1,6 +1,4 @@
-#include "io/file_writer.h"
-
-#include "common/exception.h"
+#include "checkpoint/file_writer.h"
 
 namespace kraken {
 namespace io {

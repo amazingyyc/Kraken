@@ -67,7 +67,7 @@ uint64_t RegisterSparseTable(
 torch::Tensor PullDenseTable(uint64_t table_id) {
   Tensor k_val = worker.PullDenseTable(table_id);
 
-  torch::IntArrayRef sizes = ShapeToTorchSizes(k_val.shape());
+  torch::IntArrayRef sizes(k_val.shape().dims());
   torch::Dtype dtype = ElementTypeToTorchDType(k_val.element_type());
 
   torch::Tensor val = torch::zeros(sizes, dtype);
@@ -84,7 +84,8 @@ std::vector<torch::Tensor> CombinePullDenseTable(
   std::vector<torch::Tensor> vals;
 
   for (auto& kv : k_vals) {
-    torch::IntArrayRef sizes = ShapeToTorchSizes(kv.shape());
+    // torch::IntArrayRef sizes = ShapeToTorchSizes(kv.shape());
+    torch::IntArrayRef sizes(kv.shape().dims());
     torch::Dtype dtype = ElementTypeToTorchDType(kv.element_type());
 
     torch::Tensor v = torch::zeros(sizes, dtype);
@@ -125,7 +126,8 @@ torch::Tensor PullSparseTable(uint64_t table_id, torch::Tensor indices) {
   // The sparse embedding.
   Tensor k_val = worker.PullSparseTable(table_id, k_indices);
 
-  torch::IntArrayRef sizes = ShapeToTorchSizes(k_val.shape());
+  // torch::IntArrayRef sizes = ShapeToTorchSizes(k_val.shape());
+  torch::IntArrayRef sizes(k_val.shape().dims());
   torch::Dtype dtype = ElementTypeToTorchDType(k_val.element_type());
   torch::Tensor val = torch::zeros(sizes, dtype);
 
@@ -167,7 +169,8 @@ std::vector<torch::Tensor> CombinePullSparseTable(
   std::vector<torch::Tensor> vals;
 
   for (size_t i = 0; i < k_vals.size(); ++i) {
-    torch::IntArrayRef sizes = ShapeToTorchSizes(k_vals[i].shape());
+    // torch::IntArrayRef sizes = ShapeToTorchSizes(k_vals[i].shape());
+    torch::IntArrayRef sizes(k_vals[i].shape().dims());
     torch::Dtype dtype = ElementTypeToTorchDType(k_vals[i].element_type());
     torch::Tensor val = torch::zeros(sizes, dtype);
 
@@ -243,6 +246,14 @@ void CombinePushSparseTable(const std::vector<uint64_t>& table_ids,
   }
 
   worker.CombinePushSparseTable(table_ids, k_indices, k_grads);
+}
+
+bool TrySaveModel() {
+  return worker.TrySaveModel();
+}
+
+bool TryLoadModelBlocked(const std::string& load_dir) {
+  return worker.TryLoadModelBlocked(load_dir);
 }
 
 }  // namespace py
